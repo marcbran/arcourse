@@ -19,7 +19,7 @@ func NewFacade() (pkg.Facade, error) {
 	if err != nil {
 		return nil, err
 	}
-	evaluator := jsonnetinfra.NewEvaluator()
+	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib)
 	return arcourse.NewFacade(cfg, evaluator), nil
 }
 

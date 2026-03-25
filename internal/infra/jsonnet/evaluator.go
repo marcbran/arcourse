@@ -1,24 +1,30 @@
 package jsonnet
 
 import (
-	"fmt"
-	"path/filepath"
+	"bytes"
+	"io/fs"
 
-	gojsonnet "github.com/google/go-jsonnet"
+	"github.com/marcbran/jpoet/pkg/jpoet"
 )
 
-type Evaluator struct{}
-
-func NewEvaluator() *Evaluator {
-	return &Evaluator{}
+type Evaluator struct {
+	lib fs.FS
 }
 
-func (e *Evaluator) Evaluate(root string, expression string) (string, error) {
-	vm := gojsonnet.MakeVM()
-	snippet := fmt.Sprintf("local root = import %q;\n%s", filepath.ToSlash(root), expression)
-	out, err := vm.EvaluateAnonymousSnippet("arcourse.jsonnet", snippet)
+func NewEvaluator(lib fs.FS) *Evaluator {
+	return &Evaluator{lib: lib}
+}
+
+func (e *Evaluator) EvaluateSnippet(snippet string) (string, error) {
+	var out bytes.Buffer
+	err := jpoet.NewEval().
+		FileImport([]string{"/"}).
+		FSImport(e.lib).
+		SnippetInput("arcourse.jsonnet", snippet).
+		WriterOutput(&out).
+		Eval()
 	if err != nil {
 		return "", err
 	}
-	return out, nil
+	return out.String(), nil
 }

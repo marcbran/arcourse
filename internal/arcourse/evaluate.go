@@ -1,9 +1,14 @@
 package arcourse
 
-import pkg "github.com/marcbran/arcourse/pkg/arcourse"
+import (
+	"fmt"
+	"path/filepath"
+
+	pkg "github.com/marcbran/arcourse/pkg/arcourse"
+)
 
 type Evaluator interface {
-	Evaluate(root string, expression string) (string, error)
+	EvaluateSnippet(snippet string) (string, error)
 }
 
 type EvaluateConfig struct {
@@ -26,7 +31,12 @@ func (uc *Evaluate) Exec(expression string) (pkg.Result, error) {
 	if uc.cfg.Root == "" {
 		return pkg.Result{}, pkg.ErrRootConfigNotConfigured
 	}
-	out, err := uc.evaluator.Evaluate(uc.cfg.Root, expression)
+	snippet := fmt.Sprintf(
+		"local truncateNode = import 'lib/truncate_node.libsonnet';\nlocal root = import %q;\ntruncateNode(%s)",
+		filepath.ToSlash(uc.cfg.Root),
+		expression,
+	)
+	out, err := uc.evaluator.EvaluateSnippet(snippet)
 	if err != nil {
 		return pkg.Result{}, err
 	}
