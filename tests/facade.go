@@ -24,6 +24,10 @@ func NewCLIFacade() (*CLIFacade, error) {
 	if binaryPath == "" {
 		return nil, fmt.Errorf("ARCO_BINARY is required")
 	}
+	return NewCLIFacadeWithPath(binaryPath)
+}
+
+func NewCLIFacadeWithPath(binaryPath string) (*CLIFacade, error) {
 	_, err := os.Stat(binaryPath)
 	if err != nil {
 		return nil, fmt.Errorf("unable to access ARCO_BINARY %q: %w", binaryPath, err)

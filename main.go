@@ -1,7 +1,7 @@
 package main
 
-import "github.com/marcbran/arcourse/cmd"
+import "github.com/marcbran/arcourse/pkg/arco"
 
 func main() {
-	cmd.Execute()
+	arco.Execute()
 }

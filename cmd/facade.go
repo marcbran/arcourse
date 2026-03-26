@@ -11,15 +11,16 @@ import (
 	"github.com/marcbran/arcourse/internal/arcourse"
 	jsonnetinfra "github.com/marcbran/arcourse/internal/infra/jsonnet"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
+	"github.com/marcbran/jpoet/pkg/jpoet"
 	"sigs.k8s.io/yaml"
 )
 
-func NewFacade() (pkg.Facade, error) {
+func NewFacade(plugins []*jpoet.Plugin) (pkg.Facade, error) {
 	cfg, err := loadConfig()
 	if err != nil {
 		return nil, err
 	}
-	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib)
+	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib, plugins)
 	return arcourse.NewFacade(cfg, evaluator), nil
 }
 
