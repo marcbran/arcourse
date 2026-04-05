@@ -9,17 +9,18 @@ import (
 
 type Evaluator struct {
 	lib     fs.FS
+	jpaths  []string
 	plugins []*jpoet.Plugin
 }
 
-func NewEvaluator(lib fs.FS, plugins []*jpoet.Plugin) *Evaluator {
-	return &Evaluator{lib: lib, plugins: plugins}
+func NewEvaluator(lib fs.FS, jpaths []string, plugins []*jpoet.Plugin) *Evaluator {
+	return &Evaluator{lib: lib, jpaths: jpaths, plugins: plugins}
 }
 
 func (e *Evaluator) EvaluateSnippet(snippet string) (string, error) {
 	var out bytes.Buffer
 	eval := jpoet.NewEval().
-		FileImport([]string{"/"}).
+		FileImport(e.jpaths).
 		FSImport(e.lib).
 		SnippetInput("arcourse.jsonnet", snippet).
 		WriterOutput(&out)

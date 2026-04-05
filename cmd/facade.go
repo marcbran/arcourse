@@ -20,7 +20,8 @@ func NewFacade(plugins []*jpoet.Plugin) (pkg.Facade, error) {
 	if err != nil {
 		return nil, err
 	}
-	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib, plugins)
+	jpaths := []string{filepath.Join(filepath.Dir(cfg.Evaluate.Root), "vendor")}
+	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib, jpaths, plugins)
 	return arcourse.NewFacade(cfg, evaluator), nil
 }
 
