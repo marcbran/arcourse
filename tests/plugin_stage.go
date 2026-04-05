@@ -17,7 +17,7 @@ func plugin_scenario(t *testing.T) (*Stage, *Stage, *Stage) {
 	tempDir := t.TempDir()
 	binaryPath, err := buildPluginBinary(tempDir)
 	require.NoError(t, err)
-	facade, err := NewCLIFacadeWithPath(binaryPath)
+	facade, err := NewCLIFacadeWithPath(binaryPath, tempDir)
 	require.NoError(t, err)
 	s := &Stage{
 		t:       t,
