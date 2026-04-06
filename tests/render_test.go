@@ -33,6 +33,12 @@ func TestRenderPathAsHTML(t *testing.T) {
 			path:     []string{"root", "a", "b"},
 			expected: `<div>deep</div>`,
 		},
+		{
+			name:     "path segment with hyphen",
+			graph:    `{ "my-node": { _view:: { html: "<p>hyphen</p>" } } }`,
+			path:     []string{"root", "my-node"},
+			expected: `<p>hyphen</p>`,
+		},
 	}
 
 	for _, tc := range cases {

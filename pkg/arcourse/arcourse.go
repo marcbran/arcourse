@@ -1,6 +1,7 @@
 package arcourse
 
 import (
+	"context"
 	"errors"
 	"fmt"
 )
@@ -29,6 +30,6 @@ type Result struct {
 }
 
 type Facade interface {
-	Evaluate(expression string) (Result, error)
-	Render(path []string, format Format) (Result, error)
+	Evaluate(ctx context.Context, expression string) (Result, error)
+	Render(ctx context.Context, path []string, format Format) (Result, error)
 }

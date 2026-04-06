@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"os"
 
-	pkg "github.com/marcbran/arcourse/pkg/arcourse"
+	"github.com/marcbran/jpoet/pkg/jpoet"
 	"github.com/spf13/cobra"
 )
 
-func newEvalCmd(facade pkg.Facade) *cobra.Command {
+func newEvalCmd(plugins []*jpoet.Plugin) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "eval [expression]",
 		Short: "Evaluate a Jsonnet expression against the configured root",
@@ -23,7 +23,13 @@ func newEvalCmd(facade pkg.Facade) *cobra.Command {
 				return err
 			}
 
-			result, err := facade.Evaluate(args[0])
+			cfg, err := loadConfig()
+			if err != nil {
+				return err
+			}
+			facade := buildFacade(cfg, plugins)
+
+			result, err := facade.Evaluate(c.Context(), args[0])
 			if err != nil {
 				return err
 			}

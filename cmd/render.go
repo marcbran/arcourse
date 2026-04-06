@@ -6,10 +6,11 @@ import (
 	"strings"
 
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
+	"github.com/marcbran/jpoet/pkg/jpoet"
 	"github.com/spf13/cobra"
 )
 
-func newRenderCmd(facade pkg.Facade) *cobra.Command {
+func newRenderCmd(plugins []*jpoet.Plugin) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "render [path]",
 		Short: "Render a path into the graph (dot-separated)",
@@ -27,8 +28,14 @@ func newRenderCmd(facade pkg.Facade) *cobra.Command {
 				return err
 			}
 
+			cfg, err := loadConfig()
+			if err != nil {
+				return err
+			}
+			facade := buildFacade(cfg, plugins)
+
 			path := strings.Split(args[0], ".")
-			result, err := facade.Render(path, format)
+			result, err := facade.Render(c.Context(), path, format)
 			if err != nil {
 				return err
 			}

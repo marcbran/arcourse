@@ -9,36 +9,38 @@ import (
 	"strings"
 
 	"github.com/marcbran/arcourse/internal/arcourse"
+	archttp "github.com/marcbran/arcourse/internal/http"
 	jsonnetinfra "github.com/marcbran/arcourse/internal/infra/jsonnet"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 	"github.com/marcbran/jpoet/pkg/jpoet"
 	"sigs.k8s.io/yaml"
 )
 
-func NewFacade(plugins []*jpoet.Plugin) (pkg.Facade, error) {
-	cfg, err := loadConfig()
-	if err != nil {
-		return nil, err
-	}
-	jpaths := []string{filepath.Join(filepath.Dir(cfg.Evaluate.Root), "vendor")}
-	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib, jpaths, plugins)
-	return arcourse.NewFacade(cfg, evaluator), nil
+type Config struct {
+	arcourse.Config
+	HTTP archttp.Config `json:"http"`
 }
 
-func loadConfig() (arcourse.Config, error) {
+func buildFacade(cfg Config, plugins []*jpoet.Plugin) pkg.Facade {
+	jpaths := []string{filepath.Join(filepath.Dir(cfg.Evaluate.Root), "vendor")}
+	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib, jpaths, plugins)
+	return arcourse.NewFacade(cfg.Config, evaluator)
+}
+
+func loadConfig() (Config, error) {
 	home, err := findHome()
 	if err != nil {
-		return arcourse.Config{}, err
+		return Config{}, err
 	}
 	cfgPath, err := findConfigFile(home)
 	if err != nil {
-		return arcourse.Config{}, err
+		return Config{}, err
 	}
 	data, err := os.ReadFile(cfgPath)
 	if err != nil {
-		return arcourse.Config{}, err
+		return Config{}, err
 	}
-	var cfg arcourse.Config
+	var cfg Config
 	ext := strings.ToLower(filepath.Ext(cfgPath))
 	switch ext {
 	case ".json":
@@ -47,10 +49,10 @@ func loadConfig() (arcourse.Config, error) {
 		err = yaml.Unmarshal(data, &cfg)
 	}
 	if err != nil {
-		return arcourse.Config{}, err
+		return Config{}, err
 	}
 	if cfg.Evaluate.Root == "" {
-		return arcourse.Config{}, pkg.ErrRootConfigNotConfigured
+		return Config{}, pkg.ErrRootConfigNotConfigured
 	}
 	root := cfg.Evaluate.Root
 	if !filepath.IsAbs(root) {
@@ -58,7 +60,7 @@ func loadConfig() (arcourse.Config, error) {
 	}
 	root, err = filepath.Abs(root)
 	if err != nil {
-		return arcourse.Config{}, err
+		return Config{}, err
 	}
 	cfg.Evaluate.Root = root
 	return cfg, nil

@@ -1,6 +1,7 @@
 package arcourse
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 
@@ -27,7 +28,11 @@ func NewEvaluate(cfg EvaluateConfig, evaluator Evaluator) *Evaluate {
 	}
 }
 
-func (uc *Evaluate) Exec(expression string) (pkg.Result, error) {
+func (uc *Evaluate) Exec(ctx context.Context, expression string) (pkg.Result, error) {
+	err := ctx.Err()
+	if err != nil {
+		return pkg.Result{}, err
+	}
 	if uc.cfg.Root == "" {
 		return pkg.Result{}, pkg.ErrRootConfigNotConfigured
 	}

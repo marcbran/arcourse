@@ -4,31 +4,27 @@ import (
 	"fmt"
 	"os"
 
-	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 	"github.com/marcbran/jpoet/pkg/jpoet"
 	"github.com/spf13/cobra"
 )
 
 var version = "dev"
 
-func newRootCmd(facade pkg.Facade) *cobra.Command {
+func newRootCmd(plugins []*jpoet.Plugin) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "arco",
-		Short: "Jsonnet graph tools",
+		Use:     "arco",
+		Short:   "Jsonnet graph tools",
 		Version: version,
 	}
 	cmd.PersistentFlags().BoolP("quiet", "q", false, "Suppress progress messages on stderr")
-	cmd.AddCommand(newEvalCmd(facade), newRenderCmd(facade))
+	cmd.AddCommand(newEvalCmd(plugins))
+	cmd.AddCommand(newRenderCmd(plugins))
+	cmd.AddCommand(newServeCmd(plugins))
 	return cmd
 }
 
 func Execute(plugins []*jpoet.Plugin) {
-	facade, err := NewFacade(plugins)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-	err = newRootCmd(facade).Execute()
+	err := newRootCmd(plugins).Execute()
 	if err == nil {
 		return
 	}

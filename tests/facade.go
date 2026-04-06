@@ -4,6 +4,7 @@ package tests
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -46,8 +47,8 @@ type commandOutput struct {
 	Output string `json:"output"`
 }
 
-func (f *CLIFacade) Evaluate(expression string) (pkg.Result, error) {
-	cmd := exec.Command(f.binaryPath, "eval", expression, "--format", "json")
+func (f *CLIFacade) Evaluate(ctx context.Context, expression string) (pkg.Result, error) {
+	cmd := exec.CommandContext(ctx, f.binaryPath, "eval", expression, "--format", "json")
 	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
 
 	var stdout bytes.Buffer
@@ -72,8 +73,8 @@ func (f *CLIFacade) Evaluate(expression string) (pkg.Result, error) {
 	return pkg.Result{Output: output.Output}, nil
 }
 
-func (f *CLIFacade) Render(path []string, format pkg.Format) (pkg.Result, error) {
-	cmd := exec.Command(f.binaryPath, "render", strings.Join(path, "."), "--format", string(format))
+func (f *CLIFacade) Render(ctx context.Context, path []string, format pkg.Format) (pkg.Result, error) {
+	cmd := exec.CommandContext(ctx, f.binaryPath, "render", strings.Join(path, "."), "--format", string(format))
 	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
 
 	var stdout bytes.Buffer
