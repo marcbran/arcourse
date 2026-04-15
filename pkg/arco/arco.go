@@ -5,6 +5,13 @@ import (
 	"github.com/marcbran/jpoet/pkg/jpoet"
 )
 
-func Execute(plugins ...*jpoet.Plugin) {
-	cmd.Execute(plugins)
+type Env struct {
+	Cache *jpoet.Cache
+}
+
+type Init func(env Env) []*jpoet.Plugin
+
+func Execute(init Init) {
+	env := Env{Cache: jpoet.NewCache()}
+	cmd.Execute(init(env))
 }

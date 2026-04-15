@@ -34,7 +34,9 @@ func (c *Client) Evaluate(ctx context.Context, expression string) (pkg.Result, e
 	if err != nil {
 		return pkg.Result{}, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	if resp.StatusCode != http.StatusOK {
 		var errorResp http2.ErrorResponse
 		err = json.NewDecoder(resp.Body).Decode(&errorResp)

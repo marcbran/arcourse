@@ -19,15 +19,14 @@ func NewEvaluator(lib fs.FS, jpaths []string, plugins []*jpoet.Plugin) *Evaluato
 
 func (e *Evaluator) EvaluateSnippet(snippet string) (string, error) {
 	var out bytes.Buffer
-	eval := jpoet.NewEval().
-		FileImport(e.jpaths).
-		FSImport(e.lib).
-		SnippetInput("arcourse.jsonnet", snippet).
-		WriterOutput(&out)
-	for _, p := range e.plugins {
-		eval = eval.Plugin(p)
+	opts := []jpoet.Option{
+		jpoet.FileImport(e.jpaths),
+		jpoet.FSImport(e.lib),
+		jpoet.SnippetInput("arcourse.jsonnet", snippet),
+		jpoet.WriterOutput(&out),
+		jpoet.WithPluginSet(e.plugins...),
 	}
-	err := eval.Eval()
+	err := jpoet.Eval(opts...)
 	if err != nil {
 		return "", err
 	}
