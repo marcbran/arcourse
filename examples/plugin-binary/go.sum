@@ -31,8 +31,8 @@ github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
 github.com/jhump/protoreflect v1.17.0 h1:qOEr613fac2lOuTgWN4tPAtLL7fUSbuJL5X5XumQh94=
 github.com/jhump/protoreflect v1.17.0/go.mod h1:h9+vUUL38jiBzck8ck+6G/aeMX8Z4QUY/NiJPwPNi+8=
-github.com/marcbran/jpoet v0.17.0 h1:f/RAT+jNjRFvOafvHo2c/ofbntfpvZcmr5q3aPbtdHY=
-github.com/marcbran/jpoet v0.17.0/go.mod h1:MM9y3WV4ipdwTnSA6Xe2VxUCJyb9JsFOV9WDI790JDo=
+github.com/marcbran/jpoet v0.17.1 h1:xbHFzegMLfbRqfELTuM5HKnAxpNkiaKFPv6H+MRsO6Y=
+github.com/marcbran/jpoet v0.17.1/go.mod h1:MM9y3WV4ipdwTnSA6Xe2VxUCJyb9JsFOV9WDI790JDo=
 github.com/mattn/go-colorable v0.1.9/go.mod h1:u6P/XSegPjTcexA+o6vUJrdnUu04hMope9wVRipJSqc=
 github.com/mattn/go-colorable v0.1.12/go.mod h1:u5H1YNBxpqRaxsYJYSkiCWKzEfiAb1Gb520KVy5xxl4=
 github.com/mattn/go-colorable v0.1.14 h1:9A9LHSqF/7dyVVX6g0U9cwm9pG3kP9gSzcuIPHPsaIE=
