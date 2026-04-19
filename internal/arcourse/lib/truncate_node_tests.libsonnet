@@ -44,12 +44,11 @@ local truncateNode = import './truncate_node.libsonnet';
         _node: 'resource',
         child: {
           _node: 'facet',
-          _path: 'child',
         },
       },
     },
     {
-      name: 'descendant path from original',
+      name: 'descendant path preserved',
       input:: {
         _node: 'resource',
         child: {
@@ -67,23 +66,20 @@ local truncateNode = import './truncate_node.libsonnet';
       },
     },
     {
-      name: 'descendant path generated',
+      name: 'descendant url path preserved',
       input:: {
         _node: 'resource',
-        nested: {
-          inner: {
-            _node: 'facet',
-            value: 10,
-          },
+        child: {
+          _node: 'facet',
+          _urlPath: 'root/custom/url/path',
+          value: 10,
         },
       },
       expected: {
         _node: 'resource',
-        nested: {
-          inner: {
-            _node: 'facet',
-            _path: 'nested.inner',
-          },
+        child: {
+          _node: 'facet',
+          _urlPath: 'root/custom/url/path',
         },
       },
     },
@@ -101,7 +97,6 @@ local truncateNode = import './truncate_node.libsonnet';
         _node: 'resource',
         child: {
           _node: 'facet',
-          _path: 'child',
           _summary: 'summary text',
         },
       },
@@ -119,7 +114,6 @@ local truncateNode = import './truncate_node.libsonnet';
         _node: 'resource',
         child: {
           _node: 'facet',
-          _path: 'child',
         },
       },
     },
@@ -146,7 +140,6 @@ local truncateNode = import './truncate_node.libsonnet';
           groups: {
             selected: {
               _node: 'facet',
-              _path: 'metadata.groups.selected',
             },
           },
         },
@@ -186,7 +179,6 @@ local truncateNode = import './truncate_node.libsonnet';
         _node: 'resource',
         child: {
           _node: 'resource',
-          _path: 'child',
         },
       },
     },
@@ -214,14 +206,12 @@ local truncateNode = import './truncate_node.libsonnet';
         items: [
           {
             _node: 'facet',
-            _path: 'items.0',
           },
           {
             keep: true,
           },
           {
             _node: 'facet',
-            _path: 'items.2',
             _summary: 'second',
           },
         ],

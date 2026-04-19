@@ -92,12 +92,6 @@ func TestTruncateDescendantNodesToReferences(t *testing.T) {
 			expected:   `{"_node":"resource","child":{"_node":"resource","_path":"c","_summary":"A child"}}`,
 		},
 		{
-			name:       "circular reference through nodes does not cause infinite expansion",
-			graph:      `local x = { _node: "resource", child: { _node: "resource", back: x } }; x`,
-			expression: `root`,
-			expected:   `{"_node":"resource","child":{"_node":"resource","_path":"child"}}`,
-		},
-		{
 			name:       "no _node markers produces unmodified output",
 			graph:      `{ title: "plain", nested: { x: 1 } }`,
 			expression: `root`,

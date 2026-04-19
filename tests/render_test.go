@@ -39,6 +39,18 @@ func TestRenderPathAsHTML(t *testing.T) {
 			path:     []string{"root", "my-node"},
 			expected: `<p>hyphen</p>`,
 		},
+		{
+			name:     "function field applied to next segment",
+			graph:    `{ get: function(name) { _view:: { html: "<p>" + name + "</p>" } } }`,
+			path:     []string{"root", "get", "alice"},
+			expected: `<p>alice</p>`,
+		},
+		{
+			name:     "chained function fields",
+			graph:    `{ owner: function(o) { repo: function(r) { _view:: { html: "<p>" + o + "/" + r + "</p>" } } } }`,
+			path:     []string{"root", "owner", "marcbran", "repo", "arcourse"},
+			expected: `<p>marcbran/arcourse</p>`,
+		},
 	}
 
 	for _, tc := range cases {
