@@ -79,6 +79,54 @@ func TestEvaluateGraphAndExpressionCombinations(t *testing.T) {
 	}
 }
 
+func TestImportRoot(t *testing.T) {
+	cases := []struct {
+		name       string
+		setup      func(*Stage) *Stage
+		expression string
+		expected   string
+	}{
+		{
+			name: "import root in expression resolves to assembled graph (export format)",
+			setup: func(s *Stage) *Stage {
+				return s.a_graph_root(`{ value: 42 }`)
+			},
+			expression: `(import 'root').value`,
+			expected:   `42`,
+		},
+		{
+			name: "import root in expression resolves to assembled graph (easy format)",
+			setup: func(s *Stage) *Stage {
+				return s.a_node_graph(`[[['seg'], { n: 7 }, []]]`)
+			},
+			expression: `(import 'root').seg.n`,
+			expected:   `7`,
+		},
+		{
+			name: "import root and root variable are the same graph",
+			setup: func(s *Stage) *Stage {
+				return s.a_graph_root(`{ value: 42 }`)
+			},
+			expression: `{ via_root: root.value, via_import: (import 'root').value }`,
+			expected:   `{"via_root":42,"via_import":42}`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			given, when, then := scenario(t)
+
+			tc.setup(given)
+
+			when.
+				an_expression_is_evaluated(tc.expression)
+
+			then.
+				the_output_is(tc.expected)
+		})
+	}
+}
+
 func TestTruncateDescendantNodesToReferences(t *testing.T) {
 	cases := []struct {
 		name       string

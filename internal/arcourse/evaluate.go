@@ -10,7 +10,7 @@ import (
 )
 
 type Evaluator interface {
-	EvaluateSnippet(snippet string) (string, error)
+	EvaluateSnippet(snippet string, virtualImports map[string]string) (string, error)
 }
 
 type EvaluateConfig struct {
@@ -42,18 +42,17 @@ func (e *Evaluate) Exec(ctx context.Context, expression string) (pkg.Result, err
 		return pkg.Result{}, err
 	}
 	slash := filepath.ToSlash(entryPath)
-	var snippet string
+	var rootSnippet string
 	if graphMode {
-		snippet = fmt.Sprintf(`local truncateNode = import 'lib/truncate_node.libsonnet';
-local construct_graph_root = import 'lib/construct_graph_root.libsonnet';
-local root = construct_graph_root(import %q);
-truncateNode(%s)`, slash, expression)
+		rootSnippet = fmt.Sprintf(`local construct_graph_root = import 'lib/construct_graph_root.libsonnet';
+construct_graph_root(import %q)`, slash)
 	} else {
-		snippet = fmt.Sprintf(`local truncateNode = import 'lib/truncate_node.libsonnet';
-local root = import %q;
-truncateNode(%s)`, slash, expression)
+		rootSnippet = fmt.Sprintf(`import %q`, slash)
 	}
-	out, err := e.evaluator.EvaluateSnippet(snippet)
+	snippet := fmt.Sprintf(`local truncateNode = import 'lib/truncate_node.libsonnet';
+local root = import 'root';
+truncateNode(%s)`, expression)
+	out, err := e.evaluator.EvaluateSnippet(snippet, map[string]string{"root": rootSnippet})
 	if err != nil {
 		return pkg.Result{}, err
 	}
