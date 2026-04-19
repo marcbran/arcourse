@@ -58,7 +58,7 @@ func TestRenderPathAsHTML(t *testing.T) {
 			given, when, then := scenario(t)
 
 			given.
-				a_graph(tc.graph)
+				a_graph_root(tc.graph)
 
 			when.
 				a_path_is_rendered(tc.path, pkg.FormatHTML)
@@ -73,7 +73,7 @@ func TestRenderPathNotFound(t *testing.T) {
 	given, when, then := scenario(t)
 
 	given.
-		a_graph(`{ child: { _view:: { html: "<p>hi</p>" } } }`)
+		a_graph_root(`{ child: { _view:: { html: "<p>hi</p>" } } }`)
 
 	when.
 		a_path_is_rendered([]string{"root", "nonexistent"}, pkg.FormatHTML)

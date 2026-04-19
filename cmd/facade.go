@@ -62,17 +62,6 @@ func loadConfig() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	entry := filepath.Join(workspace, "root.jsonnet")
-	fi, err := os.Stat(entry)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return Config{}, fmt.Errorf("%w: %s", pkg.ErrRootJsonnetNotFound, entry)
-		}
-		return Config{}, err
-	}
-	if !fi.Mode().IsRegular() {
-		return Config{}, fmt.Errorf("%w: %s", pkg.ErrRootJsonnetNotFound, entry)
-	}
 	cfg.Evaluate.Dir = workspace
 	return cfg, nil
 }

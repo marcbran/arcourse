@@ -3,6 +3,7 @@ package arcourse
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
@@ -28,23 +29,59 @@ func NewEvaluate(cfg EvaluateConfig, evaluator Evaluator) *Evaluate {
 	}
 }
 
-func (uc *Evaluate) Exec(ctx context.Context, expression string) (pkg.Result, error) {
+func (e *Evaluate) Exec(ctx context.Context, expression string) (pkg.Result, error) {
 	err := ctx.Err()
 	if err != nil {
 		return pkg.Result{}, err
 	}
-	if uc.cfg.Dir == "" {
+	if e.cfg.Dir == "" {
 		return pkg.Result{}, pkg.ErrEvaluateDirNotSet
 	}
-	entry := filepath.Join(uc.cfg.Dir, "root.jsonnet")
-	snippet := fmt.Sprintf(
-		"local truncateNode = import 'lib/truncate_node.libsonnet';\nlocal root = import %q;\ntruncateNode(%s)",
-		filepath.ToSlash(entry),
-		expression,
-	)
-	out, err := uc.evaluator.EvaluateSnippet(snippet)
+	entryPath, graphMode, err := e.resolveEntry()
+	if err != nil {
+		return pkg.Result{}, err
+	}
+	slash := filepath.ToSlash(entryPath)
+	var snippet string
+	if graphMode {
+		snippet = fmt.Sprintf(`local truncateNode = import 'lib/truncate_node.libsonnet';
+local construct_graph_root = import 'lib/construct_graph_root.libsonnet';
+local root = construct_graph_root(import %q);
+truncateNode(%s)`, slash, expression)
+	} else {
+		snippet = fmt.Sprintf(`local truncateNode = import 'lib/truncate_node.libsonnet';
+local root = import %q;
+truncateNode(%s)`, slash, expression)
+	}
+	out, err := e.evaluator.EvaluateSnippet(snippet)
 	if err != nil {
 		return pkg.Result{}, err
 	}
 	return pkg.Result{Output: out}, nil
+}
+
+func (e *Evaluate) resolveEntry() (path string, graphMode bool, err error) {
+	graphPath := filepath.Join(e.cfg.Dir, "graph.jsonnet")
+	fi, err := os.Stat(graphPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return "", false, err
+		}
+	} else {
+		if fi.Mode().IsRegular() {
+			return graphPath, true, nil
+		}
+	}
+	rootPath := filepath.Join(e.cfg.Dir, "root.jsonnet")
+	fi, err = os.Stat(rootPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", false, fmt.Errorf("%w: %s", pkg.ErrGraphEntryNotFound, e.cfg.Dir)
+		}
+		return "", false, err
+	}
+	if !fi.Mode().IsRegular() {
+		return "", false, fmt.Errorf("%w: %s", pkg.ErrGraphEntryNotFound, rootPath)
+	}
+	return rootPath, false, nil
 }

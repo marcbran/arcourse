@@ -8,13 +8,26 @@ func TestEvaluateSimpleExpression(t *testing.T) {
 	given, when, then := scenario(t)
 
 	given.
-		a_graph("42")
+		a_graph_root("42")
 
 	when.
 		an_expression_is_evaluated("root")
 
 	then.
 		the_output_is("42")
+}
+
+func TestEvaluateGraphJsonnetOnly(t *testing.T) {
+	given, when, then := scenario(t)
+
+	given.
+		a_node_graph(`[[['seg'], { n: 99 }, []]]`)
+
+	when.
+		an_expression_is_evaluated("root.seg.n")
+
+	then.
+		the_output_is("99")
 }
 
 func TestEvaluateGraphAndExpressionCombinations(t *testing.T) {
@@ -55,7 +68,7 @@ func TestEvaluateGraphAndExpressionCombinations(t *testing.T) {
 			given, when, then := scenario(t)
 
 			given.
-				a_graph(tc.graph)
+				a_graph_root(tc.graph)
 
 			when.
 				an_expression_is_evaluated(tc.expression)
@@ -103,7 +116,7 @@ func TestTruncateDescendantNodesToReferences(t *testing.T) {
 			given, when, then := scenario(t)
 
 			given.
-				a_graph(tc.graph)
+				a_graph_root(tc.graph)
 
 			when.
 				an_expression_is_evaluated(tc.expression)
