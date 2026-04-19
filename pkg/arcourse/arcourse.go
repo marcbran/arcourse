@@ -7,7 +7,8 @@ import (
 )
 
 var (
-	ErrRootConfigNotConfigured = errors.New("root config not configured")
+	ErrRootJsonnetNotFound = errors.New("root.jsonnet not found in evaluate dir")
+	ErrEvaluateDirNotSet   = errors.New("evaluate dir not set")
 )
 
 type Format string

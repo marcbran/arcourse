@@ -34,8 +34,7 @@ func NewCLIFacadeWithPath(binaryPath, homeDir string) (*CLIFacade, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to access ARCO_BINARY %q: %w", binaryPath, err)
 	}
-	rootFile := filepath.Join(homeDir, "root.jsonnet")
-	config := "evaluate:\n  root: " + rootFile + "\n"
+	config := "evaluate: {}\n"
 	err = os.WriteFile(filepath.Join(homeDir, "config.yaml"), []byte(config), 0o600)
 	if err != nil {
 		return nil, err

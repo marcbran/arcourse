@@ -34,7 +34,7 @@ func returnInternalServerError(w http.ResponseWriter, err error) {
 }
 
 func returnError(w http.ResponseWriter, err error) {
-	if errors.Is(err, pkg.ErrRootConfigNotConfigured) {
+	if errors.Is(err, pkg.ErrRootJsonnetNotFound) || errors.Is(err, pkg.ErrEvaluateDirNotSet) {
 		returnBadRequest(w, err)
 		return
 	}

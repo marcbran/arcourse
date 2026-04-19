@@ -13,7 +13,7 @@ type Evaluator interface {
 }
 
 type EvaluateConfig struct {
-	Root string `json:"root"`
+	Dir string `json:"dir"`
 }
 
 type Evaluate struct {
@@ -33,12 +33,13 @@ func (uc *Evaluate) Exec(ctx context.Context, expression string) (pkg.Result, er
 	if err != nil {
 		return pkg.Result{}, err
 	}
-	if uc.cfg.Root == "" {
-		return pkg.Result{}, pkg.ErrRootConfigNotConfigured
+	if uc.cfg.Dir == "" {
+		return pkg.Result{}, pkg.ErrEvaluateDirNotSet
 	}
+	entry := filepath.Join(uc.cfg.Dir, "root.jsonnet")
 	snippet := fmt.Sprintf(
 		"local truncateNode = import 'lib/truncate_node.libsonnet';\nlocal root = import %q;\ntruncateNode(%s)",
-		filepath.ToSlash(uc.cfg.Root),
+		filepath.ToSlash(entry),
 		expression,
 	)
 	out, err := uc.evaluator.EvaluateSnippet(snippet)
