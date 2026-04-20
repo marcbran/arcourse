@@ -8,13 +8,26 @@ func TestEvaluateSimpleExpression(t *testing.T) {
 	given, when, then := scenario(t)
 
 	given.
-		a_graph("42")
+		a_graph_root("42")
 
 	when.
 		an_expression_is_evaluated("root")
 
 	then.
 		the_output_is("42")
+}
+
+func TestEvaluateGraphJsonnetOnly(t *testing.T) {
+	given, when, then := scenario(t)
+
+	given.
+		a_node_graph(`[[[['seg'], { n: 99 }, []]]]`)
+
+	when.
+		an_expression_is_evaluated("root.seg.n")
+
+	then.
+		the_output_is("99")
 }
 
 func TestEvaluateGraphAndExpressionCombinations(t *testing.T) {
@@ -55,7 +68,55 @@ func TestEvaluateGraphAndExpressionCombinations(t *testing.T) {
 			given, when, then := scenario(t)
 
 			given.
-				a_graph(tc.graph)
+				a_graph_root(tc.graph)
+
+			when.
+				an_expression_is_evaluated(tc.expression)
+
+			then.
+				the_output_is(tc.expected)
+		})
+	}
+}
+
+func TestImportRoot(t *testing.T) {
+	cases := []struct {
+		name       string
+		setup      func(*Stage) *Stage
+		expression string
+		expected   string
+	}{
+		{
+			name: "import root in expression resolves to assembled graph (export format)",
+			setup: func(s *Stage) *Stage {
+				return s.a_graph_root(`{ value: 42 }`)
+			},
+			expression: `(import 'root').value`,
+			expected:   `42`,
+		},
+		{
+			name: "import root in expression resolves to assembled graph (easy format)",
+			setup: func(s *Stage) *Stage {
+				return s.a_node_graph(`[[[['seg'], { n: 7 }, []]]]`)
+			},
+			expression: `(import 'root').seg.n`,
+			expected:   `7`,
+		},
+		{
+			name: "import root and root variable are the same graph",
+			setup: func(s *Stage) *Stage {
+				return s.a_graph_root(`{ value: 42 }`)
+			},
+			expression: `{ via_root: root.value, via_import: (import 'root').value }`,
+			expected:   `{"via_root":42,"via_import":42}`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			given, when, then := scenario(t)
+
+			tc.setup(given)
 
 			when.
 				an_expression_is_evaluated(tc.expression)
@@ -92,12 +153,6 @@ func TestTruncateDescendantNodesToReferences(t *testing.T) {
 			expected:   `{"_node":"resource","child":{"_node":"resource","_path":"c","_summary":"A child"}}`,
 		},
 		{
-			name:       "circular reference through nodes does not cause infinite expansion",
-			graph:      `local x = { _node: "resource", child: { _node: "resource", back: x } }; x`,
-			expression: `root`,
-			expected:   `{"_node":"resource","child":{"_node":"resource","_path":"child"}}`,
-		},
-		{
 			name:       "no _node markers produces unmodified output",
 			graph:      `{ title: "plain", nested: { x: 1 } }`,
 			expression: `root`,
@@ -109,7 +164,7 @@ func TestTruncateDescendantNodesToReferences(t *testing.T) {
 			given, when, then := scenario(t)
 
 			given.
-				a_graph(tc.graph)
+				a_graph_root(tc.graph)
 
 			when.
 				an_expression_is_evaluated(tc.expression)

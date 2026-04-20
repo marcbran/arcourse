@@ -22,7 +22,7 @@ type Config struct {
 }
 
 func buildFacade(cfg Config, plugins []*jpoet.Plugin) pkg.Facade {
-	jpaths := []string{filepath.Join(filepath.Dir(cfg.Evaluate.Root), "vendor")}
+	jpaths := []string{filepath.Join(cfg.Evaluate.Dir, "vendor")}
 	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib, jpaths, plugins)
 	return arcourse.NewFacade(cfg.Config, evaluator)
 }
@@ -51,18 +51,18 @@ func loadConfig() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	if cfg.Evaluate.Root == "" {
-		return Config{}, pkg.ErrRootConfigNotConfigured
+	workspace := strings.TrimSpace(cfg.Evaluate.Dir)
+	if workspace == "" {
+		workspace = home
 	}
-	root := cfg.Evaluate.Root
-	if !filepath.IsAbs(root) {
-		root = filepath.Join(home, root)
+	if !filepath.IsAbs(workspace) {
+		workspace = filepath.Join(home, workspace)
 	}
-	root, err = filepath.Abs(root)
+	workspace, err = filepath.Abs(filepath.Clean(workspace))
 	if err != nil {
 		return Config{}, err
 	}
-	cfg.Evaluate.Root = root
+	cfg.Evaluate.Dir = workspace
 	return cfg, nil
 }
 

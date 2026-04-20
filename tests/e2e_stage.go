@@ -39,8 +39,14 @@ func (s *Stage) and() *Stage {
 	return s
 }
 
-func (s *Stage) a_graph(jsonnet string) *Stage {
+func (s *Stage) a_graph_root(jsonnet string) *Stage {
 	err := os.WriteFile(filepath.Join(s.tempDir, "root.jsonnet"), []byte(jsonnet), 0o600)
+	require.NoError(s.t, err)
+	return s
+}
+
+func (s *Stage) a_node_graph(jsonnet string) *Stage {
+	err := os.WriteFile(filepath.Join(s.tempDir, "graph.jsonnet"), []byte(jsonnet), 0o600)
 	require.NoError(s.t, err)
 	return s
 }

@@ -7,7 +7,8 @@ import (
 )
 
 var (
-	ErrRootConfigNotConfigured = errors.New("root config not configured")
+	ErrGraphEntryNotFound = errors.New("neither graph.jsonnet nor root.jsonnet found in evaluate dir")
+	ErrEvaluateDirNotSet  = errors.New("evaluate dir not set")
 )
 
 type Format string

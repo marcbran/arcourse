@@ -3,17 +3,18 @@ package arcourse
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 
 type Evaluator interface {
-	EvaluateSnippet(snippet string) (string, error)
+	EvaluateSnippet(snippet string, virtualImports map[string]string) (string, error)
 }
 
 type EvaluateConfig struct {
-	Root string `json:"root"`
+	Dir string `json:"dir"`
 }
 
 type Evaluate struct {
@@ -28,22 +29,58 @@ func NewEvaluate(cfg EvaluateConfig, evaluator Evaluator) *Evaluate {
 	}
 }
 
-func (uc *Evaluate) Exec(ctx context.Context, expression string) (pkg.Result, error) {
+func (e *Evaluate) Exec(ctx context.Context, expression string) (pkg.Result, error) {
 	err := ctx.Err()
 	if err != nil {
 		return pkg.Result{}, err
 	}
-	if uc.cfg.Root == "" {
-		return pkg.Result{}, pkg.ErrRootConfigNotConfigured
+	if e.cfg.Dir == "" {
+		return pkg.Result{}, pkg.ErrEvaluateDirNotSet
 	}
-	snippet := fmt.Sprintf(
-		"local truncateNode = import 'lib/truncate_node.libsonnet';\nlocal root = import %q;\ntruncateNode(%s)",
-		filepath.ToSlash(uc.cfg.Root),
-		expression,
-	)
-	out, err := uc.evaluator.EvaluateSnippet(snippet)
+	entryPath, graphMode, err := e.resolveEntry()
+	if err != nil {
+		return pkg.Result{}, err
+	}
+	slash := filepath.ToSlash(entryPath)
+	var rootSnippet string
+	if graphMode {
+		rootSnippet = fmt.Sprintf(`local construct_graph_root = import 'lib/construct_graph_root.libsonnet';
+construct_graph_root(import %q)`, slash)
+	} else {
+		rootSnippet = fmt.Sprintf(`import %q`, slash)
+	}
+	snippet := fmt.Sprintf(`local truncateNode = import 'lib/truncate_node.libsonnet';
+local root = import 'root';
+truncateNode(%s)`, expression)
+	out, err := e.evaluator.EvaluateSnippet(snippet, map[string]string{"root": rootSnippet})
 	if err != nil {
 		return pkg.Result{}, err
 	}
 	return pkg.Result{Output: out}, nil
+}
+
+func (e *Evaluate) resolveEntry() (path string, graphMode bool, err error) {
+	graphPath := filepath.Join(e.cfg.Dir, "graph.jsonnet")
+	fi, err := os.Stat(graphPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return "", false, err
+		}
+	} else {
+		if fi.Mode().IsRegular() {
+			return graphPath, true, nil
+		}
+	}
+	rootPath := filepath.Join(e.cfg.Dir, "root.jsonnet")
+	fi, err = os.Stat(rootPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", false, fmt.Errorf("%w: %s", pkg.ErrGraphEntryNotFound, e.cfg.Dir)
+		}
+		return "", false, err
+	}
+	if !fi.Mode().IsRegular() {
+		return "", false, fmt.Errorf("%w: %s", pkg.ErrGraphEntryNotFound, rootPath)
+	}
+	return rootPath, false, nil
 }

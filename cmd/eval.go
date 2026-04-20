@@ -12,7 +12,7 @@ import (
 func newEvalCmd(plugins []*jpoet.Plugin) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "eval [expression]",
-		Short: "Evaluate a Jsonnet expression against the configured root",
+		Short: "Evaluate a Jsonnet expression against the configured workspace",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			c.SilenceUsage = true
