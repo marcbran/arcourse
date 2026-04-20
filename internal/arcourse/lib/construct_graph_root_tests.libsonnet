@@ -8,7 +8,7 @@ local construct_graph_root = import './construct_graph_root.libsonnet';
       input:: [[]],
       expected: {
         _node: true,
-        _path: '.root',
+        _path: 'root',
       },
     },
     {
@@ -16,10 +16,10 @@ local construct_graph_root = import './construct_graph_root.libsonnet';
       input:: [[[['demo'], { n: 1 }, []]]],
       expected: {
         _node: true,
-        _path: '.root',
+        _path: 'root',
         demo: {
           _node: true,
-          _path: '.root.demo',
+          _path: 'root.demo',
           n: 1,
         },
       },
@@ -29,10 +29,10 @@ local construct_graph_root = import './construct_graph_root.libsonnet';
       input:: [[[['demo'], { n: 2 }]]],
       expected: {
         _node: true,
-        _path: '.root',
+        _path: 'root',
         demo: {
           _node: true,
-          _path: '.root.demo',
+          _path: 'root.demo',
           n: 2,
         },
       },
@@ -42,15 +42,15 @@ local construct_graph_root = import './construct_graph_root.libsonnet';
       input:: [[[['a'], { x: 1 }, []], [['b'], { y: 2 }, []]]],
       expected: {
         _node: true,
-        _path: '.root',
+        _path: 'root',
         a: {
           _node: true,
-          _path: '.root.a',
+          _path: 'root.a',
           x: 1,
         },
         b: {
           _node: true,
-          _path: '.root.b',
+          _path: 'root.b',
           y: 2,
         },
       },
@@ -60,11 +60,11 @@ local construct_graph_root = import './construct_graph_root.libsonnet';
       input:: [[[['a', 'b'], { k: 1 }, []]]],
       expected: {
         _node: true,
-        _path: '.root',
+        _path: 'root',
         a: {
           b: {
             _node: true,
-            _path: '.root.a.b',
+            _path: 'root.a.b',
             k: 1,
           },
         },
@@ -75,11 +75,11 @@ local construct_graph_root = import './construct_graph_root.libsonnet';
       input:: [[[['demo'], { n: 1 }]], { _view: 'default' }],
       expected: {
         _node: true,
-        _path: '.root',
+        _path: 'root',
         _view: 'default',
         demo: {
           _node: true,
-          _path: '.root.demo',
+          _path: 'root.demo',
           n: 1,
           _view: 'default',
         },
@@ -90,11 +90,11 @@ local construct_graph_root = import './construct_graph_root.libsonnet';
       input:: [[[['demo'], { n: 1, _view:: true }]], { _view: 'default' }],
       expected: {
         _node: true,
-        _path: '.root',
+        _path: 'root',
         _view: 'default',
         demo: {
           _node: true,
-          _path: '.root.demo',
+          _path: 'root.demo',
           n: 1,
         },
       },
@@ -104,16 +104,16 @@ local construct_graph_root = import './construct_graph_root.libsonnet';
       input:: [[[['x', 'y'], { u: 1 }, []], [['x', 'z'], { v: 2 }, []]]],
       expected: {
         _node: true,
-        _path: '.root',
+        _path: 'root',
         x: {
           y: {
             _node: true,
-            _path: '.root.x.y',
+            _path: 'root.x.y',
             u: 1,
           },
           z: {
             _node: true,
-            _path: '.root.x.z',
+            _path: 'root.x.z',
             v: 2,
           },
         },

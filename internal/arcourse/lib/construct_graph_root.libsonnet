@@ -2,7 +2,7 @@ local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
 local varNameOf(seg) = std.substr(seg, 1, std.length(seg) - 1);
 
 local resolvePath(node, path) =
-  std.join('.', ['.root'] + [
+  std.join('.', ['root'] + [
     if isVar(p) then varNameOf(p) + '("' + node[varNameOf(p)] + '")'
     else p
     for p in path
