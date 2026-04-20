@@ -1,7 +1,7 @@
 local refFor(node) =
   { _node: node._node } +
   (if std.objectHas(node, '_path') then { _path: node._path } else {}) +
-  (if std.objectHas(node, '_urlPath') then { _urlPath: node._urlPath } else {}) +
+  (if std.objectHasAll(node, '_urlPath') then { _urlPath:: node._urlPath } else {}) +
   (if std.objectHas(node, '_summary') then { _summary: node._summary } else {});
 
 local truncateNodeRec(value, isRoot) =

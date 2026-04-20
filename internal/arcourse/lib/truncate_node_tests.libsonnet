@@ -66,21 +66,27 @@ local truncateNode = import './truncate_node.libsonnet';
       },
     },
     {
-      name: 'descendant url path preserved',
+      name: 'hidden descendant url path remains hidden in reference',
       input:: {
         _node: 'resource',
         child: {
           _node: 'facet',
-          _urlPath: 'root/custom/url/path',
+          _urlPath:: 'root/custom/url/path',
           value: 10,
         },
       },
-      expected: {
-        _node: 'resource',
-        child: {
-          _node: 'facet',
-          _urlPath: 'root/custom/url/path',
+      output(input)::
+        local out = truncateNode(input);
+        local ref = out.child;
+        {
+          hasHidden: std.objectHasAll(ref, '_urlPath'),
+          hasVisible: std.objectHas(ref, '_urlPath'),
+          value: ref._urlPath,
         },
+      expected: {
+        hasHidden: true,
+        hasVisible: false,
+        value: 'root/custom/url/path',
       },
     },
     {
