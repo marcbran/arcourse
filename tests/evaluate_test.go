@@ -21,7 +21,7 @@ func TestEvaluateGraphJsonnetOnly(t *testing.T) {
 	given, when, then := scenario(t)
 
 	given.
-		a_node_graph(`[[['seg'], { n: 99 }, []]]`)
+		a_node_graph(`[[[['seg'], { n: 99 }, []]]]`)
 
 	when.
 		an_expression_is_evaluated("root.seg.n")
@@ -97,7 +97,7 @@ func TestImportRoot(t *testing.T) {
 		{
 			name: "import root in expression resolves to assembled graph (easy format)",
 			setup: func(s *Stage) *Stage {
-				return s.a_node_graph(`[[['seg'], { n: 7 }, []]]`)
+				return s.a_node_graph(`[[[['seg'], { n: 7 }, []]]]`)
 			},
 			expression: `(import 'root').seg.n`,
 			expected:   `7`,

@@ -1,11 +1,11 @@
 local construct_graph_root = import './construct_graph_root.libsonnet';
 
 {
-  output(input):: construct_graph_root(input.nodeSpecs),
+  output(input):: construct_graph_root(input),
   tests: [
     {
       name: 'empty nodeSpecs yields root shell',
-      input:: { nodeSpecs: [] },
+      input:: [[]],
       expected: {
         _node: true,
         _path: '.root',
@@ -13,7 +13,7 @@ local construct_graph_root = import './construct_graph_root.libsonnet';
     },
     {
       name: 'single nodeSpec three elements',
-      input:: { nodeSpecs: [[['demo'], { n: 1 }, []]] },
+      input:: [[[['demo'], { n: 1 }, []]]],
       expected: {
         _node: true,
         _path: '.root',
@@ -26,7 +26,7 @@ local construct_graph_root = import './construct_graph_root.libsonnet';
     },
     {
       name: 'two element nodeSpec defaults mixins',
-      input:: { nodeSpecs: [[['demo'], { n: 2 }]] },
+      input:: [[[['demo'], { n: 2 }]]],
       expected: {
         _node: true,
         _path: '.root',
@@ -39,7 +39,7 @@ local construct_graph_root = import './construct_graph_root.libsonnet';
     },
     {
       name: 'multiple nodeSpecs at distinct paths',
-      input:: { nodeSpecs: [[['a'], { x: 1 }, []], [['b'], { y: 2 }, []]] },
+      input:: [[[['a'], { x: 1 }, []], [['b'], { y: 2 }, []]]],
       expected: {
         _node: true,
         _path: '.root',
@@ -57,7 +57,7 @@ local construct_graph_root = import './construct_graph_root.libsonnet';
     },
     {
       name: 'single nodeSpec with nested path',
-      input:: { nodeSpecs: [[['a', 'b'], { k: 1 }, []]] },
+      input:: [[[['a', 'b'], { k: 1 }, []]]],
       expected: {
         _node: true,
         _path: '.root',
@@ -71,8 +71,37 @@ local construct_graph_root = import './construct_graph_root.libsonnet';
       },
     },
     {
+      name: 'defaultView applied to nodes without _view',
+      input:: [[[['demo'], { n: 1 }]], { _view: 'default' }],
+      expected: {
+        _node: true,
+        _path: '.root',
+        _view: 'default',
+        demo: {
+          _node: true,
+          _path: '.root.demo',
+          n: 1,
+          _view: 'default',
+        },
+      },
+    },
+    {
+      name: 'defaultView not applied to node with _view',
+      input:: [[[['demo'], { n: 1, _view:: true }]], { _view: 'default' }],
+      expected: {
+        _node: true,
+        _path: '.root',
+        _view: 'default',
+        demo: {
+          _node: true,
+          _path: '.root.demo',
+          n: 1,
+        },
+      },
+    },
+    {
       name: 'two nodeSpecs with nested paths sharing prefix',
-      input:: { nodeSpecs: [[['x', 'y'], { u: 1 }, []], [['x', 'z'], { v: 2 }, []]] },
+      input:: [[[['x', 'y'], { u: 1 }, []], [['x', 'z'], { v: 2 }, []]]],
       expected: {
         _node: true,
         _path: '.root',

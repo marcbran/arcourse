@@ -62,7 +62,9 @@ local graph(nodes, defaultView={}) =
   );
   node([], {}) + functionize(merged, {}, defaultView);
 
-function(nodeSpecs)
+function(graphSpec)
+  local nodeSpecs = graphSpec[0];
+  local defaultView = if std.length(graphSpec) > 1 then graphSpec[1] else {};
   local nodes = std.map(
     function(spec)
       local path = spec[0];
@@ -71,4 +73,4 @@ function(nodeSpecs)
       node(path, body, mixins),
     nodeSpecs
   );
-  graph(nodes, {})
+  graph(nodes, defaultView)
