@@ -34,7 +34,7 @@ func NewCLIFacadeWithPath(binaryPath, homeDir string) (*CLIFacade, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to access ARCO_BINARY %q: %w", binaryPath, err)
 	}
-	config := "evaluate: {}\n"
+	config := "mode: local\nevaluate: {}\n"
 	err = os.WriteFile(filepath.Join(homeDir, "config.yaml"), []byte(config), 0o600)
 	if err != nil {
 		return nil, err
