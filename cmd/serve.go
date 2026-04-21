@@ -17,7 +17,7 @@ func newServeCmd(plugins []*jpoet.Plugin) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			facade := buildFacade(cfg, plugins)
+			facade := buildLocalFacade(cfg, plugins)
 			return server.Serve(c.Context(), facade, cfg.HTTP)
 		},
 	}
