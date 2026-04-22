@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.0](https://github.com/marcbran/arcourse/compare/v0.1.0...v0.2.0) (2026-04-21)
+
+
+### Features
+
+* node graph layout ([#9](https://github.com/marcbran/arcourse/issues/9)) ([51a8883](https://github.com/marcbran/arcourse/commit/51a88831a860c22a2069dda63537458d2180cf33))
+* support cli client mode ([#12](https://github.com/marcbran/arcourse/issues/12)) ([f6c01f7](https://github.com/marcbran/arcourse/commit/f6c01f75e6cd6ba95cce16da3faf61643fa8ef3b))
+
 ## [0.1.0](https://github.com/marcbran/arcourse/compare/v0.0.0...v0.1.0) (2026-04-15)
 
 
