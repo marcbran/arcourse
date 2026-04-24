@@ -34,25 +34,56 @@ local buildNested(path, idx, leaf) =
   if idx == std.length(path) then leaf
   else { [path[idx]]+: buildNested(path, idx + 1, leaf) };
 
-local functionize(obj, vars, defaultView={}) =
+local functionize(obj, vars, defaultView={}, applyDefaultView=true) =
   if !std.isObject(obj) then obj
   else if std.objectHas(obj, '_node') then
-    if std.objectHasAll(obj, '_view') then obj + vars
-    else obj + vars + defaultView
+    local bound = obj + vars;
+    local visibleFields = std.objectFields(obj);
+    local hiddenFields = std.setDiff(std.objectFieldsAll(obj), visibleFields);
+    local varFields = if std.objectHasAll(obj, '_vars') then obj._vars else [];
+    local hiddenDynamicFields = std.foldl(
+      function(acc, k) acc + { [k]:: bound[k] },
+      std.filter(isVar, visibleFields),
+      {}
+    );
+    local hiddenBase = std.foldl(
+      function(acc, k) acc + { [k]:: bound[k] },
+      std.filter(function(k) !isVar(k), hiddenFields),
+      {}
+    );
+    local staticResult = {
+      [k]+: functionize(bound[k], vars, defaultView, false)
+      for k in std.filter(
+        function(k)
+          !isVar(k) &&
+          !std.member(varFields, k) &&
+          std.substr(k, 0, 1) != '_' &&
+          std.isObject(bound[k]),
+        visibleFields
+      )
+    };
+    local dynamicResult = {
+      [varNameOf(k)]: function(val) functionize(obj[k], vars + { [varNameOf(k)]: val }, defaultView, false)
+      for k in std.filter(isVar, visibleFields)
+    };
+    local result = staticResult + dynamicResult;
+    bound +
+    (if std.objectHasAll(obj, '_view') then {} else defaultView) +
+    result +
+    hiddenDynamicFields +
+    hiddenBase
   else
     local fields = std.objectFields(obj);
     local staticResult = {
-      [k]+: functionize(obj[k], vars, defaultView)
+      [k]+: functionize(obj[k], vars, defaultView, applyDefaultView)
       for k in std.filter(function(k) !isVar(k), fields)
     };
-    local result = std.foldl(
-      function(acc, k)
-        local vName = varNameOf(k);
-        acc + { [vName]: function(val) functionize(obj[k], vars + { [vName]: val }, defaultView) },
-      std.filter(isVar, fields),
-      staticResult
-    );
-    result + defaultView;
+    local dynamicResult = {
+      [varNameOf(k)]: function(val) functionize(obj[k], vars + { [varNameOf(k)]: val }, defaultView, applyDefaultView)
+      for k in std.filter(isVar, fields)
+    };
+    local result = staticResult + dynamicResult;
+    if applyDefaultView then result + defaultView else result;
 
 local graph(nodes, defaultView={}) =
   local merged = std.foldl(

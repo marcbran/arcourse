@@ -119,5 +119,45 @@ local construct_graph_root = import './construct_graph_root.libsonnet';
         },
       },
     },
+    {
+      name: 'prefix node and deeper static node can coexist',
+      input:: [[[['a'], { label: 'prefix' }, []], [['a', 'b'], { label: 'deep' }, []]]],
+      expected: {
+        _node: true,
+        _path: 'root',
+        a: {
+          _node: true,
+          _path: 'root.a',
+          label: 'prefix',
+          b: {
+            _node: true,
+            _path: 'root.a.b',
+            label: 'deep',
+          },
+        },
+      },
+    },
+    {
+      name: 'prefix node and deeper variable node can coexist',
+      input:: [[[['courses', '$course'], { title: 'course' }, []], [['courses', '$course', 'lessons', '$lesson'], { title: 'lesson' }, []]]],
+      output(input)::
+        local out = construct_graph_root(input);
+        {
+          coursePath: out.courses.course('math')._path,
+          lessonPath: out.courses.course('math').lessons.lesson('intro')._path,
+        },
+      expected: {
+        coursePath: 'root.courses.course("math")',
+        lessonPath: 'root.courses.course("math").lessons.lesson("intro")',
+      },
+    },
+    {
+      name: 'prefix-bound vars remain available deeper',
+      input:: [[[['courses', '$course'], { title: 'course' }, []], [['courses', '$course', 'lessons', '$lesson'], { title: 'lesson' }, []]]],
+      output(input)::
+        local out = construct_graph_root(input);
+        out.courses.course('math').lessons.lesson('intro')._path,
+      expected: 'root.courses.course("math").lessons.lesson("intro")',
+    },
   ],
 }

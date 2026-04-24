@@ -10,46 +10,80 @@ import (
 
 func TestRenderPathAsHTML(t *testing.T) {
 	cases := []struct {
-		name     string
-		graph    string
-		path     []string
-		expected string
+		name      string
+		rootGraph string
+		nodeGraph string
+		path      []string
+		expected  string
 	}{
 		{
-			name:     "root node",
-			graph:    `{ _view:: { html: "<p>hi</p>" } }`,
-			path:     []string{"root"},
-			expected: `<p>hi</p>`,
+			name:      "root node",
+			rootGraph: `{ _view:: { html: "<p>hi</p>" } }`,
+			path:      []string{"root"},
+			expected:  `<p>hi</p>`,
 		},
 		{
-			name:     "nested child",
-			graph:    `{ child: { _view:: { html: "<span>child</span>" } } }`,
-			path:     []string{"root", "child"},
-			expected: `<span>child</span>`,
+			name:      "nested child",
+			rootGraph: `{ child: { _view:: { html: "<span>child</span>" } } }`,
+			path:      []string{"root", "child"},
+			expected:  `<span>child</span>`,
 		},
 		{
-			name:     "deeply nested path",
-			graph:    `{ a: { b: { _view:: { html: "<div>deep</div>" } } } }`,
+			name:      "deeply nested path",
+			rootGraph: `{ a: { b: { _view:: { html: "<div>deep</div>" } } } }`,
+			path:      []string{"root", "a", "b"},
+			expected:  `<div>deep</div>`,
+		},
+		{
+			name:      "path segment with hyphen",
+			rootGraph: `{ "my-node": { _view:: { html: "<p>hyphen</p>" } } }`,
+			path:      []string{"root", "my-node"},
+			expected:  `<p>hyphen</p>`,
+		},
+		{
+			name:      "function field applied to next segment",
+			rootGraph: `{ get: function(name) { _view:: { html: "<p>" + name + "</p>" } } }`,
+			path:      []string{"root", "get", "alice"},
+			expected:  `<p>alice</p>`,
+		},
+		{
+			name:      "chained function fields",
+			rootGraph: `{ owner: function(o) { repo: function(r) { _view:: { html: "<p>" + o + "/" + r + "</p>" } } } }`,
+			path:      []string{"root", "owner", "marcbran", "repo", "arcourse"},
+			expected:  `<p>marcbran/arcourse</p>`,
+		},
+		{
+			name: "render prefix node body when deeper static node also exists",
+			nodeGraph: `[
+  [
+    [['a'], { _view:: { html: "<p>prefix</p>" } }, []],
+    [['a', 'b'], { _view:: { html: "<p>deep</p>" } }, []]
+  ]
+]`,
+			path:     []string{"root", "a"},
+			expected: `<p>prefix</p>`,
+		},
+		{
+			name: "render deeper static node past prefix node",
+			nodeGraph: `[
+  [
+    [['a'], { _view:: { html: "<p>prefix</p>" } }, []],
+    [['a', 'b'], { _view:: { html: "<p>deep</p>" } }, []]
+  ]
+]`,
 			path:     []string{"root", "a", "b"},
-			expected: `<div>deep</div>`,
+			expected: `<p>deep</p>`,
 		},
 		{
-			name:     "path segment with hyphen",
-			graph:    `{ "my-node": { _view:: { html: "<p>hyphen</p>" } } }`,
-			path:     []string{"root", "my-node"},
-			expected: `<p>hyphen</p>`,
-		},
-		{
-			name:     "function field applied to next segment",
-			graph:    `{ get: function(name) { _view:: { html: "<p>" + name + "</p>" } } }`,
-			path:     []string{"root", "get", "alice"},
-			expected: `<p>alice</p>`,
-		},
-		{
-			name:     "chained function fields",
-			graph:    `{ owner: function(o) { repo: function(r) { _view:: { html: "<p>" + o + "/" + r + "</p>" } } } }`,
-			path:     []string{"root", "owner", "marcbran", "repo", "arcourse"},
-			expected: `<p>marcbran/arcourse</p>`,
+			name: "render deeper variable node past prefix variable node",
+			nodeGraph: `[
+  [
+    [['courses', '$course'], { _view:: { html: "<p>course</p>" } }, []],
+    [['courses', '$course', 'lessons', '$lesson'], { _view:: { html: "<p>lesson</p>" } }, []]
+  ]
+]`,
+			path:     []string{"root", "courses", "course", "math", "lessons", "lesson", "intro"},
+			expected: `<p>lesson</p>`,
 		},
 	}
 
@@ -57,8 +91,11 @@ func TestRenderPathAsHTML(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			given, when, then := scenario(t)
 
-			given.
-				a_graph_root(tc.graph)
+			if tc.nodeGraph != "" {
+				given.a_node_graph(tc.nodeGraph)
+			} else {
+				given.a_graph_root(tc.rootGraph)
+			}
 
 			when.
 				a_path_is_rendered(tc.path, pkg.FormatHTML)

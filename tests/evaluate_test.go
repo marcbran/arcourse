@@ -174,3 +174,40 @@ func TestTruncateDescendantNodesToReferences(t *testing.T) {
 		})
 	}
 }
+
+func TestEvaluateNodeGraphPrefixPathVariables(t *testing.T) {
+	given, when, then := scenario(t)
+
+	given.
+		a_node_graph(`[
+  [
+    [['courses', '$course'], { title: self.course }, []],
+    [['courses', '$course', 'lessons', '$lesson'], { title: self.course + ":" + self.lesson }, []]
+  ]
+]`)
+
+	when.
+		an_expression_is_evaluated(`root.courses.course("math").lessons.lesson("intro")._path`)
+
+	then.
+		the_output_is(`"root.courses.course(\"math\").lessons.lesson(\"intro\")"`)
+}
+
+func TestEvaluatePrefixVariableNodeWithDeeperVariableDescendants(t *testing.T) {
+	given, when, then := scenario(t)
+
+	given.
+		a_node_graph(`[
+  [
+    [['kubernetes', '$context', '$namespace'], { kind: 'namespace' }, []],
+    [['kubernetes', '$context', '$namespace', 'statefulsets'], { kind: 'statefulsets' }, []],
+    [['kubernetes', '$context', '$namespace', '$statefulset', 'resource'], { kind: 'statefulset' }, []]
+  ]
+]`)
+
+	when.
+		an_expression_is_evaluated(`root.kubernetes.context("kind").namespace("storage")`)
+
+	then.
+		the_output_is(`{"_node":true,"_path":"root.kubernetes.context(\"kind\").namespace(\"storage\")","context":"kind","namespace":"storage","kind":"namespace","statefulsets":{"_node":true,"_path":"root.kubernetes.context(\"kind\").namespace(\"storage\").statefulsets"}}`)
+}
