@@ -14,12 +14,13 @@ var (
 type Format string
 
 const (
-	FormatHTML Format = "html"
+	FormatHTML    Format = "html"
+	FormatJsonnet Format = "jsonnet"
 )
 
 func ParseFormat(s string) (Format, error) {
 	switch Format(s) {
-	case FormatHTML:
+	case FormatHTML, FormatJsonnet:
 		return Format(s), nil
 	default:
 		return "", fmt.Errorf("unknown format: %s", s)

@@ -69,6 +69,19 @@ func TestRenderPathAsHTML(t *testing.T) {
 	}
 }
 
+func TestRenderPathAsJsonnet(t *testing.T) {
+	given, when, then := scenario(t)
+
+	given.
+		a_graph_root(`{ child: { _view:: { jsonnet: "local x = 1;\nx" } } }`)
+
+	when.
+		a_path_is_rendered([]string{"root", "child"}, pkg.FormatJsonnet)
+
+	then.
+		the_raw_output_is("local x = 1;\nx")
+}
+
 func TestRenderPathNotFound(t *testing.T) {
 	given, when, then := scenario(t)
 
