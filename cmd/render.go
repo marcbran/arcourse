@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
@@ -40,10 +41,30 @@ func newRenderCmd(plugins []*jpoet.Plugin) *cobra.Command {
 				return err
 			}
 
+			outputPath, err := c.Flags().GetString("output")
+			if err != nil {
+				return err
+			}
+			if outputPath != "" {
+				return writeRenderOutput(outputPath, result.Output)
+			}
+
 			_, err = fmt.Fprint(os.Stdout, result.Output)
 			return err
 		},
 	}
 	cmd.Flags().StringP("format", "f", "html", "Output format: html")
+	cmd.Flags().StringP("output", "o", "", "Write output to a file")
 	return cmd
+}
+
+func writeRenderOutput(path string, output string) error {
+	dir := filepath.Dir(path)
+	if dir != "." {
+		err := os.MkdirAll(dir, 0o755)
+		if err != nil {
+			return err
+		}
+	}
+	return os.WriteFile(path, []byte(output), 0o644)
 }
