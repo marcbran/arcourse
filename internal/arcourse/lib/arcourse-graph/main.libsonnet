@@ -30,44 +30,6 @@ local node(path, res, mixins=[]) =
   res +
   std.foldl(function(acc, m) acc + m, mixinsArray, {});
 
-local isNode(obj) = std.isObject(obj) && std.objectHas(obj, '_node');
-
-local deepMerge(a, b) =
-  if std.isObject(a) && std.isObject(b) && !isNode(a) && !isNode(b) then
-    local keys = std.setUnion(std.objectFields(a), std.objectFields(b), function(k) k);
-    {
-      [k]:
-        if std.objectHas(a, k) && std.objectHas(b, k) then deepMerge(a[k], b[k])
-        else if std.objectHas(b, k) then b[k]
-        else a[k]
-      for k in keys
-    }
-  else b;
-
-local functionize(obj, vars, defaultView={}) =
-  if !std.isObject(obj) then obj
-  else if isNode(obj) then
-    if std.objectHasAll(obj, '_view') then obj + vars
-    else obj + vars + defaultView
-  else
-    local fields = std.objectFields(obj);
-    local staticResult = {
-      [k]: functionize(obj[k], vars, defaultView)
-      for k in std.filter(function(k) !isVar(k), fields)
-    };
-    local result = std.foldl(
-      function(acc, k)
-        local vName = varNameOf(k);
-        acc + { [vName]: function(val) functionize(obj[k], vars + { [vName]: val }, defaultView) },
-      std.filter(isVar, fields),
-      staticResult
-    );
-    result + defaultView;
-
-local merge(fragments, defaultView={}) =
-  local merged = std.foldl(deepMerge, fragments, {});
-  node([], {}) + functionize(merged, {}, defaultView);
-
 local graph(nodeSpecs, defaultView={}) =
   local specs = [
     {
@@ -80,23 +42,30 @@ local graph(nodeSpecs, defaultView={}) =
   ];
   local firstSegments(specs) =
     std.set([s.path[0] for s in specs if std.length(s.path) > 0], function(k) k);
-  local build(specs) =
+  local withDefaultView(obj) =
+    if std.objectHasAll(obj, '_view') then obj else obj + defaultView;
+  local build(specs, vars={}) =
     local leafs = [s for s in specs if std.length(s.path) == 0];
     local children = {
-      [k]: build([
-        s { path: std.slice(s.path, 1, null, 1) }
-        for s in specs
-        if std.length(s.path) > 0 && s.path[0] == k
-      ])
+      [if isVar(k) then varNameOf(k) else k]:
+        local childSpecs = [
+          s { path: std.slice(s.path, 1, null, 1) }
+          for s in specs
+          if std.length(s.path) > 0 && s.path[0] == k
+        ];
+        if isVar(k) then
+          local vName = varNameOf(k);
+          function(val) build(childSpecs, vars + { [vName]: val })
+        else
+          build(childSpecs, vars)
       for k in firstSegments(specs)
     };
-    if std.length(leafs) == 0 then children
-    else if std.length(leafs) == 1 then node(leafs[0].fullPath, leafs[0].body, leafs[0].mixins) + children
+    if std.length(leafs) == 0 then withDefaultView(children)
+    else if std.length(leafs) == 1 then withDefaultView(node(leafs[0].fullPath, leafs[0].body, leafs[0].mixins) + vars + children)
     else error 'duplicate node path: %s' % std.manifestJson(leafs[0].fullPath);
-  merge([build(specs)], defaultView);
+  withDefaultView(node([], {}) + build(specs));
 
 {
   node: node,
   graph: graph,
-  merge: merge,
 }

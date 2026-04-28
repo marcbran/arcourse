@@ -119,5 +119,34 @@ local construct_graph_root = import './construct_graph_root.libsonnet';
         },
       },
     },
+    {
+      name: 'nodeSpec can have static descendant nodeSpec',
+      input:: [[[['x'], { u: 1 }, []], [['x', 'y'], { v: 2 }, []]]],
+      expected: {
+        _node: true,
+        _path: 'root',
+        x: {
+          _node: true,
+          _path: 'root.x',
+          u: 1,
+          y: {
+            _node: true,
+            _path: 'root.x.y',
+            v: 2,
+          },
+        },
+      },
+    },
+    {
+      name: 'nodeSpec can have variable descendant nodeSpec',
+      input:: [[[['namespaces'], { title: 'Namespaces' }, []], [['namespaces', '$name', 'pods'], { kind: 'PodList' }, []]]],
+      output(input):: construct_graph_root(input).namespaces.name('default').pods,
+      expected: {
+        _node: true,
+        _path: 'root.namespaces.name("default").pods',
+        name: 'default',
+        kind: 'PodList',
+      },
+    },
   ],
 }
