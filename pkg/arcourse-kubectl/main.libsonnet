@@ -80,6 +80,13 @@ local generate(context, resources, manifest=true) =
   local lowerKind(resource) = std.asciiLower(resource.kind);
   local hasDuplicateKind(resource) =
     std.length([r for r in resources if r.kind == resource.kind]) > 1;
+  local hasDuplicateName(resource) =
+    std.length([r for r in resources if r.name == resource.name]) > 1;
+  local resourceRoute(resource) =
+    if hasDuplicateName(resource) && group(resource) != '' then
+      '%s-%s' % [resource.name, safeSegment(group(resource))]
+    else
+      resource.name;
   local itemVar(resource) =
     local base =
       if hasDuplicateKind(resource) && group(resource) != '' then
@@ -88,13 +95,9 @@ local generate(context, resources, manifest=true) =
         lowerKind(resource);
     local candidate = if isUnquotedFieldName(base) then base else 'item';
     if isJsonnetKeyword(candidate) then candidate + 'Item' else candidate;
-  local hasDuplicateName(resource) =
-    std.length([r for r in resources if r.name == resource.name]) > 1;
   local route(resource) =
-    if hasDuplicateName(resource) && group(resource) != '' then
-      '%s-%s' % [resource.name, safeSegment(group(resource))]
-    else
-      resource.name;
+    local candidate = resourceRoute(resource);
+    if candidate == itemVar(resource) then candidate + 'List' else candidate;
   local queryResource(resource) =
     if hasDuplicateName(resource) && group(resource) != '' then
       '%s.%s' % [resource.name, group(resource)]
@@ -135,6 +138,12 @@ local generate(context, resources, manifest=true) =
     body,
     viewExpr,
   ]);
+  local emptyNode(path) = j.Array([
+    j.Array([j.String(p) for p in path]),
+    j.Object(),
+  ]);
+  local contextNode = emptyNode(['kubernetes', '$context']);
+  local namespaceNode = emptyNode(['kubernetes', '$context', '$namespace']);
 
   local namespacedAllList(resource) =
     local items = getItems(contextOptions({ allNamespaces: j.True }), resource);
@@ -189,6 +198,8 @@ local generate(context, resources, manifest=true) =
       )),
       view('resource')
     );
+  local namespacedDetailParent(resource) =
+    emptyNode(['kubernetes', '$context', '$namespace', '$' + itemVar(resource)]);
 
   local clusterList(resource) =
     local items = getItems(contextOptions(), resource);
@@ -208,14 +219,19 @@ local generate(context, resources, manifest=true) =
       dataObject(kubectlGet(contextOptions(), resource, member(j.Dollar, itemVar(resource)))),
       view('resource')
     );
+  local clusterDetailParent(resource) =
+    emptyNode(['kubernetes', '$context', '$' + itemVar(resource)]);
 
   local resourceNodes(resource) =
     if resource.namespaced then
       (if hasVerb(resource, 'list') then [namespacedAllList(resource), namespacedList(resource)] else []) +
-      (if hasVerb(resource, 'get') then [namespacedDetail(resource)] else [])
+      (if hasVerb(resource, 'get') then [namespacedDetailParent(resource), namespacedDetail(resource)] else [])
     else
       (if hasVerb(resource, 'list') then [clusterList(resource)] else []) +
-      (if hasVerb(resource, 'get') then [clusterDetail(resource)] else []);
+      (if hasVerb(resource, 'get') then
+        (if itemVar(resource) == 'namespace' then [] else [clusterDetailParent(resource)]) +
+        [clusterDetail(resource)]
+      else []);
 
   local apiResourcesNode = node(
     ['kubernetes', '$context', 'api-resources'],
@@ -229,7 +245,7 @@ local generate(context, resources, manifest=true) =
     j.LocalBind('a', j.Import('arcourse-ui/main.libsonnet')),
     j.LocalBind('kubectl', j.Import('kubectl/main.libsonnet')),
     j.LocalBind('root', j.Import('root')),
-  ], prettyArray([apiResourcesNode] + std.flattenArrays([resourceNodes(r) for r in resources])));
+  ], prettyArray([contextNode, namespaceNode, apiResourcesNode] + std.flattenArrays([resourceNodes(r) for r in resources])));
 
   if manifest then j.manifestJsonnet(generated) else generated;
 

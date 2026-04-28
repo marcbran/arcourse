@@ -91,5 +91,108 @@ local arcourseKubectl = import './main.libsonnet';
         bodyKind: 'Array',
       },
     },
+    {
+      name: 'resource leaf nodes get empty parent nodes',
+      input:: function()
+        local resources = [
+          {
+            name: 'pods',
+            kind: 'Pod',
+            namespaced: true,
+            verbs: ['get', 'list'],
+          },
+          {
+            name: 'namespaces',
+            kind: 'Namespace',
+            namespaced: false,
+            verbs: ['get', 'list'],
+          },
+        ];
+        local generated = arcourseKubectl.graph {
+          context: 'prod',
+          manifest: false,
+          data+: {
+            resources: resources,
+          },
+        }._view.jsonnet;
+        local specs = generated.body.body.body.elements;
+        local path(spec) = [part.expr.value for part in spec.expr.elements[0].expr.elements];
+        local bodyFieldCount(spec) = std.length(spec.expr.elements[1].expr.fields);
+        {
+          paths: [path(spec) for spec in specs],
+          contextParentIsEmpty: {
+            specElements: std.length(specs[0].expr.elements),
+            bodyFields: bodyFieldCount(specs[0]),
+          },
+          namespaceParentIsEmpty: {
+            specElements: std.length(specs[1].expr.elements),
+            bodyFields: bodyFieldCount(specs[1]),
+          },
+          namespacedParentIsEmpty: {
+            specElements: std.length(specs[5].expr.elements),
+            bodyFields: bodyFieldCount(specs[5]),
+          },
+        },
+      expected: {
+        paths: [
+          ['kubernetes', '$context'],
+          ['kubernetes', '$context', '$namespace'],
+          ['kubernetes', '$context', 'api-resources'],
+          ['kubernetes', '$context', 'pods'],
+          ['kubernetes', '$context', '$namespace', 'pods'],
+          ['kubernetes', '$context', '$namespace', '$pod'],
+          ['kubernetes', '$context', '$namespace', '$pod', 'resource'],
+          ['kubernetes', '$context', 'namespaces'],
+          ['kubernetes', '$context', '$namespace', 'resource'],
+        ],
+        contextParentIsEmpty: {
+          specElements: 2,
+          bodyFields: 0,
+        },
+        namespaceParentIsEmpty: {
+          specElements: 2,
+          bodyFields: 0,
+        },
+        namespacedParentIsEmpty: {
+          specElements: 2,
+          bodyFields: 0,
+        },
+      },
+    },
+    {
+      name: 'resource route avoids item variable collision',
+      input:: function()
+        local resources = [
+          {
+            name: 'endpoints',
+            kind: 'Endpoints',
+            namespaced: true,
+            verbs: ['get', 'list'],
+          },
+        ];
+        local generated = arcourseKubectl.graph {
+          context: 'prod',
+          manifest: false,
+          data+: {
+            resources: resources,
+          },
+        }._view.jsonnet;
+        local specs = generated.body.body.body.elements;
+        local path(spec) = [part.expr.value for part in spec.expr.elements[0].expr.elements];
+        {
+          paths: [path(spec) for spec in specs],
+        },
+      expected: {
+        paths: [
+          ['kubernetes', '$context'],
+          ['kubernetes', '$context', '$namespace'],
+          ['kubernetes', '$context', 'api-resources'],
+          ['kubernetes', '$context', 'endpointsList'],
+          ['kubernetes', '$context', '$namespace', 'endpointsList'],
+          ['kubernetes', '$context', '$namespace', '$endpoints'],
+          ['kubernetes', '$context', '$namespace', '$endpoints', 'resource'],
+        ],
+      },
+    },
   ],
 }
