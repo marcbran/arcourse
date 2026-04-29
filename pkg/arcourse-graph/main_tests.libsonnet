@@ -2,7 +2,6 @@ local g = import './main.libsonnet';
 
 local node(input) = g.node(input.path, input.res, std.get(input, 'mixins', []));
 local graph(input) = g.graph(input.nodeSpecs, std.get(input, 'defaultView', {}));
-local merge(input) = g.merge(input.fragments, std.get(input, 'defaultView', {}));
 
 local nodeTests = {
   name: 'node',
@@ -157,32 +156,66 @@ local graphTests = {
       output(input):: graph(input).demo._view,
       expected: 'custom',
     },
-  ],
-};
-
-local mergeTests = {
-  name: 'merge',
-  output(input):: merge(input),
-  tests: [
     {
-      name: 'deep merges plain containers',
+      name: 'keeps static child below prefix node',
       input:: {
-        fragments: [
-          { apps: { api: g.node(['apps', 'api'], { port: 8080 }) } },
-          { apps: { web: g.node(['apps', 'web'], { port: 80 }) } },
+        nodeSpecs: [
+          [['apps'], { title: 'Apps' }],
+          [['apps', 'api'], { port: 8080 }],
         ],
       },
-      output(input):: merge(input).apps,
+      output(input)::
+        local apps = graph(input).apps;
+        {
+          node: {
+            _node: apps._node,
+            _path: apps._path,
+            title: apps.title,
+          },
+          child: apps.api,
+        },
       expected: {
-        api: {
+        node: {
+          _node: true,
+          _path: 'root.apps',
+          title: 'Apps',
+        },
+        child: {
           _node: true,
           _path: 'root.apps.api',
           port: 8080,
         },
-        web: {
+      },
+    },
+    {
+      name: 'turns variable child below prefix node into function',
+      input:: {
+        nodeSpecs: [
+          [['namespaces'], { title: 'Namespaces' }],
+          [['namespaces', '$name', 'pods'], { kind: 'PodList' }],
+        ],
+      },
+      output(input)::
+        local namespaces = graph(input).namespaces;
+        {
+          node: {
+            _node: namespaces._node,
+            _path: namespaces._path,
+            title: namespaces.title,
+          },
+          child: namespaces.name('default').pods,
+        },
+      expected: {
+        node: {
           _node: true,
-          _path: 'root.apps.web',
-          port: 80,
+          _path: 'root.namespaces',
+          title: 'Namespaces',
+        },
+        child: {
+          _node: true,
+          _path: 'root.namespaces.name("default").pods',
+          name: 'default',
+          kind: 'PodList',
         },
       },
     },
@@ -193,6 +226,5 @@ local mergeTests = {
   tests: [
     nodeTests,
     graphTests,
-    mergeTests,
   ],
 }
