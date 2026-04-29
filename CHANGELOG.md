@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.0](https://github.com/marcbran/arcourse/compare/v0.2.0...v0.3.0) (2026-04-29)
+
+
+### Features
+
+* cli render output to file ([#16](https://github.com/marcbran/arcourse/issues/16)) ([b2d445d](https://github.com/marcbran/arcourse/commit/b2d445dbcd35db864eee9d08c925bdd5f3ebf468))
+* provide graph gen libs ([#20](https://github.com/marcbran/arcourse/issues/20)) ([35266a5](https://github.com/marcbran/arcourse/commit/35266a51a3f9e5af1a0788940667572bbf08f760))
+* support jsonnet format ([#18](https://github.com/marcbran/arcourse/issues/18)) ([0989a55](https://github.com/marcbran/arcourse/commit/0989a553921935ca2ed592919800cfaa0b00b9ab))
+* support nested nodes ([#21](https://github.com/marcbran/arcourse/issues/21)) ([9e90a41](https://github.com/marcbran/arcourse/commit/9e90a4107e69e1df0aa77d0c28f936a9a905da24))
+
 ## [0.2.0](https://github.com/marcbran/arcourse/compare/v0.1.0...v0.2.0) (2026-04-21)
 
 
