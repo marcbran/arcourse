@@ -160,6 +160,42 @@ local arcourseKubectl = import './main.libsonnet';
       },
     },
     {
+      name: 'list nodes keep kubectl data hidden and expose links',
+      input:: function()
+        local resources = [
+          {
+            name: 'pods',
+            kind: 'Pod',
+            namespaced: true,
+            verbs: ['get', 'list'],
+          },
+        ];
+        local generated = arcourseKubectl.graph {
+          context: 'prod',
+          manifest: false,
+          data+: {
+            resources: resources,
+          },
+        }._view.jsonnet;
+        local specs = generated.body.body.body.elements;
+        local body = specs[3].expr.elements[1].expr;
+        local links = body.fields[1].expr2;
+        {
+          fieldNames: [field.id for field in body.fields],
+          dataHide: body.fields[0].Hide,
+          linksKind: links.__kind__,
+          linksTarget: links.target.id,
+          linksSourceKind: links.arguments.positional[1].expr.__kind__,
+        },
+      expected: {
+        fieldNames: ['data', 'links'],
+        dataHide: 0,
+        linksKind: 'Apply',
+        linksTarget: 'foldl',
+        linksSourceKind: 'Index',
+      },
+    },
+    {
       name: 'resource route avoids item variable collision',
       input:: function()
         local resources = [

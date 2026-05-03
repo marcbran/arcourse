@@ -128,10 +128,16 @@ local generate(context, resources, manifest=true) =
       j.String(queryResource(resource)),
       name,
     ], 4);
-  local getItems(options, resource) = member(kubectlGet(options, resource), 'items');
+  local getItems(expr) = member(expr, 'items');
   local options(fields) = prettyObject([j.Field(k, fields[k]) for k in std.objectFields(fields)], 4);
   local contextOptions(extra={}) = options({ context: member(j.Dollar, 'context') } + extra);
-  local dataObject(expr) = prettyObject([j.Field('data', expr)], 2);
+  local dataField(expr, hidden=false) =
+    j.Field('data', expr) { Hide: if hidden then 0 else 1 };
+  local dataObject(expr) = prettyObject([dataField(expr)], 2);
+  local listObject(dataExpr, linksExpr) = prettyObject([
+    dataField(dataExpr, hidden=true),
+    j.Field('links', linksExpr),
+  ], 2);
   local view(name) = member(member(var('a'), name), 'view');
   local node(path, body, viewExpr) = j.Array([
     j.Array([j.String(p) for p in path]),
@@ -146,7 +152,8 @@ local generate(context, resources, manifest=true) =
   local namespaceNode = emptyNode(['kubernetes', '$context', '$namespace']);
 
   local namespacedAllList(resource) =
-    local items = getItems(contextOptions({ allNamespaces: j.True }), resource);
+    local data = kubectlGet(contextOptions({ allNamespaces: j.True }), resource);
+    local items = getItems(member(j.Dollar, 'data'));
     local foldFn = j.Function(
       [j.Parameter('acc'), j.Parameter('item')],
       j.Add(
@@ -169,15 +176,16 @@ local generate(context, resources, manifest=true) =
     );
     node(
       ['kubernetes', '$context', route(resource)],
-      dataObject(callPretty(member(var('std'), 'foldl'), [foldFn, items, j.Object()], 2)),
+      listObject(data, callPretty(member(var('std'), 'foldl'), [foldFn, items, j.Object()], 2)),
       view('list')
     );
 
   local namespacedList(resource) =
-    local items = getItems(contextOptions({ namespace: member(j.Dollar, 'namespace') }), resource);
+    local data = kubectlGet(contextOptions({ namespace: member(j.Dollar, 'namespace') }), resource);
+    local items = getItems(member(j.Dollar, 'data'));
     node(
       ['kubernetes', '$context', '$namespace', route(resource)],
-      dataObject(prettyObjectComp(
+      listObject(data, prettyObjectComp(
         [j.Field(
           itemName,
           namespacedResourceLink(resource, member(j.Dollar, 'namespace'), itemName)
@@ -202,10 +210,11 @@ local generate(context, resources, manifest=true) =
     emptyNode(['kubernetes', '$context', '$namespace', '$' + itemVar(resource)]);
 
   local clusterList(resource) =
-    local items = getItems(contextOptions(), resource);
+    local data = kubectlGet(contextOptions(), resource);
+    local items = getItems(member(j.Dollar, 'data'));
     node(
       ['kubernetes', '$context', route(resource)],
-      dataObject(prettyObjectComp(
+      listObject(data, prettyObjectComp(
         [j.Field(itemName, clusterResourceLink(resource, itemName))],
         [j.ForSpec('item', items)],
         4
