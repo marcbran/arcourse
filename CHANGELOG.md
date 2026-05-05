@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/marcbran/arcourse/compare/v0.3.0...v0.4.0) (2026-05-05)
+
+
+### Features
+
+* Dockerfile ([#24](https://github.com/marcbran/arcourse/issues/24)) ([55a3def](https://github.com/marcbran/arcourse/commit/55a3def44fe63db942ab4bc0c430a0bb0887ee4c))
+* script to infer links between openapi resources ([#22](https://github.com/marcbran/arcourse/issues/22)) ([e1adb20](https://github.com/marcbran/arcourse/commit/e1adb20b127bebbe760e2c76479539e742fcb8cd))
+
 ## [0.3.0](https://github.com/marcbran/arcourse/compare/v0.2.0...v0.3.0) (2026-04-29)
 
 
