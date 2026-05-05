@@ -57,6 +57,33 @@ local arcourseKubectl = import './main.libsonnet';
       },
     },
     {
+      name: 'graph accepts multiple contexts without single context',
+      input:: function()
+        local resources = [
+          {
+            name: 'pods',
+            kind: 'Pod',
+            namespaced: true,
+            verbs: ['get', 'list'],
+          },
+        ];
+        local graph = arcourseKubectl.graph {
+          contexts: ['prod', 'dev'],
+          manifest: false,
+          data+: {
+            resources: resources,
+          },
+        };
+        {
+          contexts: graph.data.contexts,
+          viewKind: graph._view.jsonnet.__kind__,
+        },
+      expected: {
+        contexts: ['prod', 'dev'],
+        viewKind: 'Local',
+      },
+    },
+    {
       name: 'simple k8s resources output jsonnet object',
       input:: function()
         local resources = [
@@ -121,20 +148,21 @@ local arcourseKubectl = import './main.libsonnet';
         {
           paths: [path(spec) for spec in specs],
           contextParentIsEmpty: {
-            specElements: std.length(specs[0].expr.elements),
-            bodyFields: bodyFieldCount(specs[0]),
-          },
-          namespaceParentIsEmpty: {
             specElements: std.length(specs[1].expr.elements),
             bodyFields: bodyFieldCount(specs[1]),
           },
+          namespaceParentIsEmpty: {
+            specElements: std.length(specs[2].expr.elements),
+            bodyFields: bodyFieldCount(specs[2]),
+          },
           namespacedParentIsEmpty: {
-            specElements: std.length(specs[5].expr.elements),
-            bodyFields: bodyFieldCount(specs[5]),
+            specElements: std.length(specs[6].expr.elements),
+            bodyFields: bodyFieldCount(specs[6]),
           },
         },
       expected: {
         paths: [
+          ['kubernetes', 'contexts'],
           ['kubernetes', '$context'],
           ['kubernetes', '$context', '$namespace'],
           ['kubernetes', '$context', 'api-resources'],
@@ -178,7 +206,7 @@ local arcourseKubectl = import './main.libsonnet';
           },
         }._view.jsonnet;
         local specs = generated.body.body.body.elements;
-        local body = specs[3].expr.elements[1].expr;
+        local body = specs[4].expr.elements[1].expr;
         local links = body.fields[1].expr2;
         {
           fieldNames: [field.id for field in body.fields],
@@ -220,6 +248,7 @@ local arcourseKubectl = import './main.libsonnet';
         },
       expected: {
         paths: [
+          ['kubernetes', 'contexts'],
           ['kubernetes', '$context'],
           ['kubernetes', '$context', '$namespace'],
           ['kubernetes', '$context', 'api-resources'],

@@ -1,7 +1,38 @@
 local j = import 'jsonnet/main.libsonnet';
 local kubectl = import 'kubectl/main.libsonnet';
 
-local generate(context, resources, manifest=true) =
+local resourceGroup(resource) = std.get(resource, 'group', '');
+local resourceKey(resource) = resourceGroup(resource) + '/' + resource.name;
+local resourceVerbs(resource) = std.get(resource, 'verbs', []);
+local mergeResource(left, right) =
+  if left.kind != right.kind then
+    error 'conflicting Kubernetes API resource kind for %s: %s vs %s' % [resourceKey(left), left.kind, right.kind]
+  else if left.namespaced != right.namespaced then
+    error 'conflicting Kubernetes API resource scope for %s' % resourceKey(left)
+  else
+    left {
+      verbs: std.set(resourceVerbs(left) + resourceVerbs(right)),
+    };
+local dedupeResources(resources) =
+  local byKey = std.foldl(
+    function(acc, resource)
+      local key = resourceKey(resource);
+      acc {
+        [key]: if std.objectHas(acc, key) then mergeResource(acc[key], resource) else resource,
+      },
+    resources,
+    {}
+  );
+  [byKey[key] for key in std.sort(std.objectFields(byKey))];
+local configuredContexts(config) =
+  if std.objectHas(config, 'contexts') then config.contexts else [config.context];
+local resourcesForContexts(contexts) =
+  std.flattenArrays([
+    kubectl.apiResources({ context: context, output: 'wide' })
+    for context in contexts
+  ]);
+
+local generate(resources, manifest=true) =
   local le(indent=0) = j.Fodder.LineEnd(0, indent);
   local prettyArray(elements, indent=0) =
     j.Array([
@@ -138,6 +169,10 @@ local generate(context, resources, manifest=true) =
     dataField(dataExpr, hidden=true),
     j.Field('links', linksExpr),
   ], 2);
+  local linksObject(dataExpr, linksExpr) = prettyObject([
+    dataField(dataExpr),
+    j.Field('links', linksExpr),
+  ], 2);
   local view(name) = member(member(var('a'), name), 'view');
   local node(path, body, viewExpr) = j.Array([
     j.Array([j.String(p) for p in path]),
@@ -150,6 +185,22 @@ local generate(context, resources, manifest=true) =
   ]);
   local contextNode = emptyNode(['kubernetes', '$context']);
   local namespaceNode = emptyNode(['kubernetes', '$context', '$namespace']);
+  local contextsNode =
+    node(
+      ['kubernetes', 'contexts'],
+      linksObject(
+        call(member(member(var('kubectl'), 'config'), 'getContexts')),
+        prettyObjectComp(
+          [j.Field(
+            member(var('c'), 'name'),
+            call(member(member(var('root'), 'kubernetes'), 'context'), [member(var('c'), 'name')])
+          )],
+          [j.ForSpec('c', member(j.Dollar, 'data'))],
+          4
+        )
+      ),
+      view('list')
+    );
 
   local namespacedAllList(resource) =
     local data = kubectlGet(contextOptions({ allNamespaces: j.True }), resource);
@@ -254,17 +305,18 @@ local generate(context, resources, manifest=true) =
     j.LocalBind('a', j.Import('arcourse-ui/main.libsonnet')),
     j.LocalBind('kubectl', j.Import('kubectl/main.libsonnet')),
     j.LocalBind('root', j.Import('root')),
-  ], prettyArray([contextNode, namespaceNode, apiResourcesNode] + std.flattenArrays([resourceNodes(r) for r in resources])));
+  ], prettyArray([contextsNode, contextNode, namespaceNode, apiResourcesNode] + std.flattenArrays([resourceNodes(r) for r in resources])));
 
   if manifest then j.manifestJsonnet(generated) else generated;
 
 local graph = {
   manifest: true,
   data: {
-    resources: kubectl.apiResources({ context: $.context, output: 'wide' }),
+    contexts: configuredContexts($),
+    resources: dedupeResources(resourcesForContexts($.data.contexts)),
   },
   _view:: {
-    jsonnet: generate($.context, $.data.resources, $.manifest),
+    jsonnet: generate($.data.resources, $.manifest),
   },
 };
 
