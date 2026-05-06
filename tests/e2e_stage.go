@@ -25,7 +25,7 @@ type Stage struct {
 
 func scenario(t *testing.T) (*Stage, *Stage, *Stage) {
 	tempDir := t.TempDir()
-	facade, err := NewCLIFacade(tempDir)
+	facade, err := NewE2EFacade(t, tempDir)
 	require.NoError(t, err)
 	s := &Stage{
 		t:       t,
