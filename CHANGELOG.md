@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0](https://github.com/marcbran/arcourse/compare/v0.4.0...v0.5.0) (2026-05-06)
+
+
+### Features
+
+* support multiple node layers ([#25](https://github.com/marcbran/arcourse/issues/25)) ([7e574e7](https://github.com/marcbran/arcourse/commit/7e574e7d245232d703980184507563383f4c7309))
+* unix socket ([#28](https://github.com/marcbran/arcourse/issues/28)) ([6c0b139](https://github.com/marcbran/arcourse/commit/6c0b139b7c14919c26dc563efd479089aaa2dae9))
+
 ## [0.4.0](https://github.com/marcbran/arcourse/compare/v0.3.0...v0.4.0) (2026-05-05)
 
 
