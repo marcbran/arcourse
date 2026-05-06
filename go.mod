@@ -1,6 +1,6 @@
 module github.com/marcbran/arcourse
 
-go 1.25.6
+go 1.26.2
 
 require (
 	github.com/marcbran/jpoet v0.17.1
