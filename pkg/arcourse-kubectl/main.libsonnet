@@ -3,7 +3,9 @@ local kubectl = import 'kubectl/main.libsonnet';
 
 local resourceGroup(resource) = std.get(resource, 'group', '');
 local resourceKey(resource) = resourceGroup(resource) + '/' + resource.name;
-local resourceVerbs(resource) = std.get(resource, 'verbs', []);
+local resourceVerbs(resource) =
+  local verbs = std.get(resource, 'verbs', []);
+  if verbs == null then [] else verbs;
 local mergeResource(left, right) =
   if left.kind != right.kind then
     error 'conflicting Kubernetes API resource kind for %s: %s vs %s' % [resourceKey(left), left.kind, right.kind]
@@ -103,7 +105,7 @@ local generate(resources, manifest=true) =
     if isUnquotedFieldName(name) then j.Member(expr, name) else j.Index(expr, j.String(name));
 
   local contains(xs, x) = std.length([y for y in xs if y == x]) > 0;
-  local hasVerb(resource, verb) = contains(std.get(resource, 'verbs', []), verb);
+  local hasVerb(resource, verb) = contains(resourceVerbs(resource), verb);
   local group(resource) = std.get(resource, 'group', '');
   local safeChar(c) =
     if isAsciiLetter(c) || isAsciiDigit(c) then std.asciiLower(c) else '-';

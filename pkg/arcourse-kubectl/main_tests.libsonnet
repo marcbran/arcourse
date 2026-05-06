@@ -119,6 +119,46 @@ local arcourseKubectl = import './main.libsonnet';
       },
     },
     {
+      name: 'resources with null verbs are treated as not having verbs',
+      input:: function()
+        local resources = [
+          {
+            name: 'pods',
+            kind: 'Pod',
+            namespaced: true,
+            verbs: null,
+          },
+          {
+            name: 'services',
+            kind: 'Service',
+            namespaced: true,
+            verbs: ['list'],
+          },
+        ];
+        local generated = arcourseKubectl.graph {
+          context: 'prod',
+          manifest: false,
+          data+: {
+            resources: resources,
+          },
+        }._view.jsonnet;
+        local specs = generated.body.body.body.elements;
+        local path(spec) = [part.expr.value for part in spec.expr.elements[0].expr.elements];
+        {
+          paths: [path(spec) for spec in specs],
+        },
+      expected: {
+        paths: [
+          ['kubernetes', 'contexts'],
+          ['kubernetes', '$context'],
+          ['kubernetes', '$context', '$namespace'],
+          ['kubernetes', '$context', 'api-resources'],
+          ['kubernetes', '$context', 'services'],
+          ['kubernetes', '$context', '$namespace', 'services'],
+        ],
+      },
+    },
+    {
       name: 'resource leaf nodes get empty parent nodes',
       input:: function()
         local resources = [
