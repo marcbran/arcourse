@@ -1,6 +1,6 @@
 module example/plugin-binary
 
-go 1.25.6
+go 1.26.2
 
 require (
 	github.com/google/go-jsonnet v0.22.0
