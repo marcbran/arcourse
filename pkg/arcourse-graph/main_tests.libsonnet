@@ -1,6 +1,6 @@
 local g = import './main.libsonnet';
 
-local node(input) = g.node(input.path, input.res, std.get(input, 'mixins', []));
+local node(input) = g.node(input.path, std.get(input, 'body', {}));
 local graph(input) = g.graph(input.nodeSpecs, std.get(input, 'defaultView', {}));
 
 local nodeTests = {
@@ -11,7 +11,7 @@ local nodeTests = {
       name: 'exposes resolved path fields',
       input:: {
         path: ['kubernetes', '$context', 'pods'],
-        res: { context: 'prod', kind: 'Pod' },
+        body: { context: 'prod', kind: 'Pod' },
       },
       output(input)::
         local result = node(input);
@@ -38,31 +38,38 @@ local nodeTests = {
       },
     },
     {
-      name: 'applies object mixin',
+      name: 'omitting body yields synthetic-fields-only node',
       input:: {
         path: ['demo'],
-        res: { base: true },
-        mixins: { mixed: true },
       },
       expected: {
         _node: true,
         _path: 'root.demo',
-        base: true,
-        mixed: true,
       },
     },
     {
-      name: 'applies mixins in order',
+      name: 'array body merges layers in source order',
       input:: {
         path: ['demo'],
-        res: { value: 'base' },
-        mixins: [{ value: 'first' }, { value: 'second', extra: true }],
+        body: [{ value: 'base' }, { value: 'first' }, { value: 'second', extra: true }],
       },
       expected: {
         _node: true,
         _path: 'root.demo',
         value: 'second',
         extra: true,
+      },
+    },
+    {
+      name: 'array body with single layer behaves like object body',
+      input:: {
+        path: ['demo'],
+        body: [{ base: true }],
+      },
+      expected: {
+        _node: true,
+        _path: 'root.demo',
+        base: true,
       },
     },
   ],
@@ -217,6 +224,92 @@ local graphTests = {
           name: 'default',
           kind: 'PodList',
         },
+      },
+    },
+    {
+      name: 'variadic spec merges layers in source order',
+      input:: {
+        nodeSpecs: [
+          [['demo'], { value: 'base' }, { value: 'middle' }, { value: 'final', extra: true }],
+        ],
+      },
+      output(input):: graph(input).demo,
+      expected: {
+        _node: true,
+        _path: 'root.demo',
+        value: 'final',
+        extra: true,
+      },
+    },
+    {
+      name: 'multiple specs at the same path merge in source order',
+      input:: {
+        nodeSpecs: [
+          [['demo'], { n: 1, label: 'first' }],
+          [['demo'], { label: 'second', extra: true }],
+        ],
+      },
+      output(input):: graph(input).demo,
+      expected: {
+        _node: true,
+        _path: 'root.demo',
+        n: 1,
+        label: 'second',
+        extra: true,
+      },
+    },
+    {
+      name: 'layer with _view suppresses default view under merge',
+      input:: {
+        nodeSpecs: [
+          [['demo'], { n: 1 }],
+          [['demo'], { _view:: 'custom' }],
+        ],
+        defaultView: { _view: 'default' },
+      },
+      output(input):: graph(input).demo._view,
+      expected: 'custom',
+    },
+    {
+      name: 'variable specs with different var names stay as siblings',
+      input:: {
+        nodeSpecs: [
+          [['parents', '$a'], { from: 'a' }],
+          [['parents', '$b'], { from: 'b' }],
+        ],
+      },
+      output(input)::
+        local parents = graph(input).parents;
+        {
+          a: parents.a('x'),
+          b: parents.b('y'),
+        },
+      expected: {
+        a: {
+          _node: true,
+          _path: 'root.parents.a("x")',
+          a: 'x',
+          from: 'a',
+        },
+        b: {
+          _node: true,
+          _path: 'root.parents.b("y")',
+          b: 'y',
+          from: 'b',
+        },
+      },
+    },
+    {
+      name: 'spec with no layers still establishes the node',
+      input:: {
+        nodeSpecs: [
+          [['demo']],
+        ],
+      },
+      output(input):: graph(input).demo,
+      expected: {
+        _node: true,
+        _path: 'root.demo',
       },
     },
   ],
