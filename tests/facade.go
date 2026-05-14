@@ -125,6 +125,14 @@ func (f *ServerBackedCLIFacade) Evaluate(ctx context.Context, expression string)
 	return f.client.Evaluate(ctx, expression)
 }
 
+func (f *ServerBackedCLIFacade) Query(ctx context.Context, path string) (pkg.Result, error) {
+	err := f.start()
+	if err != nil {
+		return pkg.Result{}, err
+	}
+	return f.client.Query(ctx, path)
+}
+
 func (f *ServerBackedCLIFacade) Render(ctx context.Context, path string, format pkg.Format) (pkg.Result, error) {
 	err := f.start()
 	if err != nil {
@@ -250,6 +258,26 @@ func (f *CLIFacade) Evaluate(ctx context.Context, expression string) (pkg.Result
 	}
 
 	return pkg.Result{Output: output.Output}, nil
+}
+
+func (f *CLIFacade) Query(ctx context.Context, path string) (pkg.Result, error) {
+	cmd := exec.CommandContext(ctx, f.binaryPath, "query", path)
+	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		if stderr.String() != "" {
+			return pkg.Result{}, errors.New(stderr.String())
+		}
+		return pkg.Result{}, err
+	}
+
+	return pkg.Result{Output: strings.TrimSuffix(stdout.String(), "\n")}, nil
 }
 
 func (f *CLIFacade) Render(ctx context.Context, path string, format pkg.Format) (pkg.Result, error) {
