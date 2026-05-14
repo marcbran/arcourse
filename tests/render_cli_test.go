@@ -17,7 +17,7 @@ func TestRenderCLIWritesOutputFile(t *testing.T) {
 		a_graph_root(`{ child: { _view:: { html: "<span>child</span>" } } }`)
 
 	when.
-		a_path_is_rendered_to_output_file([]string{"root", "child"}, pkg.FormatHTML, outputPath)
+		a_path_is_rendered_to_output_file("root/child", pkg.FormatHTML, outputPath)
 
 	then.
 		the_raw_output_is("").

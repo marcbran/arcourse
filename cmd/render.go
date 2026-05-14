@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 	"github.com/marcbran/jpoet/pkg/jpoet"
@@ -14,7 +13,7 @@ import (
 func newRenderCmd(plugins []*jpoet.Plugin) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "render [path]",
-		Short: "Render a path into the graph (dot-separated)",
+		Short: "Render a path into the graph (slash-separated)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			c.SilenceUsage = true
@@ -35,8 +34,7 @@ func newRenderCmd(plugins []*jpoet.Plugin) *cobra.Command {
 			}
 			facade := buildFacade(cfg, plugins)
 
-			path := strings.Split(args[0], ".")
-			result, err := facade.Render(c.Context(), path, format)
+			result, err := facade.Render(c.Context(), args[0], format)
 			if err != nil {
 				return err
 			}

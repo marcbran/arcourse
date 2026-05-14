@@ -55,12 +55,12 @@ func (s *CLIStage) a_graph_root(jsonnet string) *CLIStage {
 	return s
 }
 
-func (s *CLIStage) a_path_is_rendered_to_output_file(path []string, format pkg.Format, outputPath string) *CLIStage {
+func (s *CLIStage) a_path_is_rendered_to_output_file(path string, format pkg.Format, outputPath string) *CLIStage {
 	cmd := exec.CommandContext(
 		context.Background(),
 		s.binaryPath,
 		"render",
-		strings.Join(path, "."),
+		path,
 		"--format",
 		string(format),
 		"--output",

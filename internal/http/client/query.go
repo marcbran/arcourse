@@ -11,17 +11,16 @@ import (
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 
-type renderRequest struct {
-	Path   string `json:"path"`
-	Format string `json:"format"`
+type queryRequest struct {
+	Path string `json:"path"`
 }
 
-func (c *Client) Render(ctx context.Context, path string, format pkg.Format) (pkg.Result, error) {
-	body, err := json.Marshal(renderRequest{Path: path, Format: string(format)})
+func (c *Client) Query(ctx context.Context, path string) (pkg.Result, error) {
+	body, err := json.Marshal(queryRequest{Path: path})
 	if err != nil {
 		return pkg.Result{}, err
 	}
-	url := c.baseURL + "/api/render"
+	url := c.baseURL + "/api/query"
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return pkg.Result{}, err

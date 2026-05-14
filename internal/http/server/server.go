@@ -25,6 +25,7 @@ type Server struct {
 func NewServer(facade pkg.Facade) *Server {
 	s := &Server{facade: facade, mux: http.NewServeMux()}
 	s.mux.HandleFunc("POST /api/evaluate", s.handleEvaluate)
+	s.mux.HandleFunc("POST /api/query", s.handleQuery)
 	s.mux.HandleFunc("POST /api/render", s.handleRender)
 	s.mux.HandleFunc("GET /{path...}", s.handleBrowse)
 	return s

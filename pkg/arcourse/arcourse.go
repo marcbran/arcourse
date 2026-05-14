@@ -33,5 +33,6 @@ type Result struct {
 
 type Facade interface {
 	Evaluate(ctx context.Context, expression string) (Result, error)
-	Render(ctx context.Context, path []string, format Format) (Result, error)
+	Query(ctx context.Context, path string) (Result, error)
+	Render(ctx context.Context, path string, format Format) (Result, error)
 }

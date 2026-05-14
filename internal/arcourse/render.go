@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
@@ -16,12 +17,13 @@ func NewRender(evaluate *Evaluate) *Render {
 	return &Render{evaluate: evaluate}
 }
 
-func (uc *Render) Exec(ctx context.Context, path []string, format pkg.Format) (pkg.Result, error) {
+func (uc *Render) Exec(ctx context.Context, path string, format pkg.Format) (pkg.Result, error) {
 	err := ctx.Err()
 	if err != nil {
 		return pkg.Result{}, err
 	}
-	segments := path[1:]
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	segments := parts[1:]
 	pathJSON, err := json.Marshal(segments)
 	if err != nil {
 		return pkg.Result{}, err
