@@ -105,19 +105,13 @@ local generate(resources, manifest=true) =
   local contains(xs, x) = std.length([y for y in xs if y == x]) > 0;
   local hasVerb(resource, verb) = contains(std.get(resource, 'verbs', []), verb);
   local group(resource) = std.get(resource, 'group', '');
-  local safeChar(c) =
-    if isAsciiLetter(c) || isAsciiDigit(c) then std.asciiLower(c) else '-';
-  local safeSegment(s) = std.join('', [safeChar(c) for c in std.stringChars(s)]);
   local lowerKind(resource) = std.asciiLower(resource.kind);
   local hasDuplicateKind(resource) =
     std.length([r for r in resources if r.kind == resource.kind]) > 1;
   local hasDuplicateName(resource) =
     std.length([r for r in resources if r.name == resource.name]) > 1;
-  local resourceRoute(resource) =
-    if hasDuplicateName(resource) && group(resource) != '' then
-      '%s-%s' % [resource.name, safeSegment(group(resource))]
-    else
-      resource.name;
+  local resourcePrefix(resource) = if group(resource) == '' then [] else [group(resource)];
+  local resourceRoute(resource) = resource.name;
   local itemVar(resource) =
     local base =
       if hasDuplicateKind(resource) && group(resource) != '' then
@@ -146,12 +140,12 @@ local generate(resources, manifest=true) =
   local itemName = member(metadata(var('item')), 'name');
   local resourceNode(parent, resource) = access(parent, route(resource));
   local namespacedResourceLink(resource, namespaceExpr, nameExpr) =
-    call(
-      member(call(member(rootContext, 'namespace'), [namespaceExpr]), itemVar(resource)),
-      [nameExpr]
-    );
+    local namespaceNode = call(member(rootContext, 'namespace'), [namespaceExpr]);
+    local base = if group(resource) == '' then namespaceNode else access(namespaceNode, group(resource));
+    call(member(base, itemVar(resource)), [nameExpr]);
   local clusterResourceLink(resource, nameExpr) =
-    call(member(rootContext, itemVar(resource)), [nameExpr]);
+    local base = if group(resource) == '' then rootContext else access(rootContext, group(resource));
+    call(member(base, itemVar(resource)), [nameExpr]);
 
   local kubectlGet(options, resource, name=j.Null) =
     callPretty(member(member(var('kubectl'), 'neat'), 'get'), [
@@ -226,7 +220,7 @@ local generate(resources, manifest=true) =
       )
     );
     node(
-      ['kubernetes', '$context', route(resource)],
+      ['kubernetes', '$context'] + resourcePrefix(resource) + [route(resource)],
       listObject(data, callPretty(member(var('std'), 'foldl'), [foldFn, items, j.Object()], 2)),
       view('list')
     );
@@ -235,7 +229,7 @@ local generate(resources, manifest=true) =
     local data = kubectlGet(contextOptions({ namespace: member(j.Dollar, 'namespace') }), resource);
     local items = getItems(member(j.Dollar, 'data'));
     node(
-      ['kubernetes', '$context', '$namespace', route(resource)],
+      ['kubernetes', '$context', '$namespace'] + resourcePrefix(resource) + [route(resource)],
       listObject(data, prettyObjectComp(
         [j.Field(
           itemName,
@@ -249,7 +243,7 @@ local generate(resources, manifest=true) =
 
   local namespacedDetail(resource) =
     node(
-      ['kubernetes', '$context', '$namespace', '$' + itemVar(resource), 'resource'],
+      ['kubernetes', '$context', '$namespace'] + resourcePrefix(resource) + ['$' + itemVar(resource), 'resource'],
       dataObject(kubectlGet(
         contextOptions({ namespace: member(j.Dollar, 'namespace') }),
         resource,
@@ -258,13 +252,13 @@ local generate(resources, manifest=true) =
       view('resource')
     );
   local namespacedDetailParent(resource) =
-    emptyNode(['kubernetes', '$context', '$namespace', '$' + itemVar(resource)]);
+    emptyNode(['kubernetes', '$context', '$namespace'] + resourcePrefix(resource) + ['$' + itemVar(resource)]);
 
   local clusterList(resource) =
     local data = kubectlGet(contextOptions(), resource);
     local items = getItems(member(j.Dollar, 'data'));
     node(
-      ['kubernetes', '$context', route(resource)],
+      ['kubernetes', '$context'] + resourcePrefix(resource) + [route(resource)],
       listObject(data, prettyObjectComp(
         [j.Field(itemName, clusterResourceLink(resource, itemName))],
         [j.ForSpec('item', items)],
@@ -275,12 +269,12 @@ local generate(resources, manifest=true) =
 
   local clusterDetail(resource) =
     node(
-      ['kubernetes', '$context', '$' + itemVar(resource), 'resource'],
+      ['kubernetes', '$context'] + resourcePrefix(resource) + ['$' + itemVar(resource), 'resource'],
       dataObject(kubectlGet(contextOptions(), resource, member(j.Dollar, itemVar(resource)))),
       view('resource')
     );
   local clusterDetailParent(resource) =
-    emptyNode(['kubernetes', '$context', '$' + itemVar(resource)]);
+    emptyNode(['kubernetes', '$context'] + resourcePrefix(resource) + ['$' + itemVar(resource)]);
 
   local resourceNodes(resource) =
     if resource.namespaced then
@@ -301,11 +295,15 @@ local generate(resources, manifest=true) =
     view('resource')
   );
 
+  local nonCoreGroups = std.set([group(r) for r in resources if group(r) != '']);
+  local nonCoreNamespacedGroups = std.set([group(r) for r in resources if group(r) != '' && r.namespaced]);
+  local groupContextNodes = [emptyNode(['kubernetes', '$context', g]) for g in nonCoreGroups];
+  local groupNamespaceNodes = [emptyNode(['kubernetes', '$context', '$namespace', g]) for g in nonCoreNamespacedGroups];
   local generated = j.Locals([
     j.LocalBind('a', j.Import('arcourse-ui/main.libsonnet')),
     j.LocalBind('kubectl', j.Import('kubectl/main.libsonnet')),
     j.LocalBind('root', j.Import('root')),
-  ], prettyArray([contextsNode, contextNode, namespaceNode, apiResourcesNode] + std.flattenArrays([resourceNodes(r) for r in resources])));
+  ], prettyArray([contextsNode, contextNode, namespaceNode, apiResourcesNode] + groupContextNodes + groupNamespaceNodes + std.flattenArrays([resourceNodes(r) for r in resources])));
 
   if manifest then j.manifestJsonnet(generated) else generated;
 
