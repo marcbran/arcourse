@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0](https://github.com/marcbran/arcourse/compare/v0.5.0...v0.6.0) (2026-05-14)
+
+
+### Features
+
+* group kube nodes by resource groups ([#32](https://github.com/marcbran/arcourse/issues/32)) ([5b79554](https://github.com/marcbran/arcourse/commit/5b79554ebcd10e8237ee0af18e3e8a7fb1631168))
+* query command ([#30](https://github.com/marcbran/arcourse/issues/30)) ([c452eb3](https://github.com/marcbran/arcourse/commit/c452eb33dd7e65f73490981d840027d1c8a4e0b2))
+
 ## [0.5.0](https://github.com/marcbran/arcourse/compare/v0.4.0...v0.5.0) (2026-05-06)
 
 
