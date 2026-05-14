@@ -12,43 +12,43 @@ func TestRenderPathAsHTML(t *testing.T) {
 	cases := []struct {
 		name     string
 		graph    string
-		path     []string
+		path     string
 		expected string
 	}{
 		{
 			name:     "root node",
 			graph:    `{ _view:: { html: "<p>hi</p>" } }`,
-			path:     []string{"root"},
+			path:     "root",
 			expected: `<p>hi</p>`,
 		},
 		{
 			name:     "nested child",
 			graph:    `{ child: { _view:: { html: "<span>child</span>" } } }`,
-			path:     []string{"root", "child"},
+			path:     "root/child",
 			expected: `<span>child</span>`,
 		},
 		{
 			name:     "deeply nested path",
 			graph:    `{ a: { b: { _view:: { html: "<div>deep</div>" } } } }`,
-			path:     []string{"root", "a", "b"},
+			path:     "root/a/b",
 			expected: `<div>deep</div>`,
 		},
 		{
 			name:     "path segment with hyphen",
 			graph:    `{ "my-node": { _view:: { html: "<p>hyphen</p>" } } }`,
-			path:     []string{"root", "my-node"},
+			path:     "root/my-node",
 			expected: `<p>hyphen</p>`,
 		},
 		{
 			name:     "function field applied to next segment",
 			graph:    `{ get: function(name) { _view:: { html: "<p>" + name + "</p>" } } }`,
-			path:     []string{"root", "get", "alice"},
+			path:     "root/get/alice",
 			expected: `<p>alice</p>`,
 		},
 		{
 			name:     "chained function fields",
 			graph:    `{ owner: function(o) { repo: function(r) { _view:: { html: "<p>" + o + "/" + r + "</p>" } } } }`,
-			path:     []string{"root", "owner", "marcbran", "repo", "arcourse"},
+			path:     "root/owner/marcbran/repo/arcourse",
 			expected: `<p>marcbran/arcourse</p>`,
 		},
 	}
@@ -76,7 +76,7 @@ func TestRenderPathAsJsonnet(t *testing.T) {
 		a_graph_root(`{ child: { _view:: { jsonnet: "local x = 1;\nx" } } }`)
 
 	when.
-		a_path_is_rendered([]string{"root", "child"}, pkg.FormatJsonnet)
+		a_path_is_rendered("root/child", pkg.FormatJsonnet)
 
 	then.
 		the_raw_output_is("local x = 1;\nx")
@@ -89,7 +89,7 @@ func TestRenderPathNotFound(t *testing.T) {
 		a_graph_root(`{ child: { _view:: { html: "<p>hi</p>" } } }`)
 
 	when.
-		a_path_is_rendered([]string{"root", "nonexistent"}, pkg.FormatHTML)
+		a_path_is_rendered("root/nonexistent", pkg.FormatHTML)
 
 	then.
 		the_error_contains("nonexistent")

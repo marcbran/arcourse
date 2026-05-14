@@ -125,7 +125,7 @@ func (f *ServerBackedCLIFacade) Evaluate(ctx context.Context, expression string)
 	return f.client.Evaluate(ctx, expression)
 }
 
-func (f *ServerBackedCLIFacade) Render(ctx context.Context, path []string, format pkg.Format) (pkg.Result, error) {
+func (f *ServerBackedCLIFacade) Render(ctx context.Context, path string, format pkg.Format) (pkg.Result, error) {
 	err := f.start()
 	if err != nil {
 		return pkg.Result{}, err
@@ -252,8 +252,8 @@ func (f *CLIFacade) Evaluate(ctx context.Context, expression string) (pkg.Result
 	return pkg.Result{Output: output.Output}, nil
 }
 
-func (f *CLIFacade) Render(ctx context.Context, path []string, format pkg.Format) (pkg.Result, error) {
-	cmd := exec.CommandContext(ctx, f.binaryPath, "render", strings.Join(path, "."), "--format", string(format))
+func (f *CLIFacade) Render(ctx context.Context, path string, format pkg.Format) (pkg.Result, error) {
+	cmd := exec.CommandContext(ctx, f.binaryPath, "render", path, "--format", string(format))
 	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
 
 	var stdout bytes.Buffer

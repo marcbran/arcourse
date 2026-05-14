@@ -18,8 +18,8 @@ type outputResponse struct {
 }
 
 type renderRequest struct {
-	Path   []string `json:"path"`
-	Format string   `json:"format"`
+	Path   string `json:"path"`
+	Format string `json:"format"`
 }
 
 func (s *Server) handleEvaluate(w http.ResponseWriter, r *http.Request) {
@@ -58,7 +58,7 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 		returnBadRequest(w, err)
 		return
 	}
-	if len(req.Path) == 0 {
+	if req.Path == "" {
 		returnBadRequest(w, errors.New("path is required"))
 		return
 	}

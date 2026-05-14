@@ -11,21 +11,10 @@ import (
 func (s *Server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimRight(r.PathValue("path"), "/")
 	if path == "" {
-		http.Redirect(w, r, "/root/", http.StatusFound)
+		http.Redirect(w, r, "/root", http.StatusFound)
 		return
 	}
-	segments := strings.Split(path, "/")
-	for _, segment := range segments {
-		if strings.Contains(segment, ".") {
-			http.NotFound(w, r)
-			return
-		}
-	}
-	if len(segments) > 0 && segments[0] == "api" {
-		http.NotFound(w, r)
-		return
-	}
-	result, err := s.facade.Render(r.Context(), segments, pkg.FormatHTML)
+	result, err := s.facade.Render(r.Context(), path, pkg.FormatHTML)
 	if err != nil {
 		returnError(w, err)
 		return
