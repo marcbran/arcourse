@@ -27,10 +27,10 @@ func (f *facade) Evaluate(ctx context.Context, expression string) (pkg.Result, e
 	return f.evaluate.Exec(ctx, expression)
 }
 
-func (f *facade) Query(ctx context.Context, path string) (pkg.Result, error) {
-	return f.query.Exec(ctx, path)
+func (f *facade) Query(ctx context.Context, path string, params map[string]any) (pkg.Result, error) {
+	return f.query.Exec(ctx, path, params)
 }
 
-func (f *facade) Render(ctx context.Context, path string, format pkg.Format) (pkg.Result, error) {
-	return f.render.Exec(ctx, path, format)
+func (f *facade) Render(ctx context.Context, path string, params map[string]any, format pkg.Format) (pkg.Result, error) {
+	return f.render.Exec(ctx, path, params, format)
 }

@@ -14,7 +14,15 @@ func (s *Server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/root", http.StatusFound)
 		return
 	}
-	result, err := s.facade.Render(r.Context(), path, pkg.FormatHTML)
+	params := map[string]any{}
+	for key, values := range r.URL.Query() {
+		if len(values) == 1 {
+			params[key] = values[0]
+		} else if len(values) > 1 {
+			params[key] = values
+		}
+	}
+	result, err := s.facade.Render(r.Context(), path, params, pkg.FormatHTML)
 	if err != nil {
 		returnError(w, err)
 		return

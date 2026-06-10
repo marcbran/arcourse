@@ -17,7 +17,7 @@ func NewQuery(evaluate *Evaluate) *Query {
 	return &Query{evaluate: evaluate}
 }
 
-func (uc *Query) Exec(ctx context.Context, path string) (pkg.Result, error) {
+func (uc *Query) Exec(ctx context.Context, path string, params map[string]any) (pkg.Result, error) {
 	err := ctx.Err()
 	if err != nil {
 		return pkg.Result{}, err
@@ -28,9 +28,14 @@ func (uc *Query) Exec(ctx context.Context, path string) (pkg.Result, error) {
 	if err != nil {
 		return pkg.Result{}, err
 	}
+	paramsJSON, err := json.Marshal(normalizeParams(params))
+	if err != nil {
+		return pkg.Result{}, err
+	}
 	expression := fmt.Sprintf(
-		"(import 'lib/traverse_path.libsonnet')(root, %s)",
+		"(import 'lib/query.libsonnet')(root, %s, %s)",
 		string(pathJSON),
+		string(paramsJSON),
 	)
 	return uc.evaluate.Exec(ctx, expression)
 }

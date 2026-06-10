@@ -14,12 +14,14 @@ type evaluateRequest struct {
 }
 
 type queryRequest struct {
-	Path string `json:"path"`
+	Path   string         `json:"path"`
+	Params map[string]any `json:"params"`
 }
 
 type renderRequest struct {
-	Path   string `json:"path"`
-	Format string `json:"format"`
+	Path   string         `json:"path"`
+	Params map[string]any `json:"params"`
+	Format string         `json:"format"`
 }
 
 type outputResponse struct {
@@ -66,7 +68,7 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 		returnBadRequest(w, errors.New("path is required"))
 		return
 	}
-	result, err := s.facade.Query(r.Context(), req.Path)
+	result, err := s.facade.Query(r.Context(), req.Path, req.Params)
 	if err != nil {
 		returnError(w, err)
 		return
@@ -95,7 +97,7 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 		returnBadRequest(w, err)
 		return
 	}
-	result, err := s.facade.Render(r.Context(), req.Path, format)
+	result, err := s.facade.Render(r.Context(), req.Path, req.Params, format)
 	if err != nil {
 		returnError(w, err)
 		return

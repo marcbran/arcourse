@@ -12,11 +12,12 @@ import (
 )
 
 type queryRequest struct {
-	Path string `json:"path"`
+	Path   string         `json:"path"`
+	Params map[string]any `json:"params"`
 }
 
-func (c *Client) Query(ctx context.Context, path string) (pkg.Result, error) {
-	body, err := json.Marshal(queryRequest{Path: path})
+func (c *Client) Query(ctx context.Context, path string, params map[string]any) (pkg.Result, error) {
+	body, err := json.Marshal(queryRequest{Path: path, Params: params})
 	if err != nil {
 		return pkg.Result{}, err
 	}

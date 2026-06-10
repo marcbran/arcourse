@@ -125,20 +125,20 @@ func (f *ServerBackedCLIFacade) Evaluate(ctx context.Context, expression string)
 	return f.client.Evaluate(ctx, expression)
 }
 
-func (f *ServerBackedCLIFacade) Query(ctx context.Context, path string) (pkg.Result, error) {
+func (f *ServerBackedCLIFacade) Query(ctx context.Context, path string, params map[string]any) (pkg.Result, error) {
 	err := f.start()
 	if err != nil {
 		return pkg.Result{}, err
 	}
-	return f.client.Query(ctx, path)
+	return f.client.Query(ctx, path, params)
 }
 
-func (f *ServerBackedCLIFacade) Render(ctx context.Context, path string, format pkg.Format) (pkg.Result, error) {
+func (f *ServerBackedCLIFacade) Render(ctx context.Context, path string, params map[string]any, format pkg.Format) (pkg.Result, error) {
 	err := f.start()
 	if err != nil {
 		return pkg.Result{}, err
 	}
-	return f.client.Render(ctx, path, format)
+	return f.client.Render(ctx, path, params, format)
 }
 
 func (f *ServerBackedCLIFacade) start() error {
@@ -260,8 +260,10 @@ func (f *CLIFacade) Evaluate(ctx context.Context, expression string) (pkg.Result
 	return pkg.Result{Output: output.Output}, nil
 }
 
-func (f *CLIFacade) Query(ctx context.Context, path string) (pkg.Result, error) {
-	cmd := exec.CommandContext(ctx, f.binaryPath, "query", path)
+func (f *CLIFacade) Query(ctx context.Context, path string, params map[string]any) (pkg.Result, error) {
+	args := []string{"query", path}
+	args = appendParamArgs(args, params)
+	cmd := exec.CommandContext(ctx, f.binaryPath, args...)
 	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
 
 	var stdout bytes.Buffer
@@ -280,8 +282,10 @@ func (f *CLIFacade) Query(ctx context.Context, path string) (pkg.Result, error) 
 	return pkg.Result{Output: strings.TrimSuffix(stdout.String(), "\n")}, nil
 }
 
-func (f *CLIFacade) Render(ctx context.Context, path string, format pkg.Format) (pkg.Result, error) {
-	cmd := exec.CommandContext(ctx, f.binaryPath, "render", path, "--format", string(format))
+func (f *CLIFacade) Render(ctx context.Context, path string, params map[string]any, format pkg.Format) (pkg.Result, error) {
+	args := []string{"render", path, "--format", string(format)}
+	args = appendParamArgs(args, params)
+	cmd := exec.CommandContext(ctx, f.binaryPath, args...)
 	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
 
 	var stdout bytes.Buffer
@@ -298,4 +302,22 @@ func (f *CLIFacade) Render(ctx context.Context, path string, format pkg.Format) 
 	}
 
 	return pkg.Result{Output: strings.TrimSuffix(stdout.String(), "\n")}, nil
+}
+
+func appendParamArgs(args []string, params map[string]any) []string {
+	for key, value := range params {
+		switch value := value.(type) {
+		case []string:
+			for _, item := range value {
+				args = append(args, "--param", key+"="+item)
+			}
+		case []any:
+			for _, item := range value {
+				args = append(args, "--param", key+"="+fmt.Sprint(item))
+			}
+		default:
+			args = append(args, "--param", key+"="+fmt.Sprint(value))
+		}
+	}
+	return args
 }

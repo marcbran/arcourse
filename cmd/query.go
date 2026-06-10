@@ -9,6 +9,7 @@ import (
 )
 
 func newQueryCmd(plugins []*jpoet.Plugin) *cobra.Command {
+	var paramFlags []string
 	cmd := &cobra.Command{
 		Use:   "query [path]",
 		Short: "Query a node by path and return its JSON value (slash-separated)",
@@ -17,13 +18,18 @@ func newQueryCmd(plugins []*jpoet.Plugin) *cobra.Command {
 			c.SilenceUsage = true
 			c.SilenceErrors = true
 
+			params, err := parseParams(paramFlags)
+			if err != nil {
+				return err
+			}
+
 			cfg, err := loadConfig()
 			if err != nil {
 				return err
 			}
 			facade := buildFacade(cfg, plugins)
 
-			result, err := facade.Query(c.Context(), args[0])
+			result, err := facade.Query(c.Context(), args[0], params)
 			if err != nil {
 				return err
 			}
@@ -32,5 +38,6 @@ func newQueryCmd(plugins []*jpoet.Plugin) *cobra.Command {
 			return err
 		},
 	}
+	cmd.Flags().StringArrayVar(&paramFlags, "param", nil, "Parameter as key=value (repeatable)")
 	return cmd
 }

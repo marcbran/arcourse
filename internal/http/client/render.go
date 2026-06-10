@@ -12,12 +12,13 @@ import (
 )
 
 type renderRequest struct {
-	Path   string `json:"path"`
-	Format string `json:"format"`
+	Path   string         `json:"path"`
+	Params map[string]any `json:"params"`
+	Format string         `json:"format"`
 }
 
-func (c *Client) Render(ctx context.Context, path string, format pkg.Format) (pkg.Result, error) {
-	body, err := json.Marshal(renderRequest{Path: path, Format: string(format)})
+func (c *Client) Render(ctx context.Context, path string, params map[string]any, format pkg.Format) (pkg.Result, error) {
+	body, err := json.Marshal(renderRequest{Path: path, Params: params, Format: string(format)})
 	if err != nil {
 		return pkg.Result{}, err
 	}
