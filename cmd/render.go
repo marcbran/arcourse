@@ -11,6 +11,7 @@ import (
 )
 
 func newRenderCmd(plugins []*jpoet.Plugin) *cobra.Command {
+	var paramFlags []string
 	cmd := &cobra.Command{
 		Use:   "render [path]",
 		Short: "Render a path into the graph (slash-separated)",
@@ -18,6 +19,11 @@ func newRenderCmd(plugins []*jpoet.Plugin) *cobra.Command {
 		RunE: func(c *cobra.Command, args []string) error {
 			c.SilenceUsage = true
 			c.SilenceErrors = true
+
+			params, err := parseParams(paramFlags)
+			if err != nil {
+				return err
+			}
 
 			formatStr, err := c.Flags().GetString("format")
 			if err != nil {
@@ -34,7 +40,7 @@ func newRenderCmd(plugins []*jpoet.Plugin) *cobra.Command {
 			}
 			facade := buildFacade(cfg, plugins)
 
-			result, err := facade.Render(c.Context(), args[0], format)
+			result, err := facade.Render(c.Context(), args[0], params, format)
 			if err != nil {
 				return err
 			}
@@ -53,6 +59,7 @@ func newRenderCmd(plugins []*jpoet.Plugin) *cobra.Command {
 	}
 	cmd.Flags().StringP("format", "f", "html", "Output format: html")
 	cmd.Flags().StringP("output", "o", "", "Write output to a file")
+	cmd.Flags().StringArrayVar(&paramFlags, "param", nil, "Parameter as key=value (repeatable)")
 	return cmd
 }
 

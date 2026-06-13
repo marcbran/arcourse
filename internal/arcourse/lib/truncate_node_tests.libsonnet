@@ -90,6 +90,30 @@ local truncateNode = import './truncate_node.libsonnet';
       },
     },
     {
+      name: 'params spec included in reference',
+      input:: {
+        _node: 'resource',
+        child: {
+          _node: 'facet',
+          _params:: [{ name: 'page', type: 'number', default: 1 }],
+          value: 10,
+        },
+      },
+      output(input)::
+        local out = truncateNode(input);
+        local ref = out.child;
+        {
+          hasParamsSpec: std.objectHasAll(ref, '_params'),
+          hasVisibleParamsSpec: std.objectHas(ref, '_params'),
+          paramsSpec: ref._params,
+        },
+      expected: {
+        hasParamsSpec: true,
+        hasVisibleParamsSpec: false,
+        paramsSpec: [{ name: 'page', type: 'number', default: 1 }],
+      },
+    },
+    {
       name: 'summary included',
       input:: {
         _node: 'resource',

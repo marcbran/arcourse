@@ -17,7 +17,7 @@ func NewRender(evaluate *Evaluate) *Render {
 	return &Render{evaluate: evaluate}
 }
 
-func (uc *Render) Exec(ctx context.Context, path string, format pkg.Format) (pkg.Result, error) {
+func (uc *Render) Exec(ctx context.Context, path string, params map[string]any, format pkg.Format) (pkg.Result, error) {
 	err := ctx.Err()
 	if err != nil {
 		return pkg.Result{}, err
@@ -28,9 +28,14 @@ func (uc *Render) Exec(ctx context.Context, path string, format pkg.Format) (pkg
 	if err != nil {
 		return pkg.Result{}, err
 	}
+	paramsJSON, err := json.Marshal(normalizeParams(params))
+	if err != nil {
+		return pkg.Result{}, err
+	}
 	expression := fmt.Sprintf(
-		"(import 'lib/traverse_path.libsonnet')(root, %s)._view.%s",
+		"(import 'lib/render.libsonnet')(root, %s, %s, %q)",
 		string(pathJSON),
+		string(paramsJSON),
 		string(format),
 	)
 	result, err := uc.evaluate.Exec(ctx, expression)

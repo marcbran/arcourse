@@ -82,6 +82,43 @@ func TestRenderPathAsJsonnet(t *testing.T) {
 		the_raw_output_is("local x = 1;\nx")
 }
 
+func TestRenderNodeWithParams(t *testing.T) {
+	given, when, then := scenario(t)
+
+	given.
+		a_graph_root(`{
+			child: {
+				local node = self,
+				_params:: [{ name: 'name', type: 'string' }],
+				_view:: { html: '<p>' + node.name + '</p>' },
+			},
+		}`)
+
+	when.
+		a_path_is_rendered_with_params("root/child", map[string]any{"name": "alice"}, pkg.FormatHTML)
+
+	then.
+		the_raw_output_is("<p>alice</p>")
+}
+
+func TestRenderInvalidParams(t *testing.T) {
+	given, when, then := scenario(t)
+
+	given.
+		a_graph_root(`{
+			child: {
+				_params:: [{ name: 'page', type: 'number' }],
+				_view:: { html: '<p>ok</p>' },
+			},
+		}`)
+
+	when.
+		a_path_is_rendered_with_params("root/child", map[string]any{"unknown": "1"}, pkg.FormatHTML)
+
+	then.
+		the_error_contains("undeclared parameter")
+}
+
 func TestRenderPathNotFound(t *testing.T) {
 	given, when, then := scenario(t)
 
