@@ -27,8 +27,8 @@ local node(path, body={}) =
     _node: true,
     _vars:: vars,
     _pathTemplate:: path,
-    _path: resolvePath(self, path),
-    _urlPath:: resolveUrlPath(self, path),
+    _evalPath:: resolvePath(self, path),
+    _queryPath:: resolveUrlPath(self, path),
   } +
   mergeLayers(layers);
 

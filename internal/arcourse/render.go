@@ -38,7 +38,7 @@ func (uc *Render) Exec(ctx context.Context, path string, params map[string]any, 
 		string(paramsJSON),
 		string(format),
 	)
-	result, err := uc.evaluate.Exec(ctx, expression)
+	result, err := uc.evaluate.exec(ctx, expression)
 	if err != nil {
 		return pkg.Result{}, err
 	}

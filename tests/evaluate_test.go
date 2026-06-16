@@ -142,15 +142,15 @@ func TestTruncateDescendantNodesToReferences(t *testing.T) {
 		},
 		{
 			name:       "descendant node replaced with reference",
-			graph:      `{ _node: "resource", child: { _node: "resource", _path: "child", data: "big" } }`,
+			graph:      `{ _node: "resource", child: { _node: "resource", _evalPath:: "child", data: "big" } }`,
 			expression: `root`,
-			expected:   `{"_node":"resource","child":{"_node":"resource","_path":"child"}}`,
+			expected:   `{"_node":"resource","child":{"_node":"resource","_evalPath":"child"}}`,
 		},
 		{
 			name:       "reference includes _summary when present",
-			graph:      `{ _node: "resource", child: { _node: "resource", _path: "c", _summary: "A child", data: 42 } }`,
+			graph:      `{ _node: "resource", child: { _node: "resource", _evalPath:: "c", _summary: "A child", data: 42 } }`,
 			expression: `root`,
-			expected:   `{"_node":"resource","child":{"_node":"resource","_path":"c","_summary":"A child"}}`,
+			expected:   `{"_node":"resource","child":{"_node":"resource","_evalPath":"c","_summary":"A child"}}`,
 		},
 		{
 			name:       "no _node markers produces unmodified output",

@@ -37,5 +37,5 @@ func (uc *Query) Exec(ctx context.Context, path string, params map[string]any) (
 		string(pathJSON),
 		string(paramsJSON),
 	)
-	return uc.evaluate.Exec(ctx, expression)
+	return uc.evaluate.exec(ctx, expression)
 }

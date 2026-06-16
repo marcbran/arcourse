@@ -30,6 +30,11 @@ func NewEvaluate(cfg EvaluateConfig, evaluator Evaluator) *Evaluate {
 }
 
 func (e *Evaluate) Exec(ctx context.Context, expression string) (pkg.Result, error) {
+	wrapped := fmt.Sprintf("(import 'lib/eval.libsonnet')(root, %s)", expression)
+	return e.exec(ctx, wrapped)
+}
+
+func (e *Evaluate) exec(ctx context.Context, expression string) (pkg.Result, error) {
 	err := ctx.Err()
 	if err != nil {
 		return pkg.Result{}, err
@@ -49,9 +54,7 @@ construct_graph_root(import %q)`, slash)
 	} else {
 		rootSnippet = fmt.Sprintf(`import %q`, slash)
 	}
-	snippet := fmt.Sprintf(`local truncateNode = import 'lib/truncate_node.libsonnet';
-local root = import 'root';
-truncateNode(%s)`, expression)
+	snippet := fmt.Sprintf(`local root = import 'root'; %s`, expression)
 	out, err := e.evaluator.EvaluateSnippet(snippet, map[string]string{"root": rootSnippet})
 	if err != nil {
 		return pkg.Result{}, err
