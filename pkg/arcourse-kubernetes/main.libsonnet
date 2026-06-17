@@ -77,7 +77,7 @@ local generate(resources, group, version) =
   local call(expr, args=[]) = j.Apply(expr, args);
   local callPretty(expr, args, indent=0) = prettyApply(expr, args, indent);
   local rootContext =
-    call(member(member(var('root'), 'kubernetes'), 'context'), [member(j.Dollar, 'context')]);
+    call(member(member(var('root'), 'kubernetes'), 'context'), [access(j.Dollar, 'context')]);
   local metadata(expr) = member(expr, 'metadata');
   local itemNamespace = member(metadata(var('item')), 'namespace');
   local itemName = member(metadata(var('item')), 'name');
@@ -94,18 +94,7 @@ local generate(resources, group, version) =
     else '/apis/' + group + '/' + version;
 
   local k8sGet(pathExpr) =
-    callPretty(
-      call(member(var('std'), 'native'), [j.String('invoke:kubernetes')]),
-      [
-        j.String('request'),
-        prettyArray([prettyObject([
-          j.Field('context', access(j.Dollar, 'context')),
-          j.Field('method', j.String('GET')),
-          j.Field('path', pathExpr),
-        ], 4)], 4),
-      ],
-      4
-    );
+    call(member(var('kubernetes'), 'get'), [access(j.Dollar, 'context'), pathExpr]);
 
   local staticPath(path) = j.String(path);
   local formatPath(fmt, args) = j.Std.format(j.String(fmt), j.Array(args));
@@ -281,7 +270,7 @@ local generateAll(groups, manifest=true) =
   local contextsNode = j.Array([
     j.Array([j.String('kubernetes'), j.String('contexts')]),
     prettyObject([
-      j.Field('data', call(member(member(var('kubectl'), 'config'), 'getContexts'))),
+      j.Field('data', call(member(var('kubernetes'), 'contexts'))),
       j.Field('links', prettyObjectComp(
         [j.Field(member(var('c'), 'name'), call(member(member(var('root'), 'kubernetes'), 'context'), [member(var('c'), 'name')]))],
         [j.ForSpec('c', member(j.Dollar, 'data'))],
@@ -302,7 +291,7 @@ local generateAll(groups, manifest=true) =
   local generated = j.Locals(
     [
       j.LocalBind('a', j.Import('arcourse-ui/main.libsonnet')),
-      j.LocalBind('kubectl', j.Import('kubectl/main.libsonnet')),
+      j.LocalBind('kubernetes', j.Import('kubernetes/main.libsonnet')),
       j.LocalBind('root', j.Import('root')),
     ],
     prettyArray(allRouteNodes)
