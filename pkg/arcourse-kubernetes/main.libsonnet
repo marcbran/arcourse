@@ -17,7 +17,7 @@ local dedupeResources(resources) =
   );
   [byKey[k] for k in std.sort(std.objectFields(byKey))];
 
-local generate(resources, group, version, manifest=true) =
+local generate(resources, group, version) =
   local le(indent=0) = j.Fodder.LineEnd(0, indent);
   local prettyArray(elements, indent=0) =
     j.Array([elem.fodder(le(indent + 2)) for elem in elements]).closeFodder(le(indent));
@@ -142,7 +142,7 @@ local generate(resources, group, version, manifest=true) =
   local dataObject(expr) = prettyObject([dataField(expr)], 2);
   local listObject(dataExpr, linksExpr, columnsExpr=null) = prettyObject(
     [dataField(dataExpr, hidden=true), j.Field('links', linksExpr)] +
-    (if columnsExpr != null then [j.Field('columns', columnsExpr)] else []),
+    (if columnsExpr != null then [j.Field('columns', columnsExpr) { Hide: 0 }] else []),
     2
   );
   local view(name) = member(member(var('a'), name), 'view');
@@ -259,19 +259,62 @@ local generate(resources, group, version, manifest=true) =
     then [emptyNode(['kubernetes', '$context', '$namespace', group])]
     else [];
 
+  groupContextNodes +
+  groupNamespaceNodes +
+  std.flattenArrays([resourceNodes(r) for r in resources]);
+
+local generateAll(groups, manifest=true) =
+  local le(indent=0) = j.Fodder.LineEnd(0, indent);
+  local prettyArray(elements, indent=0) =
+    j.Array([elem.fodder(le(indent + 2)) for elem in elements]).closeFodder(le(indent));
+  local prettyObject(fields, indent=0) =
+    j.Object([field { fodder: [le(indent + 2)] } for field in fields]).closeFodder(le(indent));
+  local prettyObjectComp(fields, specs, indent=0) =
+    j.ObjectComp(
+      [field { fodder: [le(indent + 2)] } for field in fields],
+      [spec.forFodder(le(indent + 2)) for spec in specs]
+    ).closeFodder(le(indent));
+  local var(name) = j.Var(name);
+  local member(expr, name) = j.Member(expr, name);
+  local call(expr, args=[]) = j.Apply(expr, args);
+
+  local contextsNode = j.Array([
+    j.Array([j.String('kubernetes'), j.String('contexts')]),
+    prettyObject([
+      j.Field('data', call(member(member(var('kubectl'), 'config'), 'getContexts'))),
+      j.Field('links', prettyObjectComp(
+        [j.Field(member(var('c'), 'name'), call(member(member(var('root'), 'kubernetes'), 'context'), [member(var('c'), 'name')]))],
+        [j.ForSpec('c', member(j.Dollar, 'data'))],
+        4
+      )),
+    ], 2),
+    member(member(var('a'), 'list'), 'view'),
+  ]);
+  local contextNode = j.Array([
+    j.Array([j.String('kubernetes'), j.String('$context')]),
+    j.Object(),
+  ]);
+
+  local allRouteNodes = [contextsNode, contextNode] + std.flattenArrays([
+    generate(g.resources, g.group, g.version)
+    for g in groups
+  ]);
   local generated = j.Locals(
     [
       j.LocalBind('a', j.Import('arcourse-ui/main.libsonnet')),
+      j.LocalBind('kubectl', j.Import('kubectl/main.libsonnet')),
       j.LocalBind('root', j.Import('root')),
     ],
-    prettyArray(
-      groupContextNodes +
-      groupNamespaceNodes +
-      std.flattenArrays([resourceNodes(r) for r in resources])
-    )
+    prettyArray(allRouteNodes)
   );
-
   if manifest then j.manifestJsonnet(generated) else generated;
+
+local groupVersionFromSpec(specStr) =
+  local spec = std.parseJson(specStr);
+  local firstPath = std.objectFields(spec.paths)[0];
+  local parts = [p for p in std.split(firstPath, '/') if p != ''];
+  if parts[0] == 'api' then { group: '', version: parts[1] }
+  else { group: parts[1], version: parts[2] };
 
 local resourcesFromSpecAndLinks(specStr, links, columns, group) =
   local spec = std.parseJson(specStr);
@@ -303,16 +346,20 @@ local resourcesFromSpecAndLinks(specStr, links, columns, group) =
 
 local graph = {
   manifest: true,
-  group: error 'group is required',
-  version: 'v1',
-  spec: error 'spec is required',
-  links: error 'links is required',
-  columns: [],
+  groups: error 'groups is required',
   data: {
-    resources: resourcesFromSpecAndLinks($.spec, $.links, $.columns, $.group),
+    groups: [
+      local gv = groupVersionFromSpec(g.spec);
+      {
+        group: gv.group,
+        version: gv.version,
+        resources: resourcesFromSpecAndLinks(g.spec, g.links, if std.objectHasAll(g, 'columns') then g.columns else [], gv.group),
+      }
+      for g in $.groups
+    ],
   },
   _view:: {
-    jsonnet: generate($.data.resources, $.group, $.version, $.manifest),
+    jsonnet: generateAll($.data.groups, $.manifest),
   },
 };
 
