@@ -1,4 +1,5 @@
 local j = import 'jsonnet/main.libsonnet';
+local kubernetes = import 'kubernetes/main.libsonnet';
 
 local resourceVerbs(resource) = std.get(resource, 'verbs', []);
 
@@ -353,20 +354,69 @@ local resourcesFromSpecAndLinks(specStr, links, columns, group) =
     };
   dedupeResources([resourceFromLink(link) for link in effectiveLinks]);
 
+local defaultColumns(namespaced) =
+  [{ key: 'metadata.name', kind: 'name', label: 'Name', path: ['metadata', 'name'], priority: 'primary' }] +
+  (if namespaced then [{ key: 'metadata.namespace', kind: 'text', label: 'Namespace', path: ['metadata', 'namespace'], priority: 'secondary' }] else []) +
+  [{ key: 'metadata.creationTimestamp', kind: 'timestamp', label: 'Created', path: ['metadata', 'creationTimestamp'], priority: 'tertiary' }];
+
+local resourcesFromDiscovery(discovery, group, columns, links) =
+  local groupVersion = if group == '' then 'v1' else group + '/' + discovery.groupVersion;
+  local columnsForGroup = std.get(columns, groupVersion, []);
+  local linksForGroup = std.get(links, groupVersion, null);
+  local apiPrefix = if group == '' then '/api/' + discovery.groupVersion else '/apis/' + discovery.groupVersion;
+  local isNamespaced(r) = r.namespaced;
+  local sourcePath(r) = if isNamespaced(r) then apiPrefix + '/namespaces/{namespace}/' + r.name else apiPrefix + '/' + r.name;
+  local findColumns(r) =
+    local path = sourcePath(r);
+    local matching = [c for c in columnsForGroup if c.sourcePath == path];
+    if std.length(matching) > 0 then matching[0].columns else defaultColumns(isNamespaced(r));
+  local effectiveLinks = if linksForGroup != null then linksForGroup else [];
+  local linkedNames = std.set([
+    local parts = [p for p in std.split(l.sourcePath, '/') if p != ''];
+    parts[std.length(parts) - 1]
+    for l in effectiveLinks
+  ]);
+  dedupeResources([
+    r { group: group, columns: findColumns(r) }
+    for r in discovery.resources
+    if std.length(std.findSubstr('/', r.name)) == 0
+  ]);
+
+local mergeGroups(groups) =
+  local byKey = std.foldl(
+    function(acc, g)
+      local key = g.group + '/' + g.version;
+      acc {
+        [key]: if std.objectHas(acc, key)
+          then acc[key] { resources: dedupeResources(acc[key].resources + g.resources) }
+          else g,
+      },
+    groups,
+    {}
+  );
+  [byKey[k] for k in std.objectFields(byKey)];
+
+local groupsFromContext(ctx, columns, links) =
+  local core = kubernetes.get(ctx, '/api/v1');
+  local apis = kubernetes.get(ctx, '/apis');
+  [{ group: '', version: 'v1', resources: resourcesFromDiscovery(core, '', columns, links) }] + [
+    local discovery = kubernetes.get(ctx, '/apis/' + g.preferredVersion.groupVersion);
+    { group: g.name, version: g.preferredVersion.version, resources: resourcesFromDiscovery(discovery, g.name, columns, links) }
+    for g in apis.groups
+  ];
+
 local graph = {
   manifest: true,
-  groups: error 'groups is required',
-  data: {
-    groups: [
-      local gv = groupVersionFromSpec(g.spec);
-      {
-        group: gv.group,
-        version: gv.version,
-        resources: resourcesFromSpecAndLinks(g.spec, if std.objectHas(g, 'links') then g.links else null, if std.objectHasAll(g, 'columns') then g.columns else [], gv.group),
-      }
-      for g in $.groups
-    ],
-  },
+  contexts: error 'contexts is required',
+  data:
+    local columns = if std.objectHas(self, 'columns') then self.columns else {};
+    local links = if std.objectHas(self, 'links') then self.links else {};
+    {
+      groups: mergeGroups(std.flattenArrays([
+        groupsFromContext(ctx, columns, links)
+        for ctx in $.contexts
+      ])),
+    },
   _view:: {
     jsonnet: generateAll($.data.groups, $.manifest),
   },
