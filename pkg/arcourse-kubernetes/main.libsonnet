@@ -95,6 +95,8 @@ local generate(resources, group, version) =
 
   local k8sGet(pathExpr) =
     call(member(var('kubernetes'), 'get'), [access(j.Dollar, 'context'), pathExpr]);
+  local k8sNeatGet(pathExpr) =
+    call(member(member(var('kubernetes'), 'neat'), 'get'), [access(j.Dollar, 'context'), pathExpr]);
 
   local staticPath(path) = j.String(path);
   local formatPath(fmt, args) = j.Std.format(j.String(fmt), j.Array(args));
@@ -209,7 +211,7 @@ local generate(resources, group, version) =
   local namespacedDetail(resource) =
     node(
       ['kubernetes', '$context', '$namespace'] + resourcePrefix + ['$' + itemVar(resource)],
-      dataObject(k8sGet(namespacedDetailPath(resource))),
+      dataObject(k8sNeatGet(namespacedDetailPath(resource))),
       view('resource')
     );
 
@@ -229,7 +231,7 @@ local generate(resources, group, version) =
   local clusterDetail(resource) =
     node(
       ['kubernetes', '$context'] + resourcePrefix + ['$' + itemVar(resource)],
-      dataObject(k8sGet(clusterDetailPath(resource))),
+      dataObject(k8sNeatGet(clusterDetailPath(resource))),
       view('resource')
     );
 
@@ -305,8 +307,22 @@ local groupVersionFromSpec(specStr) =
   if parts[0] == 'api' then { group: '', version: parts[1] }
   else { group: parts[1], version: parts[2] };
 
+local linksFromSpec(specStr) =
+  local spec = std.parseJson(specStr);
+  local suffix = '/{name}';
+  local suffixLen = std.length(suffix);
+  local endsWith(s) =
+    std.length(s) >= suffixLen &&
+    std.substr(s, std.length(s) - suffixLen, suffixLen) == suffix;
+  [
+    { sourcePath: std.substr(p, 0, std.length(p) - suffixLen), targetPath: p, array: ['items'], vars: { name: ['metadata', 'name'] } }
+    for p in std.objectFields(spec.paths)
+    if endsWith(p) && std.objectHas(spec.paths, std.substr(p, 0, std.length(p) - suffixLen))
+  ];
+
 local resourcesFromSpecAndLinks(specStr, links, columns, group) =
   local spec = std.parseJson(specStr);
+  local effectiveLinks = if links != null then links else linksFromSpec(specStr);
   local isNamespacedPath(path) =
     std.length(std.findSubstr('/namespaces/{', path)) > 0;
   local resourceNameFromPath(path) =
@@ -317,9 +333,13 @@ local resourcesFromSpecAndLinks(specStr, links, columns, group) =
     local getOp = std.get(pathEntry, 'get', null);
     if getOp == null then null
     else std.get(getOp, 'x-kubernetes-group-version-kind', null);
+  local defaultColumns(path) =
+    [{ key: 'metadata.name', kind: 'name', label: 'Name', path: ['metadata', 'name'], priority: 'primary' }] +
+    (if isNamespacedPath(path) then [{ key: 'metadata.namespace', kind: 'text', label: 'Namespace', path: ['metadata', 'namespace'], priority: 'secondary' }] else []) +
+    [{ key: 'metadata.creationTimestamp', kind: 'timestamp', label: 'Created', path: ['metadata', 'creationTimestamp'], priority: 'tertiary' }];
   local findColumns(path) =
     local matching = [c for c in columns if c.sourcePath == path];
-    if std.length(matching) > 0 then matching[0].columns else [];
+    if std.length(matching) > 0 then matching[0].columns else defaultColumns(path);
   local resourceFromLink(link) =
     local name = resourceNameFromPath(link.sourcePath);
     local gvk = findKind(link.sourcePath);
@@ -331,7 +351,7 @@ local resourcesFromSpecAndLinks(specStr, links, columns, group) =
       group: group,
       columns: findColumns(link.sourcePath),
     };
-  dedupeResources([resourceFromLink(link) for link in links]);
+  dedupeResources([resourceFromLink(link) for link in effectiveLinks]);
 
 local graph = {
   manifest: true,
@@ -342,7 +362,7 @@ local graph = {
       {
         group: gv.group,
         version: gv.version,
-        resources: resourcesFromSpecAndLinks(g.spec, g.links, if std.objectHasAll(g, 'columns') then g.columns else [], gv.group),
+        resources: resourcesFromSpecAndLinks(g.spec, if std.objectHas(g, 'links') then g.links else null, if std.objectHasAll(g, 'columns') then g.columns else [], gv.group),
       }
       for g in $.groups
     ],
