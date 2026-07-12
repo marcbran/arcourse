@@ -18,7 +18,7 @@ local dedupeResources(resources) =
   );
   [byKey[k] for k in std.sort(std.objectFields(byKey))];
 
-local generate(resources, group, version) =
+local generate(resources, group) =
   local le(indent=0) = j.Fodder.LineEnd(0, indent);
   local prettyArray(elements, indent=0) =
     j.Array([elem.fodder(le(indent + 2)) for elem in elements]).closeFodder(le(indent));
@@ -90,9 +90,9 @@ local generate(resources, group, version) =
     local base = if group == '' then rootContext else access(rootContext, group);
     call(member(base, itemVar(resource)), [nameExpr]);
 
-  local apiPrefix =
-    if group == '' then '/api/' + version
-    else '/apis/' + group + '/' + version;
+  local apiPrefix(resource) =
+    if group == '' then '/api/' + resource.version
+    else '/apis/' + group + '/' + resource.version;
 
   local k8sGet(pathExpr) =
     call(member(var('kubernetes'), 'get'), [access(j.Dollar, 'context'), pathExpr]);
@@ -103,14 +103,14 @@ local generate(resources, group, version) =
   local formatPath(fmt, args) = j.Std.format(j.String(fmt), j.Array(args));
   local toStr(expr) = j.Std.toString(expr);
 
-  local clusterListPath(resource) = staticPath(apiPrefix + '/' + resource.name);
+  local clusterListPath(resource) = staticPath(apiPrefix(resource) + '/' + resource.name);
   local clusterDetailPath(resource) =
-    formatPath(apiPrefix + '/' + resource.name + '/%s', [toStr(access(j.Dollar, itemVar(resource)))]);
-  local namespacedAllPath(resource) = staticPath(apiPrefix + '/' + resource.name);
+    formatPath(apiPrefix(resource) + '/' + resource.name + '/%s', [toStr(access(j.Dollar, itemVar(resource)))]);
+  local namespacedAllPath(resource) = staticPath(apiPrefix(resource) + '/' + resource.name);
   local namespacedListPath(resource) =
-    formatPath(apiPrefix + '/namespaces/%s/' + resource.name, [toStr(access(j.Dollar, 'namespace'))]);
+    formatPath(apiPrefix(resource) + '/namespaces/%s/' + resource.name, [toStr(access(j.Dollar, 'namespace'))]);
   local namespacedDetailPath(resource) =
-    formatPath(apiPrefix + '/namespaces/%s/' + resource.name + '/%s', [
+    formatPath(apiPrefix(resource) + '/namespaces/%s/' + resource.name + '/%s', [
       toStr(access(j.Dollar, 'namespace')),
       toStr(access(j.Dollar, itemVar(resource))),
     ]);
@@ -288,7 +288,7 @@ local generateAll(groups, manifest=true) =
   ]);
 
   local allRouteNodes = [contextsNode, contextNode] + std.flattenArrays([
-    generate(g.resources, g.group, g.version)
+    generate(g.resources, g.group)
     for g in groups
   ]);
   local generated = j.Locals(
@@ -360,7 +360,10 @@ local defaultColumns(namespaced) =
   [{ key: 'metadata.creationTimestamp', kind: 'timestamp', label: 'Created', path: ['metadata', 'creationTimestamp'], priority: 'tertiary' }];
 
 local resourcesFromDiscovery(discovery, group, columns, links) =
-  local groupVersion = if group == '' then 'v1' else group + '/' + discovery.groupVersion;
+  local groupVersion = if group == '' then 'v1' else discovery.groupVersion;
+  local bareVersion =
+    local parts = std.split(discovery.groupVersion, '/');
+    parts[std.length(parts) - 1];
   local columnsForGroup = std.get(columns, groupVersion, []);
   local linksForGroup = std.get(links, groupVersion, null);
   local apiPrefix = if group == '' then '/api/' + discovery.groupVersion else '/apis/' + discovery.groupVersion;
@@ -377,7 +380,7 @@ local resourcesFromDiscovery(discovery, group, columns, links) =
     for l in effectiveLinks
   ]);
   dedupeResources([
-    r { group: group, columns: findColumns(r) }
+    r { group: group, version: bareVersion, columns: findColumns(r) }
     for r in discovery.resources
     if std.length(std.findSubstr('/', r.name)) == 0
   ]);
@@ -385,7 +388,7 @@ local resourcesFromDiscovery(discovery, group, columns, links) =
 local mergeGroups(groups) =
   local byKey = std.foldl(
     function(acc, g)
-      local key = g.group + '/' + g.version;
+      local key = g.group;
       acc {
         [key]: if std.objectHas(acc, key)
           then acc[key] { resources: dedupeResources(acc[key].resources + g.resources) }
@@ -396,14 +399,20 @@ local mergeGroups(groups) =
   );
   [byKey[k] for k in std.objectFields(byKey)];
 
+local groupVersionsOrdered(g) =
+  [g.preferredVersion] + [v for v in g.versions if v.version != g.preferredVersion.version];
+
 local groupsFromContext(ctx, columns, links) =
   local core = kubernetes.get(ctx, '/api/v1');
   local apis = kubernetes.get(ctx, '/apis');
-  [{ group: '', version: 'v1', resources: resourcesFromDiscovery(core, '', columns, links) }] + [
-    local discovery = kubernetes.get(ctx, '/apis/' + g.preferredVersion.groupVersion);
-    { group: g.name, version: g.preferredVersion.version, resources: resourcesFromDiscovery(discovery, g.name, columns, links) }
+  [{ group: '', resources: resourcesFromDiscovery(core, '', columns, links) }] + std.flattenArrays([
+    [
+      local discovery = kubernetes.get(ctx, '/apis/' + v.groupVersion);
+      { group: g.name, resources: resourcesFromDiscovery(discovery, g.name, columns, links) }
+      for v in groupVersionsOrdered(g)
+    ]
     for g in apis.groups
-  ];
+  ]);
 
 local graph = {
   manifest: true,
