@@ -25,15 +25,15 @@ func TestQueryNodeByPath(t *testing.T) {
 		},
 		{
 			name:     "descendant nodes truncated to references",
-			graph:    `{ _node: "resource", child: { _node: "resource", _path: "child", data: "big" } }`,
+			graph:    `{ _node: "resource", child: { _node: "resource", _queryPath:: "child", data: "big" } }`,
 			path:     "root",
-			expected: `{"_node":"resource","child":{"_node":"resource","_path":"child"}}`,
+			expected: `{"_node":"resource","child":{"_node":"resource","_queryPath":"child"}}`,
 		},
 		{
 			name:     "reference includes _summary when present",
-			graph:    `{ _node: "resource", child: { _node: "resource", _path: "c", _summary: "A child", data: 42 } }`,
+			graph:    `{ _node: "resource", child: { _node: "resource", _queryPath:: "c", _summary: "A child", data: 42 } }`,
 			path:     "root",
-			expected: `{"_node":"resource","child":{"_node":"resource","_path":"c","_summary":"A child"}}`,
+			expected: `{"_node":"resource","child":{"_node":"resource","_queryPath":"c","_summary":"A child"}}`,
 		},
 	}
 

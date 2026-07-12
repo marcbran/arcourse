@@ -20,20 +20,19 @@ local nodeTests = {
           hasPathTemplate: std.objectHasAll(result, '_pathTemplate'),
           hasVisiblePathTemplate: std.objectHas(result, '_pathTemplate'),
           pathTemplate: result._pathTemplate,
-          urlPath: result._urlPath,
+          queryPath: result._queryPath,
           vars: result._vars,
         },
       expected: {
         node: {
           _node: true,
-          _path: 'root.kubernetes.context("prod").pods',
           context: 'prod',
           kind: 'Pod',
         },
         hasPathTemplate: true,
         hasVisiblePathTemplate: false,
         pathTemplate: ['kubernetes', '$context', 'pods'],
-        urlPath: '/root/kubernetes/context/prod/pods',
+        queryPath: '/root/kubernetes/context/prod/pods',
         vars: ['context'],
       },
     },
@@ -44,7 +43,6 @@ local nodeTests = {
       },
       expected: {
         _node: true,
-        _path: 'root.demo',
       },
     },
     {
@@ -55,7 +53,6 @@ local nodeTests = {
       },
       expected: {
         _node: true,
-        _path: 'root.demo',
         value: 'second',
         extra: true,
       },
@@ -68,7 +65,6 @@ local nodeTests = {
       },
       expected: {
         _node: true,
-        _path: 'root.demo',
         base: true,
       },
     },
@@ -89,7 +85,6 @@ local graphTests = {
       output(input):: graph(input).kubernetes.context('prod').namespace('default').pods,
       expected: {
         _node: true,
-        _path: 'root.kubernetes.context("prod").namespace("default").pods',
         context: 'prod',
         namespace: 'default',
         kind: 'Pod',
@@ -112,12 +107,10 @@ local graphTests = {
       expected: {
         static: {
           _node: true,
-          _path: 'root.kubernetes.api-resources',
           kind: 'APIResourceList',
         },
         dynamic: {
           _node: true,
-          _path: 'root.kubernetes.context("prod").pods',
           context: 'prod',
           kind: 'Pod',
         },
@@ -145,7 +138,6 @@ local graphTests = {
         nameView: 'default',
         detail: {
           _node: true,
-          _path: 'root.group.name("demo").detail',
           _view: 'default',
           name: 'demo',
           value: 1,
@@ -176,7 +168,7 @@ local graphTests = {
         {
           node: {
             _node: apps._node,
-            _path: apps._path,
+            queryPath: apps._queryPath,
             title: apps.title,
           },
           child: apps.api,
@@ -184,12 +176,11 @@ local graphTests = {
       expected: {
         node: {
           _node: true,
-          _path: 'root.apps',
+          queryPath: '/root/apps',
           title: 'Apps',
         },
         child: {
           _node: true,
-          _path: 'root.apps.api',
           port: 8080,
         },
       },
@@ -207,7 +198,7 @@ local graphTests = {
         {
           node: {
             _node: namespaces._node,
-            _path: namespaces._path,
+            queryPath: namespaces._queryPath,
             title: namespaces.title,
           },
           child: namespaces.name('default').pods,
@@ -215,12 +206,11 @@ local graphTests = {
       expected: {
         node: {
           _node: true,
-          _path: 'root.namespaces',
+          queryPath: '/root/namespaces',
           title: 'Namespaces',
         },
         child: {
           _node: true,
-          _path: 'root.namespaces.name("default").pods',
           name: 'default',
           kind: 'PodList',
         },
@@ -236,7 +226,6 @@ local graphTests = {
       output(input):: graph(input).demo,
       expected: {
         _node: true,
-        _path: 'root.demo',
         value: 'final',
         extra: true,
       },
@@ -252,7 +241,6 @@ local graphTests = {
       output(input):: graph(input).demo,
       expected: {
         _node: true,
-        _path: 'root.demo',
         n: 1,
         label: 'second',
         extra: true,
@@ -287,13 +275,11 @@ local graphTests = {
       expected: {
         a: {
           _node: true,
-          _path: 'root.parents.a("x")',
           a: 'x',
           from: 'a',
         },
         b: {
           _node: true,
-          _path: 'root.parents.b("y")',
           b: 'y',
           from: 'b',
         },
@@ -309,7 +295,6 @@ local graphTests = {
       output(input):: graph(input).demo,
       expected: {
         _node: true,
-        _path: 'root.demo',
       },
     },
   ],

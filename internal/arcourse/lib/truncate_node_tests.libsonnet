@@ -1,7 +1,7 @@
 local truncateNode = import './truncate_node.libsonnet';
 
 {
-  output(input):: truncateNode(input),
+  output(input):: truncateNode(input, 'query'),
   tests: [
     {
       name: 'plain object no node',
@@ -48,45 +48,87 @@ local truncateNode = import './truncate_node.libsonnet';
       },
     },
     {
-      name: 'descendant path preserved',
+      name: 'descendant evalPath exposed in eval mode',
       input:: {
         _node: 'resource',
         child: {
           _node: 'facet',
-          _path: 'custom.path',
-          value: 10,
-        },
-      },
-      expected: {
-        _node: 'resource',
-        child: {
-          _node: 'facet',
-          _path: 'custom.path',
-        },
-      },
-    },
-    {
-      name: 'hidden descendant url path remains hidden in reference',
-      input:: {
-        _node: 'resource',
-        child: {
-          _node: 'facet',
-          _urlPath:: 'root/custom/url/path',
+          _evalPath:: 'root.custom.path',
           value: 10,
         },
       },
       output(input)::
-        local out = truncateNode(input);
+        local out = truncateNode(input, 'eval');
         local ref = out.child;
         {
-          hasHidden: std.objectHasAll(ref, '_urlPath'),
-          hasVisible: std.objectHas(ref, '_urlPath'),
-          value: ref._urlPath,
+          hasEvalPath: std.objectHas(ref, '_evalPath'),
+          hasQueryPath: std.objectHas(ref, '_queryPath'),
+          value: ref._evalPath,
         },
       expected: {
-        hasHidden: true,
-        hasVisible: false,
-        value: 'root/custom/url/path',
+        hasEvalPath: true,
+        hasQueryPath: false,
+        value: 'root.custom.path',
+      },
+    },
+    {
+      name: 'descendant queryPath exposed in query mode',
+      input:: {
+        _node: 'resource',
+        child: {
+          _node: 'facet',
+          _queryPath:: '/root/custom/path',
+          value: 10,
+        },
+      },
+      output(input)::
+        local out = truncateNode(input, 'query');
+        local ref = out.child;
+        {
+          hasQueryPath: std.objectHas(ref, '_queryPath'),
+          hasEvalPath: std.objectHas(ref, '_evalPath'),
+          value: ref._queryPath,
+        },
+      expected: {
+        hasQueryPath: true,
+        hasEvalPath: false,
+        value: '/root/custom/path',
+      },
+    },
+    {
+      name: 'evalPath hidden in query mode',
+      input:: {
+        _node: 'resource',
+        child: {
+          _node: 'facet',
+          _evalPath:: 'root.custom.path',
+          _queryPath:: '/root/custom/path',
+          value: 10,
+        },
+      },
+      output(input)::
+        local out = truncateNode(input, 'query');
+        { hasEvalPath: std.objectHasAll(out.child, '_evalPath') },
+      expected: {
+        hasEvalPath: false,
+      },
+    },
+    {
+      name: 'queryPath hidden in eval mode',
+      input:: {
+        _node: 'resource',
+        child: {
+          _node: 'facet',
+          _evalPath:: 'root.custom.path',
+          _queryPath:: '/root/custom/path',
+          value: 10,
+        },
+      },
+      output(input)::
+        local out = truncateNode(input, 'eval');
+        { hasQueryPath: std.objectHasAll(out.child, '_queryPath') },
+      expected: {
+        hasQueryPath: false,
       },
     },
     {
@@ -100,7 +142,7 @@ local truncateNode = import './truncate_node.libsonnet';
         },
       },
       output(input)::
-        local out = truncateNode(input);
+        local out = truncateNode(input, 'query');
         local ref = out.child;
         {
           hasParamsSpec: std.objectHasAll(ref, '_params'),
