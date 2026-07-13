@@ -1,5 +1,3 @@
-local h = import 'html/main.libsonnet';
-
 local collectNeighbors(obj, textPrefix='', exclude=[]) =
   std.flatMap(
     function(k)
@@ -9,8 +7,8 @@ local collectNeighbors(obj, textPrefix='', exclude=[]) =
         local textPath = if textPrefix == '' then k else '%s/%s' % [textPrefix, k];
         if std.type(value) != 'object' then []
         else
-          if std.objectHas(value, '_node') && std.objectHasAll(value, '_urlPath') then
-            [{ link: value._urlPath, text: textPath }]
+          if std.objectHas(value, '_node') && std.objectHasAll(value, '_queryPath') then
+            [{ link: value._queryPath, text: textPath }]
           else collectNeighbors(value, textPath, exclude),
     std.objectFields(obj)
   );
@@ -20,11 +18,16 @@ function(obj)
   local neighbors =
     (if std.type(links) == 'object' then collectNeighbors(links) else []) +
     collectNeighbors(obj, exclude=['data', '_view', 'links']);
-  h.aside([
-  h.nav([
-    h.ul([
-      h.li([h.a({ href: n.link }, n.text)])
-      for n in neighbors
-    ]),
-  ]),
-])
+  [
+    'aside',
+    { style: 'font-family: monospace' },
+    [
+      'nav',
+      [
+        'ul',
+      ] + [
+        ['li', ['a', { href: n.link, style: 'color: var(--primary-color)' }, n.text]]
+        for n in neighbors
+      ],
+    ],
+  ]

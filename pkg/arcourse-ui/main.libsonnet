@@ -9,6 +9,12 @@ local htmlPage(fragment) = h.manifestPage(h.html([
         white-space: pre-wrap;
         word-break: break-all;
       }
+      a:hover {
+        text-decoration: none;
+      }
+      table {
+        border-spacing: 1.5em 0;
+      }
     |||),
   ]),
   h.body([fragment]),
@@ -28,9 +34,17 @@ local yamlView = {
   },
 };
 
+local tableView = {
+  _view:: {
+    html: htmlPage($._view.fragment),
+    fragment: f.table($),
+  },
+};
+
 {
   default: { view: neighborView },
   list: { view: neighborView },
+  table: { view: tableView },
   yaml: { view: yamlView },
   resource: self.yaml,
 }
