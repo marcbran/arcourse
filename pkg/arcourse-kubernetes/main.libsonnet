@@ -161,11 +161,25 @@ local generate(resources, group) =
       for field in std.objectFields(value)
     ])
     else error 'unsupported literal type: ' + std.type(value);
-  local columnLiteral(col) = compactLiteral({ label: col.label, path: col.path });
+  local nameColumnLink(resource) =
+    local linksExpr = member(j.Dollar, 'links');
+    if resource.namespaced then
+      call(member(var('std'), 'get'), [
+        call(member(var('std'), 'get'), [linksExpr, itemNamespace, j.Object()]),
+        itemName,
+        j.Null,
+      ])
+    else
+      call(member(var('std'), 'get'), [linksExpr, itemName, j.Null]);
+  local columnLiteral(resource, col) =
+    local base = compactLiteral({ label: col.label, path: col.path });
+    if std.get(col, 'kind', null) == 'name' then
+      base { fields+: [j.FieldFunction('link', [j.Parameter('item')], nameColumnLink(resource))] }
+    else base;
   local resourceColumns(resource) =
     local cols = std.get(resource, 'columns', []);
     if std.length(cols) > 0 then
-      prettyArray([columnLiteral(col) for col in cols], 4)
+      prettyArray([columnLiteral(resource, col) for col in cols], 4)
     else null;
   local listView(resource) =
     if std.length(std.get(resource, 'columns', [])) > 0 then view('table') else view('list');
