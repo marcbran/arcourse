@@ -22,7 +22,7 @@ func (s *Server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 			params[key] = values
 		}
 	}
-	result, err := s.facade.Render(r.Context(), path, params, pkg.FormatHTML)
+	result, err := s.facade.Query(r.Context(), path, params, pkg.FormatHTML)
 	if err != nil {
 		returnError(w, err)
 		return

@@ -9,7 +9,7 @@ import (
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 
-func TestRenderCLIWritesOutputFile(t *testing.T) {
+func TestQueryCLIWritesOutputFile(t *testing.T) {
 	given, when, then := cli_scenario(t)
 	outputPath := filepath.Join(given.tempDir, "generated", "pages", "child.html")
 
@@ -17,7 +17,7 @@ func TestRenderCLIWritesOutputFile(t *testing.T) {
 		a_graph_root(`{ child: { _view:: { html: "<span>child</span>" } } }`)
 
 	when.
-		a_path_is_rendered_to_output_file("root/child", pkg.FormatHTML, outputPath)
+		a_path_is_queried_to_output_file("root/child", pkg.FormatHTML, outputPath)
 
 	then.
 		the_raw_output_is("").

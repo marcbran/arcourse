@@ -14,10 +14,11 @@ import (
 type queryRequest struct {
 	Path   string         `json:"path"`
 	Params map[string]any `json:"params"`
+	Format string         `json:"format"`
 }
 
-func (c *Client) Query(ctx context.Context, path string, params map[string]any) (pkg.Result, error) {
-	body, err := json.Marshal(queryRequest{Path: path, Params: params})
+func (c *Client) Query(ctx context.Context, path string, params map[string]any, format pkg.Format) (pkg.Result, error) {
+	body, err := json.Marshal(queryRequest{Path: path, Params: params, Format: string(format)})
 	if err != nil {
 		return pkg.Result{}, err
 	}
