@@ -211,6 +211,19 @@ func TestQueryPathNotFound(t *testing.T) {
 		the_error_contains("nonexistent")
 }
 
+func TestQueryPrimaryFormatNotAvailableOnNode(t *testing.T) {
+	given, when, then := scenario(t)
+
+	given.
+		a_graph_root(`{ _view:: { html: "<p>hi</p>" } }`)
+
+	when.
+		a_path_is_queried_with_format("root", pkg.FormatJsonnet)
+
+	then.
+		the_error_contains("no jsonnet view")
+}
+
 func TestQueryPathAsHTML(t *testing.T) {
 	cases := []struct {
 		name     string

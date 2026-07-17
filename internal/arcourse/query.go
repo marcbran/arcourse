@@ -61,7 +61,14 @@ func (uc *Query) Exec(ctx context.Context, path string, params map[string]any, f
 
 	decoded := make(map[pkg.Format]string, len(raw))
 	for _, f := range formats {
-		value, err := decodeField(f, raw[string(f)])
+		rawValue, ok := raw[string(f)]
+		if !ok {
+			if f == format {
+				return pkg.Result{}, fmt.Errorf("node has no %s view", f)
+			}
+			continue
+		}
+		value, err := decodeField(f, rawValue)
 		if err != nil {
 			return pkg.Result{}, err
 		}

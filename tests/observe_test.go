@@ -89,6 +89,22 @@ func TestObservePublishDoesNotBlockQuery(t *testing.T) {
 		the_raw_output_is("<p>second</p>")
 }
 
+func TestObserveDoesNotBreakQueryForNodeWithoutObservedView(t *testing.T) {
+	skipIfLocalCLI(t)
+	given, when, then := scenario(t)
+
+	given.
+		a_graph_root(`{ _node: "resource", title: "hello" }`)
+
+	when.
+		an_observer_is_subscribed(pkg.FormatHTML).and().
+		a_path_is_queried_with_format_promptly("root", pkg.FormatJSON).and().
+		the_observer_unsubscribes()
+
+	then.
+		the_output_is(`{"_node":"resource","title":"hello"}`)
+}
+
 func TestObserveUnsubscribeStopsDelivery(t *testing.T) {
 	skipIfLocalCLI(t)
 	given, when, then := scenario(t)
