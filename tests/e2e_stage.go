@@ -19,6 +19,9 @@ type Stage struct {
 	facade  pkg.Facade
 	tempDir string
 
+	observeCh          <-chan pkg.Result
+	observeUnsubscribe func()
+
 	LastOutput string
 	LastError  string
 }

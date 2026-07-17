@@ -16,11 +16,6 @@ type evaluateRequest struct {
 type queryRequest struct {
 	Path   string         `json:"path"`
 	Params map[string]any `json:"params"`
-}
-
-type renderRequest struct {
-	Path   string         `json:"path"`
-	Params map[string]any `json:"params"`
 	Format string         `json:"format"`
 }
 
@@ -68,36 +63,12 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 		returnBadRequest(w, errors.New("path is required"))
 		return
 	}
-	result, err := s.facade.Query(r.Context(), req.Path, req.Params)
-	if err != nil {
-		returnError(w, err)
-		return
-	}
-	returnSuccess(w, outputResponse{Output: result.Output})
-}
-
-func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		returnBadRequest(w, err)
-		return
-	}
-	var req renderRequest
-	err = json.Unmarshal(body, &req)
-	if err != nil {
-		returnBadRequest(w, err)
-		return
-	}
-	if req.Path == "" {
-		returnBadRequest(w, errors.New("path is required"))
-		return
-	}
 	format, err := pkg.ParseFormat(req.Format)
 	if err != nil {
 		returnBadRequest(w, err)
 		return
 	}
-	result, err := s.facade.Render(r.Context(), req.Path, req.Params, format)
+	result, err := s.facade.Query(r.Context(), req.Path, req.Params, format)
 	if err != nil {
 		returnError(w, err)
 		return

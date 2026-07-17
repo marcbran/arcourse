@@ -13,24 +13,24 @@ type Config struct {
 type facade struct {
 	evaluate *Evaluate
 	query    *Query
-	render   *Render
+	observe  *Observe
 }
 
-func NewFacade(cfg Config, evaluator Evaluator) pkg.Facade {
+func NewFacade(cfg Config, evaluator Evaluator, lastQuery LastQuery) pkg.Facade {
 	evaluate := NewEvaluate(cfg.Evaluate, evaluator)
-	query := NewQuery(evaluate)
-	render := NewRender(evaluate)
-	return &facade{evaluate: evaluate, query: query, render: render}
+	query := NewQuery(evaluate, lastQuery)
+	observe := NewObserve(lastQuery)
+	return &facade{evaluate: evaluate, query: query, observe: observe}
 }
 
 func (f *facade) Evaluate(ctx context.Context, expression string) (pkg.Result, error) {
 	return f.evaluate.Exec(ctx, expression)
 }
 
-func (f *facade) Query(ctx context.Context, path string, params map[string]any) (pkg.Result, error) {
-	return f.query.Exec(ctx, path, params)
+func (f *facade) Query(ctx context.Context, path string, params map[string]any, format pkg.Format) (pkg.Result, error) {
+	return f.query.Exec(ctx, path, params, format)
 }
 
-func (f *facade) Render(ctx context.Context, path string, params map[string]any, format pkg.Format) (pkg.Result, error) {
-	return f.render.Exec(ctx, path, params, format)
+func (f *facade) Observe(ctx context.Context, format pkg.Format) (<-chan pkg.Result, func()) {
+	return f.observe.Exec(ctx, format)
 }
