@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
@@ -30,6 +31,9 @@ func newObserveCmd(plugins []*jpoet.Plugin) *cobra.Command {
 			cfg, err := loadConfig()
 			if err != nil {
 				return err
+			}
+			if cfg.Mode != ModeClient {
+				return errors.New("observe requires mode: client to connect to a running arco serve; local mode has no queries to observe")
 			}
 			facade := buildFacade(cfg, plugins)
 
