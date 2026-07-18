@@ -3,6 +3,7 @@ module github.com/marcbran/arcourse
 go 1.26.2
 
 require (
+	github.com/google/uuid v1.6.0
 	github.com/marcbran/jpoet v0.17.1
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1

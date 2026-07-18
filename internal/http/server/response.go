@@ -33,9 +33,20 @@ func returnInternalServerError(w http.ResponseWriter, err error) {
 	returnJSON(w, ErrorResponse{Message: err.Error()})
 }
 
+func returnNotFound(w http.ResponseWriter, err error) {
+	slog.Warn("not found", "err", err)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusNotFound)
+	returnJSON(w, ErrorResponse{Message: err.Error()})
+}
+
 func returnError(w http.ResponseWriter, err error) {
 	if errors.Is(err, pkg.ErrGraphEntryNotFound) || errors.Is(err, pkg.ErrEvaluateDirNotSet) {
 		returnBadRequest(w, err)
+		return
+	}
+	if errors.Is(err, pkg.ErrAuditEntryNotFound) {
+		returnNotFound(w, err)
 		return
 	}
 	returnInternalServerError(w, err)

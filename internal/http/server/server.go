@@ -26,8 +26,12 @@ func NewServer(facade pkg.Facade) *Server {
 	s := &Server{facade: facade, mux: http.NewServeMux()}
 	s.mux.HandleFunc("POST /api/evaluate", s.handleEvaluate)
 	s.mux.HandleFunc("POST /api/query", s.handleQuery)
+	s.mux.HandleFunc("GET /api/audit", s.handleListAudit)
+	s.mux.HandleFunc("GET /api/audit/{id}", s.handleGetAudit)
 	s.mux.HandleFunc("GET /observe", s.handleObserve)
 	s.mux.HandleFunc("GET /observe/stream", s.handleObserveStream)
+	s.mux.HandleFunc("GET /audit", s.handleAuditPage)
+	s.mux.HandleFunc("GET /audit/{id}", s.handleAuditEntryPage)
 	s.mux.HandleFunc("GET /{path...}", s.handleBrowse)
 	return s
 }
