@@ -49,6 +49,21 @@ func TestAuditListsQueriesChronologically(t *testing.T) {
 		the_audit_entries_are_in_chronological_order()
 }
 
+func TestAuditNotRecordedWhenFormatsExplicitlyEmpty(t *testing.T) {
+	given, when, then := scenario(t)
+
+	given.
+		a_graph_root(`{ _node: "resource", _view:: { html: "<p>hi</p>" } }`).and().
+		audit_capture_is_disabled()
+
+	when.
+		a_path_is_queried_with_format("root", pkg.FormatHTML).and().
+		the_audit_is_listed()
+
+	then.
+		the_audit_has_entry_count(0)
+}
+
 func TestReplayShowsCapturedDataNotFreshRecomputation(t *testing.T) {
 	given, when, then := scenario(t)
 

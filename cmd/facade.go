@@ -200,7 +200,7 @@ func mergeConfigDefaults(cfg Config) Config {
 	if strings.TrimSpace(cfg.Audit.Dir) == "" {
 		cfg.Audit.Dir = def.Audit.Dir
 	}
-	if len(cfg.Audit.Formats) == 0 {
+	if cfg.Audit.Formats == nil {
 		cfg.Audit.Formats = def.Audit.Formats
 	}
 	return cfg

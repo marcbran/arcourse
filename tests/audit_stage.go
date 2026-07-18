@@ -4,11 +4,23 @@ package tests
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func (s *Stage) audit_capture_is_disabled() *Stage {
+	path := filepath.Join(s.tempDir, "config.yaml")
+	data, err := os.ReadFile(path)
+	require.NoError(s.t, err)
+	data = append(data, []byte("audit:\n  formats: []\n")...)
+	err = os.WriteFile(path, data, 0o600)
+	require.NoError(s.t, err)
+	return s
+}
 
 func (s *Stage) the_audit_is_listed() *Stage {
 	entries, err := s.facade.ListAudit(context.Background())
