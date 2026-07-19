@@ -9,13 +9,19 @@ import (
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 
-type Query struct {
-	evaluate  *Evaluate
-	lastQuery LastQuery
+type QueryConfig struct {
+	AuditFormats []pkg.Format `json:"auditFormats"`
 }
 
-func NewQuery(evaluate *Evaluate, lastQuery LastQuery) *Query {
-	return &Query{evaluate: evaluate, lastQuery: lastQuery}
+type Query struct {
+	cfg         QueryConfig
+	evaluate    *Evaluate
+	lastQuery   LastQuery
+	appendAudit *AppendAudit
+}
+
+func NewQuery(cfg QueryConfig, evaluate *Evaluate, lastQuery LastQuery, appendAudit *AppendAudit) *Query {
+	return &Query{cfg: cfg, evaluate: evaluate, lastQuery: lastQuery, appendAudit: appendAudit}
 }
 
 func (uc *Query) Exec(ctx context.Context, path string, params map[string]any, format pkg.Format) (pkg.Result, error) {
@@ -25,7 +31,7 @@ func (uc *Query) Exec(ctx context.Context, path string, params map[string]any, f
 	}
 
 	observed := uc.lastQuery.ObservedFormats()
-	formats := mergeFormats(observed, format)
+	formats := mergeFormats(format, observed, uc.cfg.AuditFormats)
 
 	parts := strings.Split(strings.Trim(path, "/"), "/")
 	segments := parts[1:]
@@ -83,18 +89,32 @@ func (uc *Query) Exec(ctx context.Context, path string, params map[string]any, f
 		uc.lastQuery.Publish(f, pkg.Result{Output: value})
 	}
 
+	if len(uc.cfg.AuditFormats) > 0 {
+		results := make(map[pkg.Format]pkg.Result, len(uc.cfg.AuditFormats))
+		for _, f := range uc.cfg.AuditFormats {
+			value, ok := decoded[f]
+			if !ok {
+				continue
+			}
+			results[f] = pkg.Result{Output: value}
+		}
+		uc.appendAudit.Exec(ctx, path, results)
+	}
+
 	return pkg.Result{Output: decoded[format]}, nil
 }
 
-func mergeFormats(observed []pkg.Format, primary pkg.Format) []pkg.Format {
+func mergeFormats(primary pkg.Format, sets ...[]pkg.Format) []pkg.Format {
 	seen := map[pkg.Format]bool{primary: true}
 	formats := []pkg.Format{primary}
-	for _, f := range observed {
-		if seen[f] {
-			continue
+	for _, set := range sets {
+		for _, f := range set {
+			if seen[f] {
+				continue
+			}
+			seen[f] = true
+			formats = append(formats, f)
 		}
-		seen[f] = true
-		formats = append(formats, f)
 	}
 	return formats
 }

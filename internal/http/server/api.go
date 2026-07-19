@@ -75,3 +75,26 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 	}
 	returnSuccess(w, outputResponse{Output: result.Output})
 }
+
+func (s *Server) handleListAudit(w http.ResponseWriter, r *http.Request) {
+	entries, err := s.facade.ListAudit(r.Context())
+	if err != nil {
+		returnError(w, err)
+		return
+	}
+	returnSuccess(w, entries)
+}
+
+func (s *Server) handleGetAudit(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		returnBadRequest(w, errors.New("id is required"))
+		return
+	}
+	entry, err := s.facade.GetAudit(r.Context(), id)
+	if err != nil {
+		returnError(w, err)
+		return
+	}
+	returnSuccess(w, entry)
+}

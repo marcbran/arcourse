@@ -12,6 +12,7 @@ import (
 	archttp "github.com/marcbran/arcourse/internal/http"
 	"github.com/marcbran/arcourse/internal/http/client"
 	"github.com/marcbran/arcourse/internal/infra/broadcast"
+	jsonfileinfra "github.com/marcbran/arcourse/internal/infra/jsonfile"
 	jsonnetinfra "github.com/marcbran/arcourse/internal/infra/jsonnet"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 	"github.com/marcbran/jpoet/pkg/jpoet"
@@ -31,7 +32,8 @@ func buildLocalFacade(cfg Config, plugins []*jpoet.Plugin) pkg.Facade {
 	jpaths := []string{filepath.Join(cfg.Evaluate.Dir, "vendor")}
 	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib, jpaths, plugins)
 	lastQuery := broadcast.NewLastQuery()
-	return arcourse.NewFacade(cfg.Config, evaluator, lastQuery)
+	auditRepo := jsonfileinfra.NewAuditRepo(cfg.Audit.Dir)
+	return arcourse.NewFacade(cfg.Config, evaluator, lastQuery, auditRepo)
 }
 
 type Config struct {
@@ -147,6 +149,10 @@ func defaultConfig() Config {
 		},
 		Config: arcourse.Config{
 			Evaluate: arcourse.EvaluateConfig{},
+			Audit: arcourse.AuditConfig{
+				Dir:     "audit",
+				Formats: []pkg.Format{pkg.FormatJSON, pkg.FormatHTML},
+			},
 		},
 	}
 }
@@ -158,6 +164,11 @@ func resolveConfigValues(cfg Config, home string) (Config, error) {
 		return Config{}, err
 	}
 	cfg.Evaluate.Dir = evaluateDir
+	auditDir, err := resolveRelativeDir(home, cfg.Audit.Dir)
+	if err != nil {
+		return Config{}, err
+	}
+	cfg.Audit.Dir = auditDir
 	return cfg, nil
 }
 
@@ -185,6 +196,12 @@ func mergeConfigDefaults(cfg Config) Config {
 	}
 	if strings.TrimSpace(cfg.Evaluate.Dir) == "" {
 		cfg.Evaluate.Dir = def.Evaluate.Dir
+	}
+	if strings.TrimSpace(cfg.Audit.Dir) == "" {
+		cfg.Audit.Dir = def.Audit.Dir
+	}
+	if cfg.Audit.Formats == nil {
+		cfg.Audit.Formats = def.Audit.Formats
 	}
 	return cfg
 }

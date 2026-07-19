@@ -144,6 +144,22 @@ func (f *ServerBackedCLIFacade) Observe(ctx context.Context, format pkg.Format) 
 	return f.client.Observe(ctx, format)
 }
 
+func (f *ServerBackedCLIFacade) ListAudit(ctx context.Context) ([]pkg.AuditEntry, error) {
+	err := f.start()
+	if err != nil {
+		return nil, err
+	}
+	return f.client.ListAudit(ctx)
+}
+
+func (f *ServerBackedCLIFacade) GetAudit(ctx context.Context, id string) (pkg.AuditEntry, error) {
+	err := f.start()
+	if err != nil {
+		return pkg.AuditEntry{}, err
+	}
+	return f.client.GetAudit(ctx, id)
+}
+
 func (f *ServerBackedCLIFacade) start() error {
 	f.startOnce.Do(func() {
 		f.startErr = f.startServer()
@@ -326,6 +342,56 @@ func (f *CLIFacade) Observe(ctx context.Context, format pkg.Format) (<-chan pkg.
 	}()
 
 	return ch, cancel
+}
+
+func (f *CLIFacade) ListAudit(ctx context.Context) ([]pkg.AuditEntry, error) {
+	cmd := exec.CommandContext(ctx, f.binaryPath, "audit")
+	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		if stderr.String() != "" {
+			return nil, errors.New(stderr.String())
+		}
+		return nil, err
+	}
+
+	var entries []pkg.AuditEntry
+	err = json.Unmarshal(stdout.Bytes(), &entries)
+	if err != nil {
+		return nil, err
+	}
+	return entries, nil
+}
+
+func (f *CLIFacade) GetAudit(ctx context.Context, id string) (pkg.AuditEntry, error) {
+	cmd := exec.CommandContext(ctx, f.binaryPath, "audit", id)
+	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		if stderr.String() != "" {
+			return pkg.AuditEntry{}, errors.New(stderr.String())
+		}
+		return pkg.AuditEntry{}, err
+	}
+
+	var entry pkg.AuditEntry
+	err = json.Unmarshal(stdout.Bytes(), &entry)
+	if err != nil {
+		return pkg.AuditEntry{}, err
+	}
+	return entry, nil
 }
 
 func appendParamArgs(args []string, params map[string]any) []string {

@@ -22,6 +22,9 @@ type Stage struct {
 	observeCh          <-chan pkg.Result
 	observeUnsubscribe func()
 
+	auditEntries []pkg.AuditEntry
+	auditEntry   pkg.AuditEntry
+
 	LastOutput string
 	LastError  string
 }
