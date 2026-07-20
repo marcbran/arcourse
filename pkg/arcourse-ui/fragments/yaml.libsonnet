@@ -1,5 +1,3 @@
-local h = import 'html/main.libsonnet';
-
 local yaml = {
   indent(depth)::
     std.join('', std.makeArray(depth * 2, function(_) ' ')),
@@ -12,20 +10,23 @@ local yaml = {
     else '%s' % v,
 
   key(k)::
-    h.span({ style: 'color: var(--primary-color); font-weight: bold' }, [k]),
+    { element: 'span', attributes: { style: 'color: var(--primary-color); font-weight: bold' }, children: [k] },
 
   row(key, value, depth, bullet)::
     local hasChildren =
       (std.type(value) == 'object' || std.type(value) == 'array')
       && std.length(value) > 0;
+    local indentStr = self.indent(depth);
+    local keyNode = self.key(key);
+    local scalarStr = self.scalar(value);
     if hasChildren then
-      [h.div({}, [
-        self.indent(depth), bullet, self.key(key), ':',
-      ])] + self.children(value, depth + 1)
+      [{ element: 'div', children: [
+        indentStr, bullet, keyNode, ':',
+      ] }] + self.children(value, depth + 1)
     else
-      [h.div({}, [
-        self.indent(depth), bullet, self.key(key), ': ' + self.scalar(value),
-      ])],
+      [{ element: 'div', children: [
+        indentStr, bullet, keyNode, ': ' + scalarStr,
+      ] }],
 
   children(value, depth)::
     if std.type(value) == 'object' then
@@ -40,10 +41,12 @@ local yaml = {
           self.row(kvs[0].key, kvs[0].value, depth, '- ') +
           std.flatMap(function(kv) self.row(kv.key, kv.value, depth, '  '), kvs[1:])
         else
-          [h.div({}, [
-            self.indent(depth), '- ' + self.scalar(item),
-          ])]
+          local indentStr = self.indent(depth);
+          local scalarStr = self.scalar(item);
+          [{ element: 'div', children: [
+            indentStr, '- ' + scalarStr,
+          ] }]
       , value),
 };
 
-function(value) h.pre(yaml.children(value, 0))
+function(value) { element: 'pre', children: yaml.children(value, 0) }

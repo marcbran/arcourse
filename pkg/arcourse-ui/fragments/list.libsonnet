@@ -18,16 +18,24 @@ function(obj)
   local neighbors =
     (if std.type(links) == 'object' then collectNeighbors(links) else []) +
     collectNeighbors(obj, exclude=['data', '_view', 'links']);
-  [
-    'aside',
-    { style: 'font-family: monospace' },
-    [
-      'nav',
-      [
-        'ul',
-      ] + [
-        ['li', ['a', { href: n.link, style: 'color: var(--primary-color)' }, n.text]]
-        for n in neighbors
-      ],
-    ],
-  ]
+  {
+    element: 'aside',
+    attributes: { style: 'font-family: monospace' },
+    children: [{
+      element: 'nav',
+      children: [{
+        element: 'ul',
+        children: [
+          {
+            element: 'li',
+            children: [{
+              element: 'a',
+              attributes: { href: n.link, style: 'color: var(--primary-color)' },
+              children: [n.text],
+            }],
+          }
+          for n in neighbors
+        ],
+      }],
+    }],
+  }

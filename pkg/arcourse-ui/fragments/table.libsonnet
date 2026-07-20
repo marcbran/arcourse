@@ -10,20 +10,41 @@ local cellContent(item, col) =
   local val = cellValue(item, col);
   local str = if val == null then '' else std.toString(val);
   local link = if std.objectHas(col, 'link') then col.link(item) else null;
-  if link != null then ['a', { href: link._queryPath, style: 'color: var(--primary-color)' }, str] else str;
+  if link != null then
+    { element: 'a', attributes: { href: link._queryPath, style: 'color: var(--primary-color)' }, children: [str] }
+  else
+    str;
 
 function(obj)
   local items = obj.data.items;
   local columns = std.get(obj, 'columns', []);
-  [
-    'table',
-    { style: 'font-family: monospace' },
-    [
-      'thead',
-      ['tr'] + [['th', { style: 'color: var(--primary-color); font-weight: bold' }, col.label] for col in columns],
+  {
+    element: 'table',
+    attributes: { style: 'font-family: monospace' },
+    children: [
+      {
+        element: 'thead',
+        children: [{
+          element: 'tr',
+          children: [
+            {
+              element: 'th',
+              attributes: { style: 'color: var(--primary-color); font-weight: bold' },
+              children: [col.label],
+            }
+            for col in columns
+          ],
+        }],
+      },
+      {
+        element: 'tbody',
+        children: [
+          {
+            element: 'tr',
+            children: [{ element: 'td', children: [cellContent(item, col)] } for col in columns],
+          }
+          for item in items
+        ],
+      },
     ],
-    ['tbody'] + [
-      ['tr'] + [['td', cellContent(item, col)] for col in columns]
-      for item in items
-    ],
-  ]
+  }
