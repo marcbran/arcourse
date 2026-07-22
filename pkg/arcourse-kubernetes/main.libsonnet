@@ -215,11 +215,16 @@ local generate(resources, group) =
     local items = getItems(member(j.Dollar, 'data'));
     node(
       ['kubernetes', '$context', '$namespace'] + resourcePrefix + [route(resource)],
-      listObject(data, prettyObjectComp(
-        [j.Field(itemName, namespacedResourceLink(resource, member(j.Dollar, 'namespace'), itemName))],
-        [j.ForSpec('item', items)],
-        4
-      ), resourceColumns(resource)),
+      listObject(data, prettyObject([
+        j.Field(
+          member(j.Dollar, 'namespace'),
+          prettyObjectComp(
+            [j.Field(itemName, namespacedResourceLink(resource, member(j.Dollar, 'namespace'), itemName))],
+            [j.ForSpec('item', items)],
+            4
+          )
+        ),
+      ], 2), resourceColumns(resource)),
       listView(resource)
     );
 
