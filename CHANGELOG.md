@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.7.0](https://github.com/marcbran/arcourse/compare/v0.6.0...v0.7.0) (2026-07-22)
+
+
+### Features
+
+* audit ([#52](https://github.com/marcbran/arcourse/issues/52)) ([b1d98d0](https://github.com/marcbran/arcourse/commit/b1d98d03fe82e01bfc40cd04043678d21ecd65ea))
+* observe ([#48](https://github.com/marcbran/arcourse/issues/48)) ([f6ad0e6](https://github.com/marcbran/arcourse/commit/f6ad0e66cc4ca9d1afde436b5ef7376968c8aa32))
+* ui html plugin ([#54](https://github.com/marcbran/arcourse/issues/54)) ([0f1312a](https://github.com/marcbran/arcourse/commit/0f1312a47358c3e9065b5bb18d44b6633b009109))
+
+
+### Bug Fixes
+
+* embedded graph runtime ([#51](https://github.com/marcbran/arcourse/issues/51)) ([8424c79](https://github.com/marcbran/arcourse/commit/8424c796a4eee81c5d88dc129b8e7b6c62a9e698))
+
 ## [0.6.0](https://github.com/marcbran/arcourse/compare/v0.5.0...v0.6.0) (2026-07-13)
 
 
