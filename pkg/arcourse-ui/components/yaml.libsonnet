@@ -1,6 +1,6 @@
-local h = import 'html/main.libsonnet';
-
 local yaml = {
+  local c = self,
+
   indent(depth)::
     std.join('', std.makeArray(depth * 2, function(_) ' ')),
 
@@ -12,38 +12,42 @@ local yaml = {
     else '%s' % v,
 
   key(k)::
-    h.span({ style: 'color: var(--primary-color); font-weight: bold' }, [k]),
+    { element: 'span', attributes: { style: 'color: var(--primary-color); font-weight: bold' }, children: [k] },
 
   row(key, value, depth, bullet)::
     local hasChildren =
       (std.type(value) == 'object' || std.type(value) == 'array')
       && std.length(value) > 0;
     if hasChildren then
-      [h.div({}, [
-        self.indent(depth), bullet, self.key(key), ':',
-      ])] + self.children(value, depth + 1)
+      [{ element: 'div', children: [
+        c.indent(depth), bullet, c.key(key), ':',
+      ] }] + c.children(value, depth + 1)
     else
-      [h.div({}, [
-        self.indent(depth), bullet, self.key(key), ': ' + self.scalar(value),
-      ])],
+      [{ element: 'div', children: [
+        c.indent(depth), bullet, c.key(key), ': ' + c.scalar(value),
+      ] }],
 
   children(value, depth)::
     if std.type(value) == 'object' then
       std.flatMap(
-        function(kv) self.row(kv.key, kv.value, depth, ''),
+        function(kv) c.row(kv.key, kv.value, depth, ''),
         std.objectKeysValues(value)
       )
     else
       std.flatMap(function(item)
         if std.type(item) == 'object' then
           local kvs = std.objectKeysValues(item);
-          self.row(kvs[0].key, kvs[0].value, depth, '- ') +
-          std.flatMap(function(kv) self.row(kv.key, kv.value, depth, '  '), kvs[1:])
+          c.row(kvs[0].key, kvs[0].value, depth, '- ') +
+          std.flatMap(function(kv) c.row(kv.key, kv.value, depth, '  '), kvs[1:])
         else
-          [h.div({}, [
-            self.indent(depth), '- ' + self.scalar(item),
-          ])]
+          [{ element: 'div', children: [
+            c.indent(depth), '- ' + c.scalar(item),
+          ] }]
       , value),
 };
 
-function(value) h.pre(yaml.children(value, 0))
+{
+  local c = self,
+  data:: error 'Yaml requires data',
+  html: { element: 'pre', children: yaml.children(c.data, 0) },
+}
