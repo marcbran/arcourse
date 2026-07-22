@@ -15,10 +15,11 @@ local cellContent(item, col) =
   else
     str;
 
-function(obj)
-  local items = obj.data.items;
-  local columns = std.get(obj, 'columns', []);
-  {
+{
+  local c = self,
+  items:: error 'Table requires items',
+  columns:: [],
+  html: {
     element: 'table',
     attributes: { style: 'font-family: monospace' },
     children: [
@@ -32,7 +33,7 @@ function(obj)
               attributes: { style: 'color: var(--primary-color); font-weight: bold' },
               children: [col.label],
             }
-            for col in columns
+            for col in c.columns
           ],
         }],
       },
@@ -41,10 +42,11 @@ function(obj)
         children: [
           {
             element: 'tr',
-            children: [{ element: 'td', children: [cellContent(item, col)] } for col in columns],
+            children: [{ element: 'td', children: [cellContent(item, col)] } for col in c.columns],
           }
-          for item in items
+          for item in c.items
         ],
       },
     ],
-  }
+  },
+}

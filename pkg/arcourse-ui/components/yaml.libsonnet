@@ -1,4 +1,6 @@
 local yaml = {
+  local c = self,
+
   indent(depth)::
     std.join('', std.makeArray(depth * 2, function(_) ' ')),
 
@@ -16,37 +18,36 @@ local yaml = {
     local hasChildren =
       (std.type(value) == 'object' || std.type(value) == 'array')
       && std.length(value) > 0;
-    local indentStr = self.indent(depth);
-    local keyNode = self.key(key);
-    local scalarStr = self.scalar(value);
     if hasChildren then
       [{ element: 'div', children: [
-        indentStr, bullet, keyNode, ':',
-      ] }] + self.children(value, depth + 1)
+        c.indent(depth), bullet, c.key(key), ':',
+      ] }] + c.children(value, depth + 1)
     else
       [{ element: 'div', children: [
-        indentStr, bullet, keyNode, ': ' + scalarStr,
+        c.indent(depth), bullet, c.key(key), ': ' + c.scalar(value),
       ] }],
 
   children(value, depth)::
     if std.type(value) == 'object' then
       std.flatMap(
-        function(kv) self.row(kv.key, kv.value, depth, ''),
+        function(kv) c.row(kv.key, kv.value, depth, ''),
         std.objectKeysValues(value)
       )
     else
       std.flatMap(function(item)
         if std.type(item) == 'object' then
           local kvs = std.objectKeysValues(item);
-          self.row(kvs[0].key, kvs[0].value, depth, '- ') +
-          std.flatMap(function(kv) self.row(kv.key, kv.value, depth, '  '), kvs[1:])
+          c.row(kvs[0].key, kvs[0].value, depth, '- ') +
+          std.flatMap(function(kv) c.row(kv.key, kv.value, depth, '  '), kvs[1:])
         else
-          local indentStr = self.indent(depth);
-          local scalarStr = self.scalar(item);
           [{ element: 'div', children: [
-            indentStr, '- ' + scalarStr,
+            c.indent(depth), '- ' + c.scalar(item),
           ] }]
       , value),
 };
 
-function(value) { element: 'pre', children: yaml.children(value, 0) }
+{
+  local c = self,
+  data:: error 'Yaml requires data',
+  html: { element: 'pre', children: yaml.children(c.data, 0) },
+}
