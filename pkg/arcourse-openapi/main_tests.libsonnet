@@ -95,7 +95,7 @@ local arcourseOpenapi = import './main.libsonnet';
       },
     },
     {
-      name: 'list operation includes matching links with hidden data',
+      name: 'list operation includes matching links with hidden data and default columns per target param',
       input:: function()
         local spec = {
           paths: {
@@ -136,6 +136,7 @@ local arcourseOpenapi = import './main.libsonnet';
         local body = specNode.elements[1].expr;
         local view = specNode.elements[2].expr;
         local links = body.fields[1].expr2;
+        local columns = body.fields[2].expr2;
         {
           path: path,
           fieldNames: [field.id for field in body.fields],
@@ -147,10 +148,19 @@ local arcourseOpenapi = import './main.libsonnet';
           foldBodyKind: links.arguments.positional[0].expr.body.__kind__,
           viewBase: view.target.target.id,
           viewName: view.target.id,
+          columnCount: std.length(columns.elements),
+          columnLabels: [
+            [f.expr2.value for f in col.expr.fields if f.id == 'label'][0]
+            for col in columns.elements
+          ],
+          columnHasLink: [
+            std.length([f for f in col.expr.fields if f.id == 'link']) > 0
+            for col in columns.elements
+          ],
         },
       expected: {
         path: ['demo', 'user', 'repos'],
-        fieldNames: ['data', 'links'],
+        fieldNames: ['data', 'links', 'columns', 'itemsPath'],
         dataHide: 0,
         linksKind: 'Apply',
         linksTarget: 'foldl',
@@ -158,11 +168,223 @@ local arcourseOpenapi = import './main.libsonnet';
         foldFunctionKind: 'Function',
         foldBodyKind: 'Conditional',
         viewBase: 'a',
+        viewName: 'table',
+        columnCount: 2,
+        columnLabels: ['owner', 'repo'],
+        columnHasLink: [false, true],
+      },
+    },
+    {
+      name: 'links fold source is guarded against non-array data',
+      input:: function()
+        local spec = {
+          paths: {
+            children: {
+              user: {
+                children: {
+                  repos: {
+                    operation: {
+                      pathFormat: '/user/repos',
+                    },
+                  },
+                },
+              },
+            },
+          },
+        };
+        local generated = arcourseOpenapi.graph {
+          service: 'demo',
+          manifest: false,
+          links: [
+            {
+              sourcePath: '/user/repos',
+              targetPath: '/repos/{owner}/{repo}',
+              array: [],
+              vars: {
+                owner: ['owner', 'login'],
+                repo: ['name'],
+              },
+            },
+          ],
+          data+: {
+            spec: spec,
+          },
+        }._view.jsonnet;
+        local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
+        local specNode = unwrap(generated).elements[0].expr;
+        local body = specNode.elements[1].expr;
+        local links = body.fields[1].expr2;
+        local dataArg = links.arguments.positional[1].expr;
+        {
+          dataArgKind: dataArg.__kind__,
+          guardKind: dataArg.body.__kind__,
+          condKind: dataArg.body.cond.__kind__,
+          fallbackKind: dataArg.body.branchFalse.__kind__,
+        },
+      expected: {
+        dataArgKind: 'Local',
+        guardKind: 'Conditional',
+        condKind: 'Binary',
+        fallbackKind: 'Array',
+      },
+    },
+    {
+      name: 'link target arguments are stringified even for non-string values',
+      input:: function()
+        local spec = {
+          paths: {
+            children: {
+              pulls: {
+                operation: {
+                  pathFormat: '/pulls',
+                },
+              },
+            },
+          },
+        };
+        local generated = arcourseOpenapi.graph {
+          service: 'demo',
+          manifest: false,
+          links: [
+            {
+              sourcePath: '/pulls',
+              targetPath: '/pulls/{pull_number}',
+              array: [],
+              vars: {
+                pull_number: ['number'],
+              },
+            },
+          ],
+          data+: {
+            spec: spec,
+          },
+        }._view.jsonnet;
+        local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
+        local specNode = unwrap(generated).elements[0].expr;
+        local body = specNode.elements[1].expr;
+        local columns = body.fields[2].expr2;
+        local linkFn = [f for f in columns.elements[0].expr.fields if f.id == 'link'][0];
+        local callArg = linkFn.expr2.arguments.positional[0].expr;
+        {
+          callArgKind: callArg.__kind__,
+          callArgTarget: callArg.target.id,
+          callArgBase: callArg.target.target.id,
+        },
+      expected: {
+        callArgKind: 'Apply',
+        callArgTarget: 'toString',
+        callArgBase: 'std',
+      },
+    },
+    {
+      name: 'explicit columns config overrides the default column',
+      input:: function()
+        local spec = {
+          paths: {
+            children: {
+              user: {
+                children: {
+                  repos: {
+                    operation: {
+                      pathFormat: '/user/repos',
+                    },
+                  },
+                },
+              },
+            },
+          },
+        };
+        local generated = arcourseOpenapi.graph {
+          service: 'demo',
+          manifest: false,
+          links: [
+            {
+              sourcePath: '/user/repos',
+              targetPath: '/repos/{owner}/{repo}',
+              array: [],
+              vars: {
+                owner: ['owner', 'login'],
+                repo: ['name'],
+              },
+            },
+          ],
+          columns: [
+            {
+              sourcePath: '/user/repos',
+              columns: [
+                { label: 'Name', path: ['name'], link: true },
+                { label: 'Stars', path: ['stargazers_count'] },
+              ],
+            },
+          ],
+          data+: {
+            spec: spec,
+          },
+        }._view.jsonnet;
+        local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
+        local specNode = unwrap(generated).elements[0].expr;
+        local body = specNode.elements[1].expr;
+        local view = specNode.elements[2].expr;
+        local columns = body.fields[2].expr2;
+        {
+          fieldNames: [field.id for field in body.fields],
+          viewName: view.target.id,
+          columnCount: std.length(columns.elements),
+          firstColumnFieldNames: [f.id for f in columns.elements[0].expr.fields],
+          secondColumnFieldNames: [f.id for f in columns.elements[1].expr.fields],
+        },
+      expected: {
+        fieldNames: ['data', 'links', 'columns', 'itemsPath'],
+        viewName: 'table',
+        columnCount: 2,
+        firstColumnFieldNames: ['label', 'path', 'link'],
+        secondColumnFieldNames: ['label', 'path'],
+      },
+    },
+    {
+      name: 'link with no target params stays a plain list with no columns',
+      input:: function()
+        local spec = {
+          paths: {
+            children: {
+              status: {
+                operation: {
+                  pathFormat: '/status',
+                },
+              },
+            },
+          },
+        };
+        local generated = arcourseOpenapi.graph {
+          service: 'demo',
+          manifest: false,
+          links: [
+            {
+              sourcePath: '/status',
+              targetPath: '/current-status',
+              array: [],
+              vars: {},
+            },
+          ],
+          data+: {
+            spec: spec,
+          },
+        }._view.jsonnet;
+        local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
+        local specNode = unwrap(generated).elements[0].expr;
+        local body = specNode.elements[1].expr;
+        local view = specNode.elements[2].expr;
+        {
+          fieldNames: [field.id for field in body.fields],
+          viewName: view.target.id,
+        },
+      expected: {
+        fieldNames: ['data', 'links'],
         viewName: 'list',
       },
     },
     {
-      name: 'resource operation gets empty endpoint parent node',
+      name: 'resource operation attaches directly to its own path',
       input:: function()
         local spec = {
           paths: {
@@ -192,20 +414,15 @@ local arcourseOpenapi = import './main.libsonnet';
         local bodyFieldCount(spec) = std.length(spec.expr.elements[1].expr.fields);
         {
           paths: [path(spec) for spec in specs],
-          parentIsEmpty: {
-            specElements: std.length(specs[0].expr.elements),
-            bodyFields: bodyFieldCount(specs[0]),
-          },
+          nodeElements: std.length(specs[0].expr.elements),
+          bodyFields: bodyFieldCount(specs[0]),
         },
       expected: {
         paths: [
           ['github', 'users', '$username'],
-          ['github', 'users', '$username', 'resource'],
         ],
-        parentIsEmpty: {
-          specElements: 2,
-          bodyFields: 0,
-        },
+        nodeElements: 3,
+        bodyFields: 1,
       },
     },
     {
@@ -251,7 +468,7 @@ local arcourseOpenapi = import './main.libsonnet';
           dataHide: body.fields[0].Hide,
         },
       expected: {
-        fieldNames: ['data', 'links'],
+        fieldNames: ['data', 'links', 'columns', 'itemsPath'],
         dataHide: 0,
       },
     },

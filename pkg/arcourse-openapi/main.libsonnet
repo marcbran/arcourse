@@ -1,7 +1,7 @@
 local j = import 'jsonnet/main.libsonnet';
 local openapi = import 'openapi/main.libsonnet';
 
-local generate(service, spec, links=[], manifest=true) =
+local generate(service, spec, links=[], columns=[], manifest=true) =
   local le(indent=0) = j.Fodder.LineEnd(0, indent);
   local prettyArray(elements, indent=0) =
     j.Array([
@@ -171,6 +171,10 @@ local generate(service, spec, links=[], manifest=true) =
   local pathValue(expr, path) =
     std.foldl(function(acc, part) access(acc, part), path, expr);
   local dataArray(link) = pathValue(member(j.Dollar, 'data'), link.array);
+  local isArrayExpr(expr) =
+    j.Eq(call(member(var('std'), 'type'), [expr]), j.String('array'));
+  local safeDataArray(link) =
+    j.Local([j.LocalBind('arr', dataArray(link))], j.If(isArrayExpr(var('arr')), var('arr'), j.Array([])));
   local itemValue(path) = pathValue(var('item'), path);
   local paramValue(link, param) =
     if std.objectHas(std.get(link, 'vars', {}), param) then itemValue(link.vars[param])
@@ -180,7 +184,7 @@ local generate(service, spec, links=[], manifest=true) =
       function(acc, part)
         local param = pathParamInner(part);
         if param == null then access(acc, part)
-        else call(access(acc, mangledPathVar(param)), [paramValue(link, param)]),
+        else call(access(acc, mangledPathVar(param)), [j.Std.toString(paramValue(link, param))]),
       splitPath(link.targetPath),
       access(var('root'), service)
     );
@@ -242,7 +246,7 @@ local generate(service, spec, links=[], manifest=true) =
     local body = if guard == null then mergeLink(link) else j.If(guard, mergeLink(link), var('acc'));
     callPretty(member(var('std'), 'foldl'), [
       j.Function([j.Parameter('acc'), j.Parameter('item')], body),
-      dataArray(link),
+      safeDataArray(link),
       emptyObject,
     ], 4);
   local linkComprehensions(links) = [linkComprehension(link) for link in links];
@@ -258,41 +262,91 @@ local generate(service, spec, links=[], manifest=true) =
     for link in links
     if link.sourcePath == templatePath(op)
   ];
+  local compactLiteral(value) =
+    if value == null then j.Null
+    else if std.type(value) == 'string' then j.String(value)
+    else if std.type(value) == 'boolean' then if value then j.True else j.False
+    else if std.type(value) == 'number' then j.Number(std.toString(value))
+    else if std.type(value) == 'array' then j.Array([compactLiteral(item) for item in value])
+    else if std.type(value) == 'object' then j.Object([
+      objectField(field, compactLiteral(value[field]))
+      for field in std.objectFields(value)
+    ])
+    else error 'unsupported literal type: ' + std.type(value);
+  local columnsFor(op) =
+    local matching = [c for c in columns if c.sourcePath == templatePath(op)];
+    if std.length(matching) > 0 then matching[0].columns else null;
+  local defaultColumns(op) =
+    local ls = linksFor(op);
+    if std.length(ls) == 0 then null
+    else
+      local link = ls[0];
+      local params = targetParams(link);
+      local vars = std.get(link, 'vars', {});
+      local varParams = [p for p in params if std.objectHas(vars, p)];
+      if std.length(varParams) == 0 then null
+      else [
+        { label: p, path: vars[p], link: p == varParams[std.length(varParams) - 1] }
+        for p in varParams
+      ];
+  local columnsForOp(op) =
+    local explicit = columnsFor(op);
+    if explicit != null then explicit
+    else
+      local d = defaultColumns(op);
+      if d != null then d else [];
+  local columnLink(link) = j.FieldFunction('link', [j.Parameter('item')], targetLink(link));
+  local columnLiteral(col, link) =
+    local base = compactLiteral({ label: col.label, path: col.path });
+    if std.get(col, 'link', false) && link != null then
+      base { fields+: [columnLink(link)] }
+    else base;
+  local resourceColumns(op) =
+    local cols = columnsForOp(op);
+    if std.length(cols) == 0 then null
+    else
+      local ls = linksFor(op);
+      local firstLink = if std.length(ls) > 0 then ls[0] else null;
+      prettyArray([columnLiteral(col, firstLink) for col in cols], 4);
+  local view(name) = member(member(var('a'), name), 'view');
+  local listView(op) =
+    if resourceColumns(op) != null then view('table') else view('list');
   local dataField(expr, hidden=false) =
     j.Field('data', expr) { Hide: if hidden then 0 else 1 };
-  local dataObject(op, expr, hiddenData=false) =
+  local dataObject(op, expr) =
     local links = linksFor(op);
-    local fields = [dataField(expr, hiddenData)] +
+    local fields = [dataField(expr)] +
       (if std.length(links) == 0 then [] else [j.Field('links', linksExpr(links))]);
     prettyObject(fields, 2);
-  local view(name) = member(member(var('a'), name), 'view');
+  local listObject(op, expr) =
+    local links = linksFor(op);
+    local cols = resourceColumns(op);
+    local firstLink = if std.length(links) > 0 then links[0] else null;
+    local fields = [dataField(expr, hidden=true)] +
+      (if std.length(links) == 0 then [] else [j.Field('links', linksExpr(links))]) +
+      (if cols != null then [j.Field('columns', cols) { Hide: 0 }] else []) +
+      (if cols != null && firstLink != null then [j.Field('itemsPath', compactLiteral(firstLink.array)) { Hide: 0 }] else []);
+    prettyObject(fields, 2);
   local node(path, body, viewExpr) = j.Array([
     j.Array([j.String(p) for p in path]),
     body,
     viewExpr,
   ]);
-  local emptyNode(path) = j.Array([
-    j.Array([j.String(p) for p in path]),
-    j.Object(),
-  ]);
   local resourceOperationNode(path, op) =
     node(
-      [service] + [routeSegment(p) for p in path] + ['resource'],
+      [service] + [routeSegment(p) for p in path],
       dataObject(op, request(op)),
       view('resource')
     );
   local listOperationNode(path, op) =
     node(
       [service] + [routeSegment(p) for p in path],
-      dataObject(op, request(op), hiddenData=true),
-      view('list')
+      listObject(op, request(op)),
+      listView(op)
     );
   local operationNodesForPath(path, op) =
     if std.length(linksFor(op)) > 0 then [listOperationNode(path, op)]
-    else [
-      emptyNode([service] + [routeSegment(p) for p in path]),
-      resourceOperationNode(path, op),
-    ];
+    else [resourceOperationNode(path, op)];
   local hasRequiredParams(params) =
     std.length([p for p in params if p.required]) > 0;
   local isResourceOperation(op) =
@@ -321,9 +375,10 @@ local graph = {
   data: {
     spec: openapi.nestedSpec($.spec),
     links: std.get($, 'links', []),
+    columns: std.get($, 'columns', []),
   },
   _view:: {
-    jsonnet: generate($.service, $.data.spec, $.data.links, $.manifest),
+    jsonnet: generate($.service, $.data.spec, $.data.links, $.data.columns, $.manifest),
   },
 };
 

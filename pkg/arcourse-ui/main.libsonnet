@@ -42,14 +42,22 @@ local yamlView = baseView {
   },
 };
 
+local safeGet(obj, path) =
+  std.foldl(
+    function(acc, k)
+      if acc != null && std.isObject(acc) && std.objectHasAll(acc, k) then acc[k] else null,
+    path,
+    obj
+  );
+
 local tableView = baseView {
   _view+:: {
-    fragment: c.panel {
-      child:: c.table {
-        items:: $.data.items,
-        columns:: std.get($, 'columns', []),
-      },
-    },
+    fragment:
+      local items = safeGet($.data, std.get($, 'itemsPath', ['items']));
+      if std.isArray(items) then
+        c.panel { child:: c.table { items:: items, columns:: std.get($, 'columns', []) } }
+      else
+        c.panel { child:: c.yaml { data:: $.data } },
   },
 };
 
