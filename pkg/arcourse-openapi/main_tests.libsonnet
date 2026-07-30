@@ -426,6 +426,95 @@ local arcourseOpenapi = import './main.libsonnet';
       },
     },
     {
+      name: 'context params are prefixed onto every path and threaded into the request context',
+      input:: function()
+        local spec = {
+          paths: {
+            children: {
+              users: {
+                children: {
+                  '{username}': {
+                    operation: {
+                      pathFormat: '/users/{username}',
+                      pathArgNames: ['username'],
+                    },
+                  },
+                },
+              },
+            },
+          },
+        };
+        local generated = arcourseOpenapi.graph {
+          service: 'github',
+          manifest: false,
+          contextParams: ['region', 'tenant'],
+          data+: {
+            spec: spec,
+          },
+        }._view.jsonnet;
+        local specs = generated.body.elements;
+        local path(spec) = [part.expr.value for part in spec.expr.elements[0].expr.elements];
+        local requestApply(spec) = spec.expr.elements[1].expr.fields[0].expr2;
+        local inputObjectExpr(spec) =
+          requestApply(spec).arguments.positional[1].expr.elements[0].expr;
+        local fieldNames(spec) = [f.id for f in inputObjectExpr(spec).fields];
+        local contextField(spec) =
+          local fields = inputObjectExpr(spec).fields;
+          fields[std.length(fields) - 1];
+        {
+          paths: [path(spec) for spec in specs],
+          inputFields: fieldNames(specs[0]),
+          contextFieldId: contextField(specs[0]).id,
+          contextValueFields: [f.id for f in contextField(specs[0]).expr2.fields],
+        },
+      expected: {
+        paths: [
+          ['github', 'region', '$region', 'tenant', '$tenant', 'users', '$username'],
+        ],
+        inputFields: ['method', 'path', 'context'],
+        contextFieldId: 'context',
+        contextValueFields: ['region', 'tenant'],
+      },
+    },
+    {
+      name: 'no context field is added when contextParams is empty',
+      input:: function()
+        local spec = {
+          paths: {
+            children: {
+              users: {
+                children: {
+                  '{username}': {
+                    operation: {
+                      pathFormat: '/users/{username}',
+                      pathArgNames: ['username'],
+                    },
+                  },
+                },
+              },
+            },
+          },
+        };
+        local generated = arcourseOpenapi.graph {
+          service: 'github',
+          manifest: false,
+          data+: {
+            spec: spec,
+          },
+        }._view.jsonnet;
+        local specs = generated.body.elements;
+        local requestApply(spec) = spec.expr.elements[1].expr.fields[0].expr2;
+        local inputObjectExpr(spec) =
+          requestApply(spec).arguments.positional[1].expr.elements[0].expr;
+        local fieldNames(spec) = [f.id for f in inputObjectExpr(spec).fields];
+        {
+          inputFields: fieldNames(specs[0]),
+        },
+      expected: {
+        inputFields: ['method', 'path'],
+      },
+    },
+    {
       name: 'links match parameterized source path templates',
       input:: function()
         local spec = {
