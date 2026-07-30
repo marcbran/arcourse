@@ -1,7 +1,7 @@
 local j = import 'jsonnet/main.libsonnet';
 local openapi = import 'openapi/main.libsonnet';
 
-local generate(service, spec, links=[], columns=[], manifest=true) =
+local generate(service, spec, links=[], columns=[], contextParams=[], manifest=true) =
   local le(indent=0) = j.Fodder.LineEnd(0, indent);
   local prettyArray(elements, indent=0) =
     j.Array([
@@ -95,6 +95,7 @@ local generate(service, spec, links=[], columns=[], manifest=true) =
     local inner = pathParamInner(seg);
     if inner == null then seg else '$' + mangledPathVar(inner);
   local splitPath(path) = [part for part in std.split(path, '/') if part != ''];
+  local contextPrefix = std.flattenArrays([[p, '$' + mangledPathVar(p)] for p in contextParams]);
 
   local var(name) = j.Var(name);
   local member(expr, name) = j.Member(expr, name);
@@ -149,6 +150,12 @@ local generate(service, spec, links=[], columns=[], manifest=true) =
     else
       prettyObject([argField(bucketKey, p) for p in params], 6);
 
+  local contextObject =
+    if std.length(contextParams) == 0 then null
+    else prettyObject([
+      objectField(p, access(j.Dollar, mangledPathVar(p)))
+      for p in contextParams
+    ], 6);
   local inputObject(op) =
     local q = std.get(op, 'queryParams', []);
     local h = std.get(op, 'headerParams', []);
@@ -160,7 +167,9 @@ local generate(service, spec, links=[], columns=[], manifest=true) =
       if std.length(q) > 0 then base + [j.Field('query', paramObject('query', q))] else base;
     local withHeaders =
       if std.length(h) > 0 then withQuery + [j.Field('headers', paramObject('headers', h))] else withQuery;
-    prettyObject(withHeaders, 6);
+    local withContext =
+      if contextObject == null then withHeaders else withHeaders + [j.Field('context', contextObject)];
+    prettyObject(withContext, 6);
 
   local request(op) =
     callPretty(call(member(var('std'), 'native'), [j.String('invoke:' + service)]), [
@@ -334,13 +343,13 @@ local generate(service, spec, links=[], columns=[], manifest=true) =
   ]);
   local resourceOperationNode(path, op) =
     node(
-      [service] + [routeSegment(p) for p in path],
+      [service] + contextPrefix + [routeSegment(p) for p in path],
       dataObject(op, request(op)),
       view('resource')
     );
   local listOperationNode(path, op) =
     node(
-      [service] + [routeSegment(p) for p in path],
+      [service] + contextPrefix + [routeSegment(p) for p in path],
       listObject(op, request(op)),
       listView(op)
     );
@@ -372,13 +381,14 @@ local generate(service, spec, links=[], columns=[], manifest=true) =
 
 local graph = {
   manifest: true,
+  contextParams: [],
   data: {
     spec: openapi.nestedSpec($.spec),
     links: std.get($, 'links', []),
     columns: std.get($, 'columns', []),
   },
   _view:: {
-    jsonnet: generate($.service, $.data.spec, $.data.links, $.data.columns, $.manifest),
+    jsonnet: generate($.service, $.data.spec, $.data.links, $.data.columns, $.contextParams, $.manifest),
   },
 };
 
