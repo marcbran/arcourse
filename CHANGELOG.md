@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.8.0](https://github.com/marcbran/arcourse/compare/v0.7.0...v0.8.0) (2026-07-30)
+
+
+### Features
+
+* context in openapi generation ([#63](https://github.com/marcbran/arcourse/issues/63)) ([35b8a91](https://github.com/marcbran/arcourse/commit/35b8a91ab533ef178eb15c54ef78ac80007d7183))
+* tables in OpenAPI graphs ([#57](https://github.com/marcbran/arcourse/issues/57)) ([fc9f269](https://github.com/marcbran/arcourse/commit/fc9f269cf9f210363c82d5125fcc5075c18abd84))
+
+
+### Bug Fixes
+
+* links in namespaced resource table ([#55](https://github.com/marcbran/arcourse/issues/55)) ([349ce76](https://github.com/marcbran/arcourse/commit/349ce760a41004ba2f46de3df1ac4372678fa581))
+
 ## [0.7.0](https://github.com/marcbran/arcourse/compare/v0.6.0...v0.7.0) (2026-07-22)
 
 
