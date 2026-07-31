@@ -1,5 +1,5 @@
 local c = import 'components/main.libsonnet';
-local html = import 'github.com/marcbran/jsonnet/plugin/html/main.libsonnet';
+local html = import 'html/main.libsonnet';
 
 local collectNeighbors(obj, textPrefix='', exclude=[]) =
   std.flatMap(
