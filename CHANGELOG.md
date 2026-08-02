@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/marcbran/arcourse/compare/v0.8.0...v0.9.0) (2026-08-02)
+
+
+### Features
+
+* echarts and grafana charts/dashboards ([#65](https://github.com/marcbran/arcourse/issues/65)) ([0d41ea7](https://github.com/marcbran/arcourse/commit/0d41ea7764e0b7f52b76c3301d6e3515cc35713b))
+
 ## [0.8.0](https://github.com/marcbran/arcourse/compare/v0.7.0...v0.8.0) (2026-07-30)
 
 
