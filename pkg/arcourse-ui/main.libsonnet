@@ -36,6 +36,47 @@ local neighborView = baseView {
   },
 };
 
+local isNode(value) =
+  std.type(value) == 'object' && std.objectHas(value, '_node') && std.objectHasAll(value, '_queryPath');
+
+local directNeighbors(obj, exclude=[]) =
+  std.flatMap(
+    function(k)
+      if std.member(exclude, k) || std.substr(k, 0, 1) == '_' then []
+      else
+        local value = obj[k];
+        if isNode(value) then [{ link: value._queryPath, text: k }] else [],
+    std.objectFields(obj)
+  );
+
+local linksItems(obj) =
+  local links = std.get(obj, 'links', {});
+  if std.type(links) != 'object' then []
+  else std.flatMap(
+    function(k) if isNode(links[k]) then [{ link: links[k]._queryPath, text: k }] else [],
+    std.objectFields(links)
+  );
+
+local linksGroups(obj) =
+  local links = std.get(obj, 'links', {});
+  if std.type(links) != 'object' then []
+  else std.flatMap(
+    function(k)
+      local value = links[k];
+      if std.type(value) == 'object' && !isNode(value) then [{ title: k, items: collectNeighbors(value) }]
+      else [],
+    std.objectFields(links)
+  );
+
+local groupView = baseView {
+  _view+:: {
+    fragment: c.panel { style:: ' padding: 0.25em;', child:: c.groupList {
+      items:: directNeighbors($, exclude=['data', '_view', 'links']) + linksItems($),
+      groups:: linksGroups($),
+    } },
+  },
+};
+
 local yamlView = baseView {
   _view+:: {
     fragment: c.panel { child:: c.yaml { data:: $.data } },
@@ -82,6 +123,7 @@ local resourceView = baseView {
 {
   default: { view: neighborView },
   list: { view: neighborView },
+  groupList: { view: groupView },
   table: { view: tableView },
   yaml: { view: yamlView },
   resource: { view: resourceView },
