@@ -20,6 +20,7 @@ local chartView = baseView {
         style:: ' display: block; width: 100%; box-sizing: border-box;',
         child:: c.chart {
           option:: $.option,
+          links:: std.get($, 'links', {}),
           id:: std.get($, 'chartId', 'chart'),
           width:: std.get($, 'width', '100%'),
           height:: std.get($, 'height', '400px'),
