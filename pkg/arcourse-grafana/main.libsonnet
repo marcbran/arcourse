@@ -9,11 +9,6 @@ local refId(i) = std.char(std.codepoint('A') + i);
 
 local queryDefaults = { instant: false, range: !self.instant };
 
-// Grafana's /api/ds/query doesn't understand compound relative ranges
-// (e.g. now-2h30m) - it silently mis-parses them. Resolving every from/to
-// to an absolute epoch-ms here sidesteps that entirely: relative values
-// (now, now-...) resolve via addDuration, everything else is expected to
-// be RFC3339 (what the nav component sends for absolute values).
 local resolveTime(nowMs, value) =
   if value == 'now' then std.toString(nowMs)
   else if std.length(value) > 3 && std.substr(value, 0, 3) == 'now' then
@@ -38,8 +33,6 @@ local query(datasource, queries, from='now-1h', to='now') =
 local seriesName(frame) =
   std.get(frame.schema.fields[1].config, 'displayNameFromDS', frame.schema.refId);
 
-// A frame with no value field (only the time field) means the query window
-// had no data - happens for windows outside the data's actual range.
 local hasSeries(frame) = std.length(frame.schema.fields) > 1;
 
 local round(v, decimals) =
@@ -64,8 +57,6 @@ local seriesFromFrames(frames, type, decimals) = [
   if hasSeries(frame)
 ];
 
-// Optional per-query link:: function(labels) node, keyed by legend name, so
-// a legend entry can navigate to another arcourse node.
 local linksFromFrames(frames, linkFn) =
   if linkFn == null then {}
   else {
@@ -74,8 +65,6 @@ local linksFromFrames(frames, linkFn) =
     if hasSeries(frame) && linkFn(frame.schema.fields[1].labels) != null
   };
 
-// SI-prefix scale for a whole chart, picked once from the largest absolute
-// value across all series so every line shares one unit/axis label.
 local siPrefixes = [
   { factor: 1e12, suffix: 'TB' },
   { factor: 1e9, suffix: 'GB' },
@@ -139,7 +128,10 @@ local chartNode = a.chart.view {
     local allSeries = scaleSeries(rawSeries, scale.factor, $.decimals);
     {
       title: { text: $.title },
-      tooltip: { trigger: 'axis' },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'cross', z: 100, lineStyle: { color: '#888', type: 'dashed' } },
+      },
       legend: {
         data: [{ name: s.name, itemStyle: { opacity: 1 } } for s in allSeries],
         type: 'scroll',
@@ -147,7 +139,20 @@ local chartNode = a.chart.view {
         icon: 'roundRect',
       },
       grid: { top: 40, bottom: 40, containLabel: true },
-      xAxis: { type: 'time' },
+      xAxis: {
+        type: 'time',
+        axisLabel: {
+          formatter: {
+            year: '{yyyy}',
+            month: '{MMM}',
+            day: '{MMM} {d}',
+            hour: '{HH}:{mm}',
+            minute: '{HH}:{mm}',
+            second: '{HH}:{mm}:{ss}',
+            none: '{yyyy}-{MM}-{dd}',
+          },
+        },
+      },
       yAxis: { type: 'value' } + (
         if scale.suffix != null then { axisLabel: { formatter: '{value} ' + scale.suffix } } else {}
       ),

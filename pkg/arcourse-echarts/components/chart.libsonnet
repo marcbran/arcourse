@@ -49,8 +49,45 @@
                   var option = %s;
                   option.tooltip = Object.assign({}, option.tooltip, { trigger: 'item' });
 
+                  option.brush = {
+                    xAxisIndex: 'all',
+                    brushStyle: {
+                      color: 'rgba(255, 255, 255, 0.08)',
+                      borderWidth: 0,
+                    },
+                  };
+                  option.toolbox = { show: false };
+
                   chart.setOption(option);
                   window.addEventListener('resize', function () { chart.resize(); });
+
+                  chart.dispatchAction({
+                    type: 'takeGlobalCursor',
+                    key: 'brush',
+                    brushOption: { brushType: 'lineX', brushMode: 'single' },
+                  });
+                  // Drag-select a horizontal range to navigate to it as an
+                  // absolute time range, mirroring Grafana's chart-drag zoom.
+                  // brushSelected fires continuously while dragging, so it
+                  // only tracks the pending range - navigation happens once,
+                  // on mouseup, so it doesn't fire mid-drag.
+                  var pendingRange = null;
+                  chart.on('brushSelected', function (params) {
+                    var batch = params.batch && params.batch[0];
+                    var area = batch && batch.areas && batch.areas[0];
+                    pendingRange = area && area.coordRange;
+                  });
+                  chart.getZr().on('mouseup', function () {
+                    if (!pendingRange) return;
+                    var range = pendingRange;
+                    pendingRange = null;
+                    var from = new Date(Math.min(range[0], range[1])).toISOString();
+                    var to = new Date(Math.max(range[0], range[1])).toISOString();
+                    var url = new URL(window.location.href);
+                    url.searchParams.set('from', from);
+                    url.searchParams.set('to', to);
+                    window.location.href = url.toString();
+                  });
 
                   var links = %s;
                   // Click: toggle. Cmd/ctrl+click: toggle all (isolate this
