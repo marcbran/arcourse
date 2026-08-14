@@ -10,6 +10,10 @@ local pageStyle = |||
       color-mix(in srgb, var(--primary-color) 3%, white),
       color-mix(in srgb, var(--primary-color) 8%, black)
     );
+    --container-low-color: light-dark(
+      color-mix(in srgb, var(--primary-color) 8%, white),
+      color-mix(in srgb, var(--primary-color) 15%, black)
+    );
     --border-color: light-dark(
       color-mix(in srgb, var(--primary-color) 20%, white),
       color-mix(in srgb, var(--primary-color) 30%, black)

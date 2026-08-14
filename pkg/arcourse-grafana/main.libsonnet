@@ -1,5 +1,6 @@
 local a = import '../arcourse-echarts/main.libsonnet';
 local ui = import '../arcourse-ui/main.libsonnet';
+local time = import 'github.com/marcbran/jsonnet/plugin/time/main.libsonnet';
 local root = import 'root';
 
 local request(input) = std.native('invoke:grafana')('request', [input]);
@@ -8,7 +9,20 @@ local refId(i) = std.char(std.codepoint('A') + i);
 
 local queryDefaults = { instant: false, range: !self.instant };
 
+// Grafana's /api/ds/query doesn't understand compound relative ranges
+// (e.g. now-2h30m) - it silently mis-parses them. Resolving every from/to
+// to an absolute epoch-ms here sidesteps that entirely: relative values
+// (now, now-...) resolve via addDuration, everything else is expected to
+// be RFC3339 (what the nav component sends for absolute values).
+local resolveTime(nowMs, value) =
+  if value == 'now' then std.toString(nowMs)
+  else if std.length(value) > 3 && std.substr(value, 0, 3) == 'now' then
+    std.toString(time.addDuration(nowMs, std.substr(value, 3, std.length(value) - 3)))
+  else
+    std.toString(time.parseRFC3339(value));
+
 local query(datasource, queries, from='now-1h', to='now') =
+  local nowMs = time.now();
   local reqQueries = [
     queryDefaults + queries[i] { refId: refId(i) }
     for i in std.range(0, std.length(queries) - 1)
@@ -18,11 +32,15 @@ local query(datasource, queries, from='now-1h', to='now') =
     path: '/api/ds/query',
     readonly: true,
     context: { datasource: datasource },
-    body: { queries: reqQueries, from: from, to: to },
+    body: { queries: reqQueries, from: resolveTime(nowMs, from), to: resolveTime(nowMs, to) },
   });
 
 local seriesName(frame) =
   std.get(frame.schema.fields[1].config, 'displayNameFromDS', frame.schema.refId);
+
+// A frame with no value field (only the time field) means the query window
+// had no data - happens for windows outside the data's actual range.
+local hasSeries(frame) = std.length(frame.schema.fields) > 1;
 
 local round(v, decimals) =
   if v == null || decimals == null then v
@@ -43,6 +61,7 @@ local seriesFromFrames(frames, type, decimals) = [
     ],
   }
   for frame in frames
+  if hasSeries(frame)
 ];
 
 // Optional per-query link:: function(labels) node, keyed by legend name, so
@@ -52,7 +71,7 @@ local linksFromFrames(frames, linkFn) =
   else {
     [seriesName(frame)]: linkFn(frame.schema.fields[1].labels)._queryPath
     for frame in frames
-    if linkFn(frame.schema.fields[1].labels) != null
+    if hasSeries(frame) && linkFn(frame.schema.fields[1].labels) != null
   };
 
 // SI-prefix scale for a whole chart, picked once from the largest absolute
@@ -85,11 +104,24 @@ local scaleSeries(series, factor, decimals) = [
   for s in series
 ];
 
+local timeParams = [
+  { name: 'from', type: 'string', default: 'now-1h' },
+  { name: 'to', type: 'string', default: 'now' },
+];
+
+local timeRangeNavScript = importstr 'time-range-nav.js';
+
+local timeRangeNav(from, to) = [
+  { element: 'time-range-nav', attributes: { from: from, to: to } },
+  { element: 'script', children: [{ html: timeRangeNavScript }] },
+];
+
 local chartNode = a.chart.view {
   type:: 'line',
   decimals:: 2,
   unit:: null,
-  data: query($.datasource, $.queries, std.get($, 'from', 'now-1h'), std.get($, 'to', 'now')),
+  _params:: timeParams,
+  data: query($.datasource, $.queries, $.from, $.to),
   links::
     local results = $.data.results;
     std.foldl(
@@ -121,6 +153,10 @@ local chartNode = a.chart.view {
       ),
       series: allSeries,
     },
+  _view+:: {
+    local base = super.fragment,
+    fragment: base { child:: [timeRangeNav($.from, $.to), base.child] },
+  },
 };
 
 local collectQueries(node) =
@@ -150,8 +186,13 @@ local resolveTree(node, results, index) =
 local dashboardNode = a.dashboard.view {
   local n = self,
   layout:: error 'Dashboard requires layout',
-  data: query(n.datasource, collectQueries(n.layout), std.get(n, 'from', 'now-1h'), std.get(n, 'to', 'now')),
+  _params:: timeParams,
+  data: query(n.datasource, collectQueries(n.layout), n.from, n.to),
   tree:: resolveTree(n.layout, n.data.results, 0).node,
+  _view+:: {
+    local base = super.fragment,
+    fragment: base { child:: [timeRangeNav(n.from, n.to), base.child] },
+  },
 };
 
 local instantFrames(datasource, expr, from='now-5m', to='now') =
