@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.10.0](https://github.com/marcbran/arcourse/compare/v0.9.0...v0.10.0) (2026-08-15)
+
+
+### Features
+
+* chart polish ([#68](https://github.com/marcbran/arcourse/issues/68)) ([c36f993](https://github.com/marcbran/arcourse/commit/c36f9939e4c37106055ec6f1fa4798da0dd9e48c))
+
+
+### Bug Fixes
+
+* openapi context params paths ([#70](https://github.com/marcbran/arcourse/issues/70)) ([b02ec40](https://github.com/marcbran/arcourse/commit/b02ec401a6e5ae2e9742a11ed9f8392b967d1c20))
+
 ## [0.9.0](https://github.com/marcbran/arcourse/compare/v0.8.0...v0.9.0) (2026-08-02)
 
 
