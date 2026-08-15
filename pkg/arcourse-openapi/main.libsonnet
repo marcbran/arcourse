@@ -95,7 +95,8 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
     local inner = pathParamInner(seg);
     if inner == null then seg else '$' + mangledPathVar(inner);
   local splitPath(path) = [part for part in std.split(path, '/') if part != ''];
-  local contextPrefix = std.flattenArrays([[p, '$' + mangledPathVar(p)] for p in contextParams]);
+  local contextPrefix = ['$' + mangledPathVar(p) for p in contextParams];
+  local contextTargetParts = ['{' + p + '}' for p in contextParams];
 
   local var(name) = j.Var(name);
   local member(expr, name) = j.Member(expr, name);
@@ -194,7 +195,7 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
         local param = pathParamInner(part);
         if param == null then access(acc, part)
         else call(access(acc, mangledPathVar(param)), [j.Std.toString(paramValue(link, param))]),
-      splitPath(link.targetPath),
+      contextTargetParts + splitPath(link.targetPath),
       access(var('root'), service)
     );
   local targetParams(link) = [
