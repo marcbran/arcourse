@@ -5,7 +5,10 @@ test-go:
 test-jsonnet:
     jpoet test .
 
-test: test-go test-jsonnet
+test-node:
+    node --test
+
+test: test-go test-jsonnet test-node
 
 lint:
     golangci-lint run ./...

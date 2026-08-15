@@ -12,7 +12,8 @@ local render(node, path) =
       attributes: { style: flexStyle(node) + ' display: flex;' },
       children: [
         chart {
-          option:: node.chart,
+          option:: node.chart.option,
+          links:: node.chart.links,
           id:: 'chart-' + std.join('-', [std.toString(p) for p in path]),
           width:: '100%',
           height:: '100%',

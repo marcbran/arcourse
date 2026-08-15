@@ -17,9 +17,10 @@ local chartView = baseView {
   _view+:: {
     fragment:
       c.panel {
-        style:: ' display: block; width: 100%; box-sizing: border-box;',
+        style:: ' display: block; width: 100%; box-sizing: border-box; padding: 0.25em;',
         child:: c.chart {
           option:: $.option,
+          links:: std.get($, 'links', {}),
           id:: std.get($, 'chartId', 'chart'),
           width:: std.get($, 'width', '100%'),
           height:: std.get($, 'height', '400px'),
@@ -32,7 +33,7 @@ local dashboardView = baseView {
   _view+:: {
     fragment:
       c.panel {
-        style:: ' display: block; width: 100%; box-sizing: border-box;',
+        style:: ' display: block; width: 100%; box-sizing: border-box; padding: 0.25em;',
         child:: c.dashboard {
           layout:: $.tree,
           height:: std.get($, 'height', '600px'),
