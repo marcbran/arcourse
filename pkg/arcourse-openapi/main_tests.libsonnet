@@ -469,7 +469,7 @@ local arcourseOpenapi = import './main.libsonnet';
         },
       expected: {
         paths: [
-          ['github', 'region', '$region', 'tenant', '$tenant', 'users', '$username'],
+          ['github', '$region', '$tenant', 'users', '$username'],
         ],
         inputFields: ['method', 'path', 'context'],
         contextFieldId: 'context',
@@ -559,6 +559,58 @@ local arcourseOpenapi = import './main.libsonnet';
       expected: {
         fieldNames: ['data', 'links', 'columns', 'itemsPath'],
         dataHide: 0,
+      },
+    },
+    {
+      name: 'context params are applied before target path params in generated links',
+      input:: function()
+        local spec = {
+          paths: {
+            children: {
+              user: {
+                children: {
+                  repos: {
+                    operation: {
+                      pathFormat: '/user/repos',
+                    },
+                  },
+                },
+              },
+            },
+          },
+        };
+        local generated = arcourseOpenapi.graph {
+          service: 'demo',
+          manifest: false,
+          contextParams: ['region'],
+          links: [
+            {
+              sourcePath: '/user/repos',
+              targetPath: '/repos/{owner}/{repo}',
+              array: [],
+              vars: {
+                owner: ['owner', 'login'],
+                repo: ['name'],
+              },
+            },
+          ],
+          data+: {
+            spec: spec,
+          },
+        }._view.jsonnet;
+        local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
+        local specNode = unwrap(generated).elements[0].expr;
+        local columns = specNode.elements[1].expr.fields[2].expr2;
+        local linkField = [f for f in columns.elements[1].expr.fields if f.id == 'link'][0];
+        local memberChain(expr) =
+          if expr.__kind__ == 'Apply' then memberChain(expr.target)
+          else if expr.__kind__ == 'Index' && std.objectHas(expr, 'id') then memberChain(expr.target) + [expr.id]
+          else [];
+        {
+          chain: memberChain(linkField.expr2),
+        },
+      expected: {
+        chain: ['demo', 'region', 'repos', 'owner', 'repo'],
       },
     },
   ],
