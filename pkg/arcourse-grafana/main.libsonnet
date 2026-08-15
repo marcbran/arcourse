@@ -1,6 +1,6 @@
 local a = import '../arcourse-echarts/main.libsonnet';
 local ui = import '../arcourse-ui/main.libsonnet';
-local time = import 'github.com/marcbran/jsonnet/plugin/time/main.libsonnet';
+local time = import 'time/main.libsonnet';
 local root = import 'root';
 
 local request(input) = std.native('invoke:grafana')('request', [input]);

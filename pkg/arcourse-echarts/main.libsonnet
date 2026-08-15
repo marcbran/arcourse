@@ -1,5 +1,5 @@
 local c = import 'components/main.libsonnet';
-local html = import 'github.com/marcbran/jsonnet/plugin/html/main.libsonnet';
+local html = import 'html/main.libsonnet';
 
 local echartsSrc = 'https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js';
 local echartsScript = { element: 'script', attributes: { src: echartsSrc } };
