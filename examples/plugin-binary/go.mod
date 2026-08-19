@@ -5,7 +5,7 @@ go 1.26.2
 require (
 	github.com/google/go-jsonnet v0.22.0
 	github.com/marcbran/arcourse v0.0.0
-	github.com/marcbran/jpoet v0.18.0
+	github.com/marcbran/jpoet v0.19.0
 )
 
 require (
