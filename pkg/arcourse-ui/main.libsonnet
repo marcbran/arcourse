@@ -1,5 +1,6 @@
 local c = import 'components/main.libsonnet';
 local html = import 'html/main.libsonnet';
+local linkspecs = import 'linkspecs.libsonnet';
 
 local collectNeighbors(obj, textPrefix='', exclude=[]) =
   std.flatMap(
@@ -32,7 +33,7 @@ local baseView = {
 
 local neighborView = baseView {
   _view+:: {
-    fragment: c.panel { child:: c.list { items:: neighbors($) } },
+    fragment: c.list { items:: neighbors($) },
   },
 };
 
@@ -70,16 +71,16 @@ local linksGroups(obj) =
 
 local groupView = baseView {
   _view+:: {
-    fragment: c.panel { style:: ' padding: 0.25em;', child:: c.groupList {
+    fragment: c.groupList {
       items:: directNeighbors($, exclude=['data', '_view', 'links']) + linksItems($),
       groups:: linksGroups($),
-    } },
+    },
   },
 };
 
 local yamlView = baseView {
   _view+:: {
-    fragment: c.panel { child:: c.yaml { data:: $.data } },
+    fragment: c.yaml { data:: $.data },
   },
 };
 
@@ -94,11 +95,14 @@ local safeGet(obj, path) =
 local tableView = baseView {
   _view+:: {
     fragment:
-      local items = safeGet($.data, std.get($, 'itemsPath', ['items']));
-      if std.isArray(items) then
-        c.panel { child:: c.table { items:: items, columns:: std.get($, 'columns', []) } }
-      else
-        c.panel { child:: c.yaml { data:: $.data } },
+      local table = std.get($, 'table', {});
+      local at = std.get(table, 'at', ['items']);
+      local items = safeGet($.data, at);
+      c.table {
+        items:: items,
+        columns:: std.get(table, 'columns', []),
+        rowLink:: linkspecs.rowLinkFor($, std.get($, 'linkSpecs', []), at),
+      },
   },
 };
 
@@ -106,25 +110,18 @@ local resourceView = baseView {
   _view+:: {
     fragment:
       local items = neighbors($);
-      if std.length(items) > 0 then
-        {
-          element: 'div',
-          attributes: { style: 'display: inline-flex; gap: 0.25em; border: 1px solid var(--border-color); border-radius: 0.5em; padding: 0.25em;' },
-          children: [
-            c.panel { child:: c.list { items:: items }, style:: ' min-width: 8em;' },
-            c.panel { child:: c.yaml { data:: $.data } },
-          ],
-        }
-      else
-        c.panel { child:: c.yaml { data:: $.data } },
+      local listCard = if std.length(items) > 0 then [c.list { items:: items, style:: ' min-width: 8em;' }] else [];
+      listCard + [c.yaml { data:: $.data }],
   },
 };
 
+local withNode = { node: self.view + linkspecs.withLinkSpecs };
+
 {
-  default: { view: neighborView },
-  list: { view: neighborView },
-  groupList: { view: groupView },
-  table: { view: tableView },
-  yaml: { view: yamlView },
-  resource: { view: resourceView },
+  default: { view: neighborView } + withNode,
+  list: { view: neighborView } + withNode,
+  groupList: { view: groupView } + withNode,
+  table: { view: tableView } + withNode,
+  yaml: { view: yamlView } + withNode,
+  resource: { view: resourceView } + withNode,
 }

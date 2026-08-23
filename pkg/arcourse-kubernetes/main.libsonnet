@@ -24,13 +24,6 @@ local generate(resources, group) =
     j.Array([elem.fodder(le(indent + 2)) for elem in elements]).closeFodder(le(indent));
   local prettyObject(fields, indent=0) =
     j.Object([field { fodder: [le(indent + 2)] } for field in fields]).closeFodder(le(indent));
-  local prettyApply(target, args, indent=0) =
-    j.Apply(target, [arg.fodder(le(indent + 2)) for arg in args]).rightFodder(le(indent));
-  local prettyObjectComp(fields, specs, indent=0) =
-    j.ObjectComp(
-      [field { fodder: [le(indent + 2)] } for field in fields],
-      [spec.forFodder(le(indent + 2)) for spec in specs]
-    ).closeFodder(le(indent));
 
   local isAsciiLetter(c) = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
   local isAsciiDigit(c) = c >= '0' && c <= '9';
@@ -76,19 +69,26 @@ local generate(resources, group) =
   local var(name) = j.Var(name);
   local member(expr, name) = j.Member(expr, name);
   local call(expr, args=[]) = j.Apply(expr, args);
-  local callPretty(expr, args, indent=0) = prettyApply(expr, args, indent);
-  local rootContext =
-    call(member(member(var('root'), 'kubernetes'), 'context'), [access(j.Dollar, 'context')]);
-  local metadata(expr) = member(expr, 'metadata');
-  local itemNamespace = member(metadata(var('item')), 'namespace');
-  local itemName = member(metadata(var('item')), 'name');
-  local namespacedResourceLink(resource, namespaceExpr, nameExpr) =
-    local namespaceNode = call(member(rootContext, 'namespace'), [namespaceExpr]);
-    local base = if group == '' then namespaceNode else access(namespaceNode, group);
-    call(member(base, itemVar(resource)), [nameExpr]);
-  local clusterResourceLink(resource, nameExpr) =
-    local base = if group == '' then rootContext else access(rootContext, group);
-    call(member(base, itemVar(resource)), [nameExpr]);
+
+  local contextOrigin = { origin: 'context' };
+  local groupSegment = if group == '' then [] else [{ const: group }];
+  local nameSegment(resource) = { param: itemVar(resource), path: ['metadata', 'name'] };
+  local allNamespacesLinkSpec(resource) = {
+    at: ['items'],
+    keys: [{ path: ['metadata', 'namespace'] }, { path: ['metadata', 'name'] }],
+    value: [{ const: 'kubernetes' }, contextOrigin, { param: 'namespace', path: ['metadata', 'namespace'] }]
+           + groupSegment + [nameSegment(resource)],
+  };
+  local singleNamespaceLinkSpec(resource) = {
+    at: ['items'],
+    keys: [{ path: ['metadata', 'name'] }],
+    value: [{ const: 'kubernetes' }, contextOrigin, { origin: 'namespace' }] + groupSegment + [nameSegment(resource)],
+  };
+  local clusterLinkSpec(resource) = {
+    at: ['items'],
+    keys: [{ path: ['metadata', 'name'] }],
+    value: [{ const: 'kubernetes' }, contextOrigin] + groupSegment + [nameSegment(resource)],
+  };
 
   local apiPrefix(resource) =
     if group == '' then '/api/' + resource.version
@@ -117,38 +117,6 @@ local generate(resources, group) =
 
   local objectField(name, expr) =
     if isUnquotedFieldName(name) then j.Field(name, expr) else j.Field(j.String(name), expr);
-  local literal(value, indent=0) =
-    if value == null then j.Null
-    else if std.type(value) == 'string' then j.String(value)
-    else if std.type(value) == 'boolean' then if value then j.True else j.False
-    else if std.type(value) == 'number' then j.Number(std.toString(value))
-    else if std.type(value) == 'array' then prettyArray([literal(item, indent + 2) for item in value], indent)
-    else if std.type(value) == 'object' then prettyObject([
-      objectField(field, literal(value[field], indent + 2))
-      for field in std.objectFields(value)
-    ], indent)
-    else error 'unsupported literal type: ' + std.type(value);
-
-  local dataField(expr, hidden=false) =
-    j.Field('data', expr) { Hide: if hidden then 0 else 1 };
-  local dataObject(expr) = prettyObject([dataField(expr)], 2);
-  local listObject(dataExpr, linksExpr, columnsExpr=null) = prettyObject(
-    [dataField(dataExpr, hidden=true), j.Field('links', linksExpr)] +
-    (if columnsExpr != null then [j.Field('columns', columnsExpr) { Hide: 0 }] else []),
-    2
-  );
-  local view(name) = member(member(var('a'), name), 'view');
-  local node(path, body, viewExpr) = j.Array([
-    j.Array([j.String(p) for p in path]),
-    body,
-    viewExpr,
-  ]);
-  local emptyNode(path) = j.Array([
-    j.Array([j.String(p) for p in path]),
-    j.Object(),
-  ]);
-
-  local getItems(expr) = member(expr, 'items');
 
   local compactLiteral(value) =
     if value == null then j.Null
@@ -161,98 +129,70 @@ local generate(resources, group) =
       for field in std.objectFields(value)
     ])
     else error 'unsupported literal type: ' + std.type(value);
-  local nameColumnLink(resource) =
-    local linksExpr = member(j.Dollar, 'links');
-    if resource.namespaced then
-      call(member(var('std'), 'get'), [
-        call(member(var('std'), 'get'), [linksExpr, itemNamespace, j.Object()]),
-        itemName,
-        j.Null,
-      ])
-    else
-      call(member(var('std'), 'get'), [linksExpr, itemName, j.Null]);
-  local columnLiteral(resource, col) =
-    local base = compactLiteral({ label: col.label, path: col.path });
-    if std.get(col, 'kind', null) == 'name' then
-      base { fields+: [j.FieldFunction('link', [j.Parameter('item')], nameColumnLink(resource))] }
-    else base;
+
+  local dataField(expr, hidden=false) =
+    j.Field('data', expr) { Hide: if hidden then 0 else 1 };
+  local dataObject(expr) = prettyObject([dataField(expr)], 2);
+  local linkSpecEntry(spec) =
+    prettyObject([objectField(field, compactLiteral(spec[field])) for field in ['at', 'keys', 'value']], 6);
+  local listObject(dataExpr, linkSpecs, columnsExpr=null) = prettyObject(
+    [dataField(dataExpr), j.Field('linkSpecs', prettyArray([linkSpecEntry(s) for s in linkSpecs], 4)) { Hide: 0 }] +
+    (if columnsExpr != null then [j.Field('table', prettyObject([
+       j.Field('at', j.Array([j.String('items')])),
+       j.Field('columns', columnsExpr),
+     ], 4)) { Hide: 0 }] else []),
+    2
+  );
+  local nodeView(name) = member(member(var('a'), name), 'node');
+  local nodePath(path) = j.Array([j.String(p) for p in path]);
+  local node(path, viewExpr, body) = j.Array([nodePath(path), j.Add(viewExpr, body)]);
+  local emptyNode(path) = j.Array([nodePath(path), j.Object()]);
+
+  local columnLiteral(col) = compactLiteral({ label: col.label, path: col.path });
   local resourceColumns(resource) =
     local cols = std.get(resource, 'columns', []);
     if std.length(cols) > 0 then
-      prettyArray([columnLiteral(resource, col) for col in cols], 4)
+      prettyArray([columnLiteral(col) for col in cols], 4)
     else null;
   local listView(resource) =
-    if std.length(std.get(resource, 'columns', [])) > 0 then view('table') else view('list');
+    if std.length(std.get(resource, 'columns', [])) > 0 then nodeView('table') else nodeView('list');
 
   local namespacedAllList(resource) =
     local data = k8sGet(namespacedAllPath(resource));
-    local items = getItems(member(j.Dollar, 'data'));
-    local foldFn = j.Function(
-      [j.Parameter('acc'), j.Parameter('item')],
-      j.Add(
-        var('acc'),
-        prettyObject([
-          j.Field(
-            itemNamespace,
-            j.Add(
-              call(member(var('std'), 'get'), [var('acc'), itemNamespace, j.Object()]),
-              prettyObject([
-                j.Field(itemName, namespacedResourceLink(resource, itemNamespace, itemName)),
-              ], 16)
-            )
-          ),
-        ], 8)
-      )
-    );
     node(
       ['kubernetes', '$context'] + resourcePrefix + [route(resource)],
-      listObject(data, callPretty(member(var('std'), 'foldl'), [foldFn, items, j.Object()], 2), resourceColumns(resource)),
-      listView(resource)
+      listView(resource),
+      listObject(data, [allNamespacesLinkSpec(resource)], resourceColumns(resource))
     );
 
   local namespacedList(resource) =
     local data = k8sGet(namespacedListPath(resource));
-    local items = getItems(member(j.Dollar, 'data'));
     node(
       ['kubernetes', '$context', '$namespace'] + resourcePrefix + [route(resource)],
-      listObject(data, prettyObject([
-        j.Field(
-          member(j.Dollar, 'namespace'),
-          prettyObjectComp(
-            [j.Field(itemName, namespacedResourceLink(resource, member(j.Dollar, 'namespace'), itemName))],
-            [j.ForSpec('item', items)],
-            4
-          )
-        ),
-      ], 2), resourceColumns(resource)),
-      listView(resource)
+      listView(resource),
+      listObject(data, [singleNamespaceLinkSpec(resource)], resourceColumns(resource))
     );
 
   local namespacedDetail(resource) =
     node(
       ['kubernetes', '$context', '$namespace'] + resourcePrefix + ['$' + itemVar(resource)],
-      dataObject(k8sNeatGet(namespacedDetailPath(resource))),
-      view('resource')
+      nodeView('resource'),
+      dataObject(k8sNeatGet(namespacedDetailPath(resource)))
     );
 
   local clusterList(resource) =
     local data = k8sGet(clusterListPath(resource));
-    local items = getItems(member(j.Dollar, 'data'));
     node(
       ['kubernetes', '$context'] + resourcePrefix + [route(resource)],
-      listObject(data, prettyObjectComp(
-        [j.Field(itemName, clusterResourceLink(resource, itemName))],
-        [j.ForSpec('item', items)],
-        4
-      ), resourceColumns(resource)),
-      listView(resource)
+      listView(resource),
+      listObject(data, [clusterLinkSpec(resource)], resourceColumns(resource))
     );
 
   local clusterDetail(resource) =
     node(
       ['kubernetes', '$context'] + resourcePrefix + ['$' + itemVar(resource)],
-      dataObject(k8sNeatGet(clusterDetailPath(resource))),
-      view('resource')
+      nodeView('resource'),
+      dataObject(k8sNeatGet(clusterDetailPath(resource)))
     );
 
   local resourceNodes(resource) =
@@ -291,15 +231,17 @@ local generateAll(groups, manifest=true) =
 
   local contextsNode = j.Array([
     j.Array([j.String('kubernetes'), j.String('contexts')]),
-    prettyObject([
-      j.Field('data', call(member(var('kubernetes'), 'contexts'))),
-      j.Field('links', prettyObjectComp(
-        [j.Field(member(var('c'), 'name'), call(member(member(var('root'), 'kubernetes'), 'context'), [member(var('c'), 'name')]))],
-        [j.ForSpec('c', member(j.Dollar, 'data'))],
-        4
-      )),
-    ], 2),
-    member(member(var('a'), 'list'), 'view'),
+    j.Add(
+      member(member(var('a'), 'list'), 'node'),
+      prettyObject([
+        j.Field('data', call(member(var('kubernetes'), 'contexts'))),
+        j.Field('links', prettyObjectComp(
+          [j.Field(member(var('c'), 'name'), call(member(member(var('root'), 'kubernetes'), 'context'), [member(var('c'), 'name')]))],
+          [j.ForSpec('c', member(j.Dollar, 'data'))],
+          4
+        )),
+      ], 2)
+    ),
   ]);
   local contextNode = j.Array([
     j.Array([j.String('kubernetes'), j.String('$context')]),

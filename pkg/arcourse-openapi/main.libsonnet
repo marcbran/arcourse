@@ -13,29 +13,6 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
       field { fodder: [le(indent + 2)] }
       for field in fields
     ]).closeFodder(le(indent));
-  local prettyArrayComp(body, specs, indent=0) =
-    j.ArrayComp(
-      body,
-      [
-        if spec.__kind__ == 'ForSpec' then spec.forFodder(le(indent + 2))
-        else if spec.__kind__ == 'IfSpec' then spec.ifFodder(le(indent + 2))
-        else spec
-        for spec in specs
-      ]
-    ).closeFodder(le(indent));
-  local prettyObjectComp(fields, specs, indent=0) =
-    j.ObjectComp(
-      [
-        field { fodder: [le(indent + 2)] }
-        for field in fields
-      ],
-      [
-        if spec.__kind__ == 'ForSpec' then spec.forFodder(le(indent + 2))
-        else if spec.__kind__ == 'IfSpec' then spec.ifFodder(le(indent + 2))
-        else spec
-        for spec in specs
-      ]
-    ).closeFodder(le(indent));
   local prettyApply(target, args, indent=0) =
     j.Apply(target, [
       arg.fodder(le(indent + 2))
@@ -94,9 +71,11 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
   local routeSegment(seg) =
     local inner = pathParamInner(seg);
     if inner == null then seg else '$' + mangledPathVar(inner);
-  local splitPath(path) = [part for part in std.split(path, '/') if part != ''];
   local contextPrefix = ['$' + mangledPathVar(p) for p in contextParams];
-  local contextTargetParts = ['{' + p + '}' for p in contextParams];
+
+  local collectionFor(sourcePath) =
+    local matching = [c for c in columns if c.sourcePath == sourcePath];
+    if std.length(matching) > 0 then matching[0] else null;
 
   local var(name) = j.Var(name);
   local member(expr, name) = j.Member(expr, name);
@@ -178,95 +157,7 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
       prettyArray([inputObject(op)], 4),
     ], 4);
 
-  local pathValue(expr, path) =
-    std.foldl(function(acc, part) access(acc, part), path, expr);
-  local dataArray(link) = pathValue(member(j.Dollar, 'data'), link.array);
-  local isArrayExpr(expr) =
-    j.Eq(call(member(var('std'), 'type'), [expr]), j.String('array'));
-  local safeDataArray(link) =
-    j.Local([j.LocalBind('arr', dataArray(link))], j.If(isArrayExpr(var('arr')), var('arr'), j.Array([])));
-  local itemValue(path) = pathValue(var('item'), path);
-  local paramValue(link, param) =
-    if std.objectHas(std.get(link, 'vars', {}), param) then itemValue(link.vars[param])
-    else access(j.Dollar, mangledPathVar(param));
-  local targetLink(link) =
-    std.foldl(
-      function(acc, part)
-        local param = pathParamInner(part);
-        if param == null then access(acc, part)
-        else call(access(acc, mangledPathVar(param)), [j.Std.toString(paramValue(link, param))]),
-      contextTargetParts + splitPath(link.targetPath),
-      access(var('root'), service)
-    );
-  local targetParams(link) = [
-    param
-    for part in splitPath(link.targetPath)
-    for param in [pathParamInner(part)]
-    if param != null
-  ];
-  local objectHas(expr, field) =
-    call(member(var('std'), 'objectHas'), [expr, j.String(field)]);
-  local isObject(expr) =
-    j.Eq(call(member(var('std'), 'type'), [expr]), j.String('object'));
-  local itemPathGuard(path) =
-    local guard(expr, parts) =
-      if std.length(parts) == 0 then j.Neq(expr, j.Null)
-      else
-        local next = access(expr, parts[0]);
-        j.And(
-          j.And(
-            j.Neq(expr, j.Null),
-            j.And(isObject(expr), objectHas(expr, parts[0]))
-          ),
-          guard(next, std.slice(parts, 1, std.length(parts), 1))
-        );
-    guard(var('item'), path);
-  local linkGuard(link) =
-    local guards = [
-      itemPathGuard(link.vars[param])
-      for param in std.objectFields(std.get(link, 'vars', {}))
-      if std.objectHas(std.get(link, 'vars', {}), param)
-    ];
-    if std.length(guards) == 0 then null
-    else std.foldl(
-      function(acc, guard) j.And(acc, guard),
-      std.slice(guards, 1, std.length(guards), 1),
-      guards[0]
-    );
-  local nestedLinkValue(link, params, index, indent=6) =
-    if index >= std.length(params) then targetLink(link)
-    else prettyObject([
-      j.Field(
-        j.Std.toString(paramValue(link, params[index])),
-        nestedLinkValue(link, params, index + 1, indent + 2)
-      ) { SuperSugar: index < std.length(params) - 1 },
-    ], indent);
-  local nestedLinkObject(link) =
-    local params = targetParams(link);
-    prettyObject([
-      j.Field(
-        j.Std.toString(paramValue(link, params[0])),
-        nestedLinkValue(link, params, 1)
-      ) { SuperSugar: std.length(params) > 1 },
-    ], 6);
-  local mergeLink(link) =
-    j.Add(var('acc'), nestedLinkObject(link));
-  local linkComprehension(link) =
-    local guard = linkGuard(link);
-    local body = if guard == null then mergeLink(link) else j.If(guard, mergeLink(link), var('acc'));
-    callPretty(member(var('std'), 'foldl'), [
-      j.Function([j.Parameter('acc'), j.Parameter('item')], body),
-      safeDataArray(link),
-      emptyObject,
-    ], 4);
-  local linkComprehensions(links) = [linkComprehension(link) for link in links];
-  local linksExpr(links) =
-    local exprs = linkComprehensions(links);
-    std.foldl(
-      function(acc, expr) j.Add(acc, expr),
-      std.slice(exprs, 1, std.length(exprs), 1),
-      exprs[0]
-    );
+  local paramSegments(link) = [seg for seg in link.value if std.objectHas(seg, 'param')];
   local linksFor(op) = [
     link
     for link in links
@@ -284,20 +175,20 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
     ])
     else error 'unsupported literal type: ' + std.type(value);
   local columnsFor(op) =
-    local matching = [c for c in columns if c.sourcePath == templatePath(op)];
-    if std.length(matching) > 0 then matching[0].columns else null;
+    local entry = collectionFor(templatePath(op));
+    if entry == null then null else std.get(entry, 'columns', null);
   local defaultColumns(op) =
     local ls = linksFor(op);
     if std.length(ls) == 0 then null
     else
-      local link = ls[0];
-      local params = targetParams(link);
-      local vars = std.get(link, 'vars', {});
-      local varParams = [p for p in params if std.objectHas(vars, p)];
-      if std.length(varParams) == 0 then null
+      local segs = paramSegments(ls[0]);
+      if std.length(segs) == 0 then null
       else [
-        { label: p, path: vars[p], link: p == varParams[std.length(varParams) - 1] }
-        for p in varParams
+        {
+          label: segs[i].param,
+          path: segs[i].path,
+        }
+        for i in std.range(0, std.length(segs) - 1)
       ];
   local columnsForOp(op) =
     local explicit = columnsFor(op);
@@ -305,57 +196,66 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
     else
       local d = defaultColumns(op);
       if d != null then d else [];
-  local columnLink(link) = j.FieldFunction('link', [j.Parameter('item')], targetLink(link));
-  local columnLiteral(col, link) =
-    local base = compactLiteral({ label: col.label, path: col.path });
-    if std.get(col, 'link', false) && link != null then
-      base { fields+: [columnLink(link)] }
-    else base;
+  local columnLiteral(col) = compactLiteral({ label: col.label, path: col.path });
   local resourceColumns(op) =
     local cols = columnsForOp(op);
     if std.length(cols) == 0 then null
-    else
-      local ls = linksFor(op);
-      local firstLink = if std.length(ls) > 0 then ls[0] else null;
-      prettyArray([columnLiteral(col, firstLink) for col in cols], 4);
-  local view(name) = member(member(var('a'), name), 'view');
+    else prettyArray([columnLiteral(col) for col in cols], 6);
+  local nodeView(name) = member(member(var('a'), name), 'node');
   local listView(op) =
-    if resourceColumns(op) != null then view('table') else view('list');
+    if resourceColumns(op) != null then nodeView('table') else nodeView('list');
+  local tableAt(op) =
+    local ls = linksFor(op);
+    if std.length(ls) > 0 then ls[0].at
+    else
+      local collection = collectionFor(templatePath(op));
+      if collection != null then std.get(collection, 'array', []) else [];
+  local tableField(op) =
+    local cols = resourceColumns(op);
+    if cols == null then null
+    else j.Field('table', prettyObject([
+      objectField('at', compactLiteral(tableAt(op))),
+      j.Field('columns', cols),
+    ], 4)) { Hide: 0 };
   local dataField(expr, hidden=false) =
     j.Field('data', expr) { Hide: if hidden then 0 else 1 };
+  local withLinkPrefix(item) =
+    item {
+      value: [{ const: service }] +
+             [{ origin: mangledPathVar(p) } for p in contextParams] +
+             item.value,
+    };
+  local prettyEntry(item) =
+    prettyObject([objectField(field, compactLiteral(item[field])) for field in ['at', 'keys', 'value']], 6);
+  local linkSpecsField(items) =
+    j.Field(
+      'linkSpecs',
+      prettyArray([prettyEntry(withLinkPrefix(item)) for item in items], 4)
+    ) { Hide: 0 };
   local dataObject(op, expr) =
-    local links = linksFor(op);
+    local ls = linksFor(op);
     local fields = [dataField(expr)] +
-      (if std.length(links) == 0 then [] else [j.Field('links', linksExpr(links))]);
+      (if std.length(ls) == 0 then [] else [linkSpecsField(ls)]);
     prettyObject(fields, 2);
   local listObject(op, expr) =
-    local links = linksFor(op);
-    local cols = resourceColumns(op);
-    local firstLink = if std.length(links) > 0 then links[0] else null;
-    local fields = [dataField(expr, hidden=true)] +
-      (if std.length(links) == 0 then [] else [j.Field('links', linksExpr(links))]) +
-      (if cols != null then [j.Field('columns', cols) { Hide: 0 }] else []) +
-      (if cols != null && firstLink != null then [j.Field('itemsPath', compactLiteral(firstLink.array)) { Hide: 0 }] else []);
+    local ls = linksFor(op);
+    local table = tableField(op);
+    local fields = [dataField(expr)] +
+      (if std.length(ls) == 0 then [] else [linkSpecsField(ls)]) +
+      (if table != null then [table] else []);
     prettyObject(fields, 2);
-  local node(path, body, viewExpr) = j.Array([
-    j.Array([j.String(p) for p in path]),
-    body,
-    viewExpr,
-  ]);
   local resourceOperationNode(path, op) =
-    node(
-      [service] + contextPrefix + [routeSegment(p) for p in path],
-      dataObject(op, request(op)),
-      view('resource')
-    );
+    j.Array([
+      j.Array([j.String(p) for p in [service] + contextPrefix + [routeSegment(p) for p in path]]),
+      j.Add(nodeView('resource'), dataObject(op, request(op))),
+    ]);
   local listOperationNode(path, op) =
-    node(
-      [service] + contextPrefix + [routeSegment(p) for p in path],
-      listObject(op, request(op)),
-      listView(op)
-    );
+    j.Array([
+      j.Array([j.String(p) for p in [service] + contextPrefix + [routeSegment(p) for p in path]]),
+      j.Add(listView(op), listObject(op, request(op))),
+    ]);
   local operationNodesForPath(path, op) =
-    if std.length(linksFor(op)) > 0 then [listOperationNode(path, op)]
+    if collectionFor(templatePath(op)) != null then [listOperationNode(path, op)]
     else [resourceOperationNode(path, op)];
   local hasRequiredParams(params) =
     std.length([p for p in params if p.required]) > 0;
@@ -373,8 +273,7 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
     ]);
 
   local generated = j.Locals(
-    [j.LocalBind('a', j.Import('arcourse-ui/main.libsonnet'))] +
-    (if std.length(links) == 0 then [] else [j.LocalBind('root', j.Import('root'))]),
+    [j.LocalBind('a', j.Import('arcourse-ui/main.libsonnet'))],
     prettyArray(operationNodes(spec.paths))
   );
 

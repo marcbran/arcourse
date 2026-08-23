@@ -18,7 +18,7 @@ p.pkg({
 |||, {
   default: p.desc('Renders the node\'s neighboring links as a list. Fallback view.'),
   list: p.desc('Renders the node\'s neighboring links as a list.'),
-  table: p.desc('Renders `data` items (at `itemsPath`, default `[\'items\']`) as a table with `columns`.'),
+  table: p.desc('Renders `data` items (at `table.at`, default `[\'items\']`) as a table with `table.columns`, each row linking to its own item if `linkSpecs` resolves one.'),
   yaml: p.desc('Renders `data` as YAML.'),
   resource: p.desc('Renders `data` as YAML alongside a list of neighboring links, if any.'),
 })

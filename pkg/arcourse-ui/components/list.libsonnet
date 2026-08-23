@@ -1,26 +1,46 @@
+local style = |||
+  @scope (.list) {
+    :scope {
+      font-family: monospace;
+    }
+    a {
+      color: var(--primary-color);
+    }
+    a:hover {
+      text-decoration: none;
+    }
+    ul {
+      list-style: none;
+    }
+  }
+|||;
+
 {
   local c = self,
   items:: error 'List requires items',
-  html: {
-    element: 'aside',
-    attributes: { style: 'font-family: monospace' },
-    children: [{
-      element: 'nav',
+  style:: '',
+  html: [
+    { element: 'style', children: [style] },
+    {
+      element: 'aside',
+      attributes: { class: 'list card' } + (if c.style != '' then { style: c.style } else {}),
       children: [{
-        element: 'ul',
-        attributes: { style: 'list-style: none;' },
-        children: [
-          {
-            element: 'li',
-            children: [{
-              element: 'a',
-              attributes: { href: item.link, style: 'color: var(--primary-color)' },
-              children: [item.text],
-            }],
-          }
-          for item in c.items
-        ],
+        element: 'nav',
+        children: [{
+          element: 'ul',
+          children: [
+            {
+              element: 'li',
+              children: [{
+                element: 'a',
+                attributes: { href: item.link },
+                children: [item.text],
+              }],
+            }
+            for item in c.items
+          ],
+        }],
       }],
-    }],
-  },
+    },
+  ],
 }
