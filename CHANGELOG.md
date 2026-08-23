@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/marcbran/arcourse/compare/v0.10.0...v0.11.0) (2026-08-23)
+
+
+### Features
+
+* unified link specs ([#78](https://github.com/marcbran/arcourse/issues/78)) ([17ef2cc](https://github.com/marcbran/arcourse/commit/17ef2ccd000faab64903e6c5ceb726382bbf6025))
+
 ## [0.10.0](https://github.com/marcbran/arcourse/compare/v0.9.0...v0.10.0) (2026-08-15)
 
 
