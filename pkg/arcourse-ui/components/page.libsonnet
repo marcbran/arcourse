@@ -6,6 +6,10 @@ local pageStyle = |||
   :root {
     color-scheme: light dark;
     --primary-color: light-dark(#0451a5, #569cd6);
+    --on-background-color: light-dark(
+      color-mix(in srgb, var(--primary-color) 12%, black),
+      color-mix(in srgb, var(--primary-color) 12%, white)
+    );
     --background-color: light-dark(
       color-mix(in srgb, var(--primary-color) 3%, white),
       color-mix(in srgb, var(--primary-color) 8%, black)
@@ -21,20 +25,24 @@ local pageStyle = |||
   }
   body {
     background-color: var(--background-color);
+    color: var(--on-background-color);
     padding: 0.5em;
   }
-  pre {
-    white-space: pre-wrap;
-    word-break: break-all;
+  .card {
+    display: inline-block;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5em;
+    padding: 0.75em;
   }
-  a:hover {
-    text-decoration: none;
+  .deck {
+    display: contents;
   }
-  table {
-    border-collapse: collapse;
-  }
-  th, td {
-    padding: 0.1em 0.4em;
+  .deck:has(.card ~ .card) {
+    display: inline-flex;
+    gap: 0.25em;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5em;
+    padding: 0.25em;
   }
 |||;
 
@@ -47,7 +55,10 @@ local pageStyle = |||
       element: 'html',
       children: [
         { element: 'head', children: [{ element: 'style', children: [pageStyle] }] },
-        { element: 'body', children: [c.fragment] },
+        {
+          element: 'body',
+          children: [{ element: 'div', attributes: { class: 'deck' }, children: c.fragment }],
+        },
       ],
     },
   ],

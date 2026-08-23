@@ -118,34 +118,43 @@ local arcourseOpenapi = import './main.libsonnet';
           links: [
             {
               sourcePath: '/user/repos',
-              targetPath: '/repos/{owner}/{repo}',
-              array: [],
-              vars: {
-                owner: ['owner', 'login'],
-                repo: ['name'],
-              },
+              at: [],
+              keys: [{ path: ['name'] }],
+              value: [
+                { const: 'repos' },
+                { param: 'owner', path: ['owner', 'login'] },
+                { param: 'repo', path: ['name'] },
+              ],
             },
+          ],
+          columns: [
+            { sourcePath: '/user/repos', array: [] },
           ],
           data+: {
             spec: spec,
           },
         }._view.jsonnet;
+        local manifestLiteral(expr) =
+          if expr.__kind__ == 'LiteralString' then expr.value
+          else if expr.__kind__ == 'Array' then [manifestLiteral(e.expr) for e in expr.elements]
+          else if expr.__kind__ == 'Object' then { [f.id]: manifestLiteral(f.expr2) for f in expr.fields }
+          else error 'unexpected kind ' + expr.__kind__;
         local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
         local specNode = unwrap(generated).elements[0].expr;
         local path = [part.expr.value for part in specNode.elements[0].expr.elements];
-        local body = specNode.elements[1].expr;
-        local view = specNode.elements[2].expr;
-        local links = body.fields[1].expr2;
-        local columns = body.fields[2].expr2;
+        local merged = specNode.elements[1].expr;
+        local body = merged.right;
+        local view = merged.left;
+        local specsField = [f for f in body.fields if f.id == 'linkSpecs'][0];
+        local table = [f for f in body.fields if f.id == 'table'][0].expr2;
+        local columns = [f for f in table.fields if f.id == 'columns'][0].expr2;
         {
           path: path,
+          nodeElementCount: std.length(specNode.elements),
           fieldNames: [field.id for field in body.fields],
           dataHide: body.fields[0].Hide,
-          linksKind: links.__kind__,
-          linksTarget: links.target.id,
-          argumentCount: std.length(links.arguments.positional),
-          foldFunctionKind: links.arguments.positional[0].expr.__kind__,
-          foldBodyKind: links.arguments.positional[0].expr.body.__kind__,
+          specsHide: specsField.Hide,
+          specs: [manifestLiteral(e.expr) for e in specsField.expr2.elements],
           viewBase: view.target.target.id,
           viewName: view.target.id,
           columnCount: std.length(columns.elements),
@@ -153,29 +162,33 @@ local arcourseOpenapi = import './main.libsonnet';
             [f.expr2.value for f in col.expr.fields if f.id == 'label'][0]
             for col in columns.elements
           ],
-          columnHasLink: [
-            std.length([f for f in col.expr.fields if f.id == 'link']) > 0
-            for col in columns.elements
-          ],
         },
       expected: {
         path: ['demo', 'user', 'repos'],
-        fieldNames: ['data', 'links', 'columns', 'itemsPath'],
-        dataHide: 0,
-        linksKind: 'Apply',
-        linksTarget: 'foldl',
-        argumentCount: 3,
-        foldFunctionKind: 'Function',
-        foldBodyKind: 'Conditional',
+        nodeElementCount: 2,
+        fieldNames: ['data', 'linkSpecs', 'table'],
+        dataHide: 1,
+        specsHide: 0,
+        specs: [
+          {
+            at: [],
+            keys: [{ path: ['name'] }],
+            value: [
+              { const: 'demo' },
+              { const: 'repos' },
+              { param: 'owner', path: ['owner', 'login'] },
+              { param: 'repo', path: ['name'] },
+            ],
+          },
+        ],
         viewBase: 'a',
         viewName: 'table',
         columnCount: 2,
         columnLabels: ['owner', 'repo'],
-        columnHasLink: [false, true],
       },
     },
     {
-      name: 'links fold source is guarded against non-array data',
+      name: 'table.at follows the link anchor, not columns.json, when both are present',
       input:: function()
         local spec = {
           paths: {
@@ -198,82 +211,44 @@ local arcourseOpenapi = import './main.libsonnet';
           links: [
             {
               sourcePath: '/user/repos',
-              targetPath: '/repos/{owner}/{repo}',
-              array: [],
-              vars: {
-                owner: ['owner', 'login'],
-                repo: ['name'],
-              },
+              at: ['items'],
+              keys: [{ path: ['name'] }],
+              value: [
+                { const: 'repos' },
+                { param: 'repo', path: ['name'] },
+              ],
             },
+          ],
+          columns: [
+            { sourcePath: '/user/repos', array: ['stale_or_wrong'] },
           ],
           data+: {
             spec: spec,
           },
         }._view.jsonnet;
+        local manifestLiteral(expr) =
+          if expr.__kind__ == 'LiteralString' then expr.value
+          else if expr.__kind__ == 'Array' then [manifestLiteral(e.expr) for e in expr.elements]
+          else if expr.__kind__ == 'Object' then { [f.id]: manifestLiteral(f.expr2) for f in expr.fields }
+          else error 'unexpected kind ' + expr.__kind__;
         local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
         local specNode = unwrap(generated).elements[0].expr;
-        local body = specNode.elements[1].expr;
-        local links = body.fields[1].expr2;
-        local dataArg = links.arguments.positional[1].expr;
+        local merged = specNode.elements[1].expr;
+        local body = merged.right;
+        local specsField = [f for f in body.fields if f.id == 'linkSpecs'][0];
+        local table = [f for f in body.fields if f.id == 'table'][0].expr2;
+        local at = [f for f in table.fields if f.id == 'at'][0];
         {
-          dataArgKind: dataArg.__kind__,
-          guardKind: dataArg.body.__kind__,
-          condKind: dataArg.body.cond.__kind__,
-          fallbackKind: dataArg.body.branchFalse.__kind__,
+          nodeElementCount: std.length(specNode.elements),
+          fieldNames: [field.id for field in body.fields],
+          tableAt: manifestLiteral(at.expr2),
+          specAt: [manifestLiteral(e.expr).at for e in specsField.expr2.elements],
         },
       expected: {
-        dataArgKind: 'Local',
-        guardKind: 'Conditional',
-        condKind: 'Binary',
-        fallbackKind: 'Array',
-      },
-    },
-    {
-      name: 'link target arguments are stringified even for non-string values',
-      input:: function()
-        local spec = {
-          paths: {
-            children: {
-              pulls: {
-                operation: {
-                  pathFormat: '/pulls',
-                },
-              },
-            },
-          },
-        };
-        local generated = arcourseOpenapi.graph {
-          service: 'demo',
-          manifest: false,
-          links: [
-            {
-              sourcePath: '/pulls',
-              targetPath: '/pulls/{pull_number}',
-              array: [],
-              vars: {
-                pull_number: ['number'],
-              },
-            },
-          ],
-          data+: {
-            spec: spec,
-          },
-        }._view.jsonnet;
-        local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
-        local specNode = unwrap(generated).elements[0].expr;
-        local body = specNode.elements[1].expr;
-        local columns = body.fields[2].expr2;
-        local linkFn = [f for f in columns.elements[0].expr.fields if f.id == 'link'][0];
-        local callArg = linkFn.expr2.arguments.positional[0].expr;
-        {
-          callArgKind: callArg.__kind__,
-          callArgTarget: callArg.target.id,
-          callArgBase: callArg.target.target.id,
-        },
-      expected: {
-        callArgKind: 'Apply',
-        callArgTarget: 'toString',
-        callArgBase: 'std',
+        nodeElementCount: 2,
+        fieldNames: ['data', 'linkSpecs', 'table'],
+        tableAt: ['items'],
+        specAt: [['items']],
       },
     },
     {
@@ -300,17 +275,19 @@ local arcourseOpenapi = import './main.libsonnet';
           links: [
             {
               sourcePath: '/user/repos',
-              targetPath: '/repos/{owner}/{repo}',
-              array: [],
-              vars: {
-                owner: ['owner', 'login'],
-                repo: ['name'],
-              },
+              at: [],
+              keys: [{ path: ['name'] }],
+              value: [
+                { const: 'repos' },
+                { param: 'owner', path: ['owner', 'login'] },
+                { param: 'repo', path: ['name'] },
+              ],
             },
           ],
           columns: [
             {
               sourcePath: '/user/repos',
+              array: [],
               columns: [
                 { label: 'Name', path: ['name'], link: true },
                 { label: 'Stars', path: ['stargazers_count'] },
@@ -323,10 +300,13 @@ local arcourseOpenapi = import './main.libsonnet';
         }._view.jsonnet;
         local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
         local specNode = unwrap(generated).elements[0].expr;
-        local body = specNode.elements[1].expr;
-        local view = specNode.elements[2].expr;
-        local columns = body.fields[2].expr2;
+        local merged = specNode.elements[1].expr;
+        local body = merged.right;
+        local view = merged.left;
+        local table = [f for f in body.fields if f.id == 'table'][0].expr2;
+        local columns = [f for f in table.fields if f.id == 'columns'][0].expr2;
         {
+          nodeElementCount: std.length(specNode.elements),
           fieldNames: [field.id for field in body.fields],
           viewName: view.target.id,
           columnCount: std.length(columns.elements),
@@ -334,10 +314,11 @@ local arcourseOpenapi = import './main.libsonnet';
           secondColumnFieldNames: [f.id for f in columns.elements[1].expr.fields],
         },
       expected: {
-        fieldNames: ['data', 'links', 'columns', 'itemsPath'],
+        nodeElementCount: 2,
+        fieldNames: ['data', 'linkSpecs', 'table'],
         viewName: 'table',
         columnCount: 2,
-        firstColumnFieldNames: ['label', 'path', 'link'],
+        firstColumnFieldNames: ['label', 'path'],
         secondColumnFieldNames: ['label', 'path'],
       },
     },
@@ -361,10 +342,15 @@ local arcourseOpenapi = import './main.libsonnet';
           links: [
             {
               sourcePath: '/status',
-              targetPath: '/current-status',
-              array: [],
-              vars: {},
+              at: [],
+              keys: [],
+              value: [
+                { const: 'current-status' },
+              ],
             },
+          ],
+          columns: [
+            { sourcePath: '/status', array: [] },
           ],
           data+: {
             spec: spec,
@@ -372,14 +358,17 @@ local arcourseOpenapi = import './main.libsonnet';
         }._view.jsonnet;
         local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
         local specNode = unwrap(generated).elements[0].expr;
-        local body = specNode.elements[1].expr;
-        local view = specNode.elements[2].expr;
+        local merged = specNode.elements[1].expr;
+        local body = merged.right;
+        local view = merged.left;
         {
+          nodeElementCount: std.length(specNode.elements),
           fieldNames: [field.id for field in body.fields],
           viewName: view.target.id,
         },
       expected: {
-        fieldNames: ['data', 'links'],
+        nodeElementCount: 2,
+        fieldNames: ['data', 'linkSpecs'],
         viewName: 'list',
       },
     },
@@ -411,17 +400,19 @@ local arcourseOpenapi = import './main.libsonnet';
         }._view.jsonnet;
         local specs = generated.body.elements;
         local path(spec) = [part.expr.value for part in spec.expr.elements[0].expr.elements];
-        local bodyFieldCount(spec) = std.length(spec.expr.elements[1].expr.fields);
+        local bodyFieldCount(spec) = std.length(spec.expr.elements[1].expr.right.fields);
         {
           paths: [path(spec) for spec in specs],
           nodeElements: std.length(specs[0].expr.elements),
+          bodyKind: specs[0].expr.elements[1].expr.__kind__,
           bodyFields: bodyFieldCount(specs[0]),
         },
       expected: {
         paths: [
           ['github', 'users', '$username'],
         ],
-        nodeElements: 3,
+        nodeElements: 2,
+        bodyKind: 'Binary',
         bodyFields: 1,
       },
     },
@@ -454,7 +445,7 @@ local arcourseOpenapi = import './main.libsonnet';
         }._view.jsonnet;
         local specs = generated.body.elements;
         local path(spec) = [part.expr.value for part in spec.expr.elements[0].expr.elements];
-        local requestApply(spec) = spec.expr.elements[1].expr.fields[0].expr2;
+        local requestApply(spec) = spec.expr.elements[1].expr.right.fields[0].expr2;
         local inputObjectExpr(spec) =
           requestApply(spec).arguments.positional[1].expr.elements[0].expr;
         local fieldNames(spec) = [f.id for f in inputObjectExpr(spec).fields];
@@ -503,7 +494,7 @@ local arcourseOpenapi = import './main.libsonnet';
           },
         }._view.jsonnet;
         local specs = generated.body.elements;
-        local requestApply(spec) = spec.expr.elements[1].expr.fields[0].expr2;
+        local requestApply(spec) = spec.expr.elements[1].expr.right.fields[0].expr2;
         local inputObjectExpr(spec) =
           requestApply(spec).arguments.positional[1].expr.elements[0].expr;
         local fieldNames(spec) = [f.id for f in inputObjectExpr(spec).fields];
@@ -520,12 +511,16 @@ local arcourseOpenapi = import './main.libsonnet';
         local spec = {
           paths: {
             children: {
-              users: {
+              orgs: {
                 children: {
-                  '{username}': {
-                    operation: {
-                      pathFormat: '/users/%s',
-                      pathArgNames: ['username'],
+                  '{org}': {
+                    children: {
+                      repos: {
+                        operation: {
+                          pathFormat: '/orgs/%s/repos',
+                          pathArgNames: ['org'],
+                        },
+                      },
                     },
                   },
                 },
@@ -538,40 +533,48 @@ local arcourseOpenapi = import './main.libsonnet';
           manifest: false,
           links: [
             {
-              sourcePath: '/users/{username}',
-              targetPath: '/users/{username}',
-              array: [],
-              vars: {
-                username: ['login'],
-              },
+              sourcePath: '/orgs/{org}/repos',
+              at: [],
+              keys: [{ path: ['name'] }],
+              value: [
+                { const: 'repos' },
+                { param: 'repo', path: ['name'] },
+              ],
             },
+          ],
+          columns: [
+            { sourcePath: '/orgs/{org}/repos', array: [] },
           ],
           data+: {
             spec: spec,
           },
         }._view.jsonnet;
         local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
-        local body = unwrap(generated).elements[0].expr.elements[1].expr;
+        local specNode = unwrap(generated).elements[0].expr;
+        local body = specNode.elements[1].expr.right;
         {
+          nodeElementCount: std.length(specNode.elements),
           fieldNames: [field.id for field in body.fields],
           dataHide: body.fields[0].Hide,
         },
       expected: {
-        fieldNames: ['data', 'links', 'columns', 'itemsPath'],
-        dataHide: 0,
+        nodeElementCount: 2,
+        fieldNames: ['data', 'linkSpecs', 'table'],
+        dataHide: 1,
       },
     },
     {
-      name: 'context params are applied before target path params in generated links',
+      name: 'resource operation with a root-anchored resource link gets linkSpecs prefixed with root and service, no local resourcelinks import',
       input:: function()
         local spec = {
           paths: {
             children: {
-              user: {
+              accounts: {
                 children: {
-                  repos: {
+                  '$id': {
                     operation: {
-                      pathFormat: '/user/repos',
+                      pathFormat: '/accounts/%s',
+                      pathArgNames: ['id'],
                     },
                   },
                 },
@@ -580,18 +583,14 @@ local arcourseOpenapi = import './main.libsonnet';
           },
         };
         local generated = arcourseOpenapi.graph {
-          service: 'demo',
+          service: 'acme',
           manifest: false,
-          contextParams: ['region'],
           links: [
             {
-              sourcePath: '/user/repos',
-              targetPath: '/repos/{owner}/{repo}',
-              array: [],
-              vars: {
-                owner: ['owner', 'login'],
-                repo: ['name'],
-              },
+              sourcePath: '/accounts/{id}',
+              at: [],
+              keys: [{ const: 'service' }],
+              value: [{ const: 'services' }, { param: 'id', path: ['service_id'] }],
             },
           ],
           data+: {
@@ -599,18 +598,430 @@ local arcourseOpenapi = import './main.libsonnet';
           },
         }._view.jsonnet;
         local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
+        local binds(node, acc=[]) =
+          if node.__kind__ == 'Local' then binds(node.body, acc + [b.variable for b in node.binds])
+          else acc;
         local specNode = unwrap(generated).elements[0].expr;
-        local columns = specNode.elements[1].expr.fields[2].expr2;
-        local linkField = [f for f in columns.elements[1].expr.fields if f.id == 'link'][0];
-        local memberChain(expr) =
-          if expr.__kind__ == 'Apply' then memberChain(expr.target)
-          else if expr.__kind__ == 'Index' && std.objectHas(expr, 'id') then memberChain(expr.target) + [expr.id]
-          else [];
+        local merged = specNode.elements[1].expr;
+        local body = merged.right;
+        local specsField = [f for f in body.fields if f.id == 'linkSpecs'][0];
+        local specsElements = specsField.expr2.elements;
+        local firstValueElements = specsElements[0].expr.fields[2].expr2.elements;
         {
-          chain: memberChain(linkField.expr2),
+          localVars: binds(generated),
+          nodeElementCount: std.length(specNode.elements),
+          bodyFieldNames: [f.id for f in body.fields],
+          dataHide: [f for f in body.fields if f.id == 'data'][0].Hide,
+          specsHide: specsField.Hide,
+          specsCount: std.length(specsElements),
+          specsFirstKind: specsElements[0].expr.__kind__,
+          entryFieldNames: [f.id for f in specsElements[0].expr.fields],
+          valueFirstSegmentConst: firstValueElements[0].expr.fields[0].expr2.value,
         },
       expected: {
-        chain: ['demo', 'region', 'repos', 'owner', 'repo'],
+        localVars: ['a'],
+        nodeElementCount: 2,
+        bodyFieldNames: ['data', 'linkSpecs'],
+        dataHide: 1,
+        specsHide: 0,
+        specsCount: 1,
+        specsFirstKind: 'Object',
+        entryFieldNames: ['at', 'keys', 'value'],
+        valueFirstSegmentConst: 'acme',
+      },
+    },
+    {
+      name: 'resource operation without matching resource links stays plain',
+      input:: function()
+        local spec = {
+          paths: {
+            children: {
+              accounts: {
+                children: {
+                  '$id': {
+                    operation: {
+                      pathFormat: '/accounts/%s',
+                      pathArgNames: ['id'],
+                    },
+                  },
+                },
+              },
+              teams: {
+                children: {
+                  '$id': {
+                    operation: {
+                      pathFormat: '/teams/%s',
+                      pathArgNames: ['id'],
+                    },
+                  },
+                },
+              },
+            },
+          },
+        };
+        local generated = arcourseOpenapi.graph {
+          service: 'acme',
+          manifest: false,
+          links: [
+            {
+              sourcePath: '/accounts/{id}',
+              at: [],
+              keys: [{ const: 'service' }],
+              value: [{ const: 'services' }, { param: 'id', path: ['service_id'] }],
+            },
+          ],
+          data+: {
+            spec: spec,
+          },
+        }._view.jsonnet;
+        local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
+        local specs = unwrap(generated).elements;
+        local pathOf(spec) = [part.expr.value for part in spec.expr.elements[0].expr.elements];
+        local nodeFor(target) = [s for s in specs if pathOf(s) == target][0];
+        {
+          accountsElementCount: std.length(nodeFor(['acme', 'accounts', '$id']).expr.elements),
+          teamsElementCount: std.length(nodeFor(['acme', 'teams', '$id']).expr.elements),
+          accountsBodyFieldNames: [f.id for f in nodeFor(['acme', 'accounts', '$id']).expr.elements[1].expr.right.fields],
+          teamsBodyFieldNames: [f.id for f in nodeFor(['acme', 'teams', '$id']).expr.elements[1].expr.right.fields],
+        },
+      expected: {
+        accountsElementCount: 2,
+        teamsElementCount: 2,
+        accountsBodyFieldNames: ['data', 'linkSpecs'],
+        teamsBodyFieldNames: ['data'],
+      },
+    },
+    {
+      name: 'resource link spec array-crossing entry embeds nested keys and a param-sourced path segment as literal data',
+      input:: function()
+        local spec = {
+          paths: {
+            children: {
+              accounts: {
+                children: {
+                  '$id': {
+                    operation: {
+                      pathFormat: '/accounts/%s',
+                      pathArgNames: ['id'],
+                    },
+                  },
+                },
+              },
+            },
+          },
+        };
+        local generated = arcourseOpenapi.graph {
+          service: 'acme',
+          manifest: false,
+          links: [
+            {
+              sourcePath: '/accounts/{id}',
+              at: ['members'],
+              keys: [{ const: 'members' }, { path: ['user_id'] }],
+              value: [{ const: 'users' }, { param: 'id', path: ['user_id'] }],
+            },
+          ],
+          data+: {
+            spec: spec,
+          },
+        }._view.jsonnet;
+        local manifestLiteral(expr) =
+          if expr.__kind__ == 'LiteralString' then expr.value
+          else if expr.__kind__ == 'Array' then [manifestLiteral(e.expr) for e in expr.elements]
+          else if expr.__kind__ == 'Object' then { [f.id]: manifestLiteral(f.expr2) for f in expr.fields }
+          else error 'unexpected kind ' + expr.__kind__;
+        local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
+        local specNode = unwrap(generated).elements[0].expr;
+        local body = specNode.elements[1].expr.right;
+        local specsField = [f for f in body.fields if f.id == 'linkSpecs'][0];
+        local specsElements = specsField.expr2.elements;
+        {
+          specs: [manifestLiteral(e.expr) for e in specsElements],
+        },
+      expected: {
+        specs: [
+          {
+            at: ['members'],
+            keys: [{ const: 'members' }, { path: ['user_id'] }],
+            value: [{ const: 'acme' }, { const: 'users' }, { param: 'id', path: ['user_id'] }],
+          },
+        ],
+      },
+    },
+    {
+      name: 'resource link with an origin-sourced param embeds identically as literal data, no special-case AST',
+      input:: function()
+        local spec = {
+          paths: {
+            children: {
+              accounts: {
+                children: {
+                  '$id': {
+                    children: {
+                      integrations: {
+                        children: {
+                          '$integration_id': {
+                            operation: {
+                              pathFormat: '/accounts/%s/integrations/%s',
+                              pathArgNames: ['id', 'integration_id'],
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        };
+        local generated = arcourseOpenapi.graph {
+          service: 'acme',
+          manifest: false,
+          links: [
+            {
+              sourcePath: '/accounts/{id}/integrations/{integration_id}',
+              at: [],
+              keys: [{ const: 'account' }],
+              value: [{ const: 'accounts' }, { origin: 'id' }],
+            },
+          ],
+          data+: {
+            spec: spec,
+          },
+        }._view.jsonnet;
+        local manifestLiteral(expr) =
+          if expr.__kind__ == 'LiteralString' then expr.value
+          else if expr.__kind__ == 'Array' then [manifestLiteral(e.expr) for e in expr.elements]
+          else if expr.__kind__ == 'Object' then { [f.id]: manifestLiteral(f.expr2) for f in expr.fields }
+          else error 'unexpected kind ' + expr.__kind__;
+        local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
+        local specNode = unwrap(generated).elements[0].expr;
+        local body = specNode.elements[1].expr.right;
+        local specsField = [f for f in body.fields if f.id == 'linkSpecs'][0];
+        local specsElements = specsField.expr2.elements;
+        {
+          specs: [manifestLiteral(e.expr) for e in specsElements],
+        },
+      expected: {
+        specs: [
+          {
+            at: [],
+            keys: [{ const: 'account' }],
+            value: [{ const: 'acme' }, { const: 'accounts' }, { origin: 'id' }],
+          },
+        ],
+      },
+    },
+    {
+      name: 'a collection with no links still renders as a table, falling back to columns.json for table.at',
+      input:: function()
+        local spec = {
+          paths: {
+            children: {
+              events: {
+                operation: {
+                  pathFormat: '/events',
+                },
+              },
+            },
+          },
+        };
+        local generated = arcourseOpenapi.graph {
+          service: 'demo',
+          manifest: false,
+          columns: [
+            {
+              sourcePath: '/events',
+              array: ['data'],
+              columns: [{ label: 'Summary', path: ['summary'] }],
+            },
+          ],
+          data+: {
+            spec: spec,
+          },
+        }._view.jsonnet;
+        local manifestLiteral(expr) =
+          if expr.__kind__ == 'LiteralString' then expr.value
+          else if expr.__kind__ == 'Array' then [manifestLiteral(e.expr) for e in expr.elements]
+          else if expr.__kind__ == 'Object' then { [f.id]: manifestLiteral(f.expr2) for f in expr.fields }
+          else error 'unexpected kind ' + expr.__kind__;
+        local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
+        local specNode = unwrap(generated).elements[0].expr;
+        local merged = specNode.elements[1].expr;
+        local body = merged.right;
+        local table = [f for f in body.fields if f.id == 'table'][0].expr2;
+        {
+          nodeElementCount: std.length(specNode.elements),
+          fieldNames: [field.id for field in body.fields],
+          viewName: merged.left.target.id,
+          tableAt: manifestLiteral([f for f in table.fields if f.id == 'at'][0].expr2),
+        },
+      expected: {
+        nodeElementCount: 2,
+        fieldNames: ['data', 'table'],
+        viewName: 'table',
+        tableAt: ['data'],
+      },
+    },
+    {
+      name: 'a singleton resource with a link is not mistaken for a collection despite its path having no parameter',
+      input:: function()
+        local spec = {
+          paths: {
+            children: {
+              user: {
+                operation: {
+                  pathFormat: '/user',
+                },
+              },
+            },
+          },
+        };
+        local generated = arcourseOpenapi.graph {
+          service: 'github',
+          manifest: false,
+          links: [
+            {
+              sourcePath: '/user',
+              at: [],
+              keys: [{ const: 'company' }],
+              value: [{ const: 'orgs' }, { param: 'org', path: ['company'] }],
+            },
+          ],
+          collections: [],
+          data+: {
+            spec: spec,
+          },
+        }._view.jsonnet;
+        local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
+        local specNode = unwrap(generated).elements[0].expr;
+        local body = specNode.elements[1].expr.right;
+        {
+          nodeElementCount: std.length(specNode.elements),
+          bodyFieldNames: [f.id for f in body.fields],
+          dataHide: [f for f in body.fields if f.id == 'data'][0].Hide,
+        },
+      expected: {
+        nodeElementCount: 2,
+        bodyFieldNames: ['data', 'linkSpecs'],
+        dataHide: 1,
+      },
+    },
+    {
+      name: 'context params are woven into resource linkSpecs as origin segments, between service and the link value',
+      input:: function()
+        local spec = {
+          paths: {
+            children: {
+              accounts: {
+                children: {
+                  '$id': {
+                    operation: {
+                      pathFormat: '/accounts/%s',
+                      pathArgNames: ['id'],
+                    },
+                  },
+                },
+              },
+            },
+          },
+        };
+        local generated = arcourseOpenapi.graph {
+          service: 'acme',
+          manifest: false,
+          contextParams: ['region'],
+          links: [
+            {
+              sourcePath: '/accounts/{id}',
+              at: [],
+              keys: [{ const: 'service' }],
+              value: [{ const: 'services' }, { param: 'id', path: ['service_id'] }],
+            },
+          ],
+          data+: {
+            spec: spec,
+          },
+        }._view.jsonnet;
+        local manifestLiteral(expr) =
+          if expr.__kind__ == 'LiteralString' then expr.value
+          else if expr.__kind__ == 'Array' then [manifestLiteral(e.expr) for e in expr.elements]
+          else if expr.__kind__ == 'Object' then { [f.id]: manifestLiteral(f.expr2) for f in expr.fields }
+          else error 'unexpected kind ' + expr.__kind__;
+        local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
+        local specNode = unwrap(generated).elements[0].expr;
+        local body = specNode.elements[1].expr.right;
+        local specsField = [f for f in body.fields if f.id == 'linkSpecs'][0];
+        {
+          specs: [manifestLiteral(e.expr) for e in specsField.expr2.elements],
+        },
+      expected: {
+        specs: [
+          {
+            at: [],
+            keys: [{ const: 'service' }],
+            value: [
+              { const: 'acme' },
+              { origin: 'region' },
+              { const: 'services' },
+              { param: 'id', path: ['service_id'] },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      name: 'a context param needing mangling is woven in under its mangled node field name, so resolveTarget can find it',
+      input:: function()
+        local spec = {
+          paths: {
+            children: {
+              widgets: {
+                operation: {
+                  pathFormat: '/widgets',
+                },
+              },
+            },
+          },
+        };
+        local generated = arcourseOpenapi.graph {
+          service: 'acme',
+          manifest: false,
+          contextParams: ['self'],
+          links: [
+            {
+              sourcePath: '/widgets',
+              at: [],
+              keys: [{ path: ['name'] }],
+              value: [
+                { const: 'widgets' },
+                { param: 'id', path: ['name'] },
+              ],
+            },
+          ],
+          columns: [
+            { sourcePath: '/widgets', array: [] },
+          ],
+          data+: {
+            spec: spec,
+          },
+        }._view.jsonnet;
+        local manifestLiteral(expr) =
+          if expr.__kind__ == 'LiteralString' then expr.value
+          else if expr.__kind__ == 'Array' then [manifestLiteral(e.expr) for e in expr.elements]
+          else if expr.__kind__ == 'Object' then { [f.id]: manifestLiteral(f.expr2) for f in expr.fields }
+          else error 'unexpected kind ' + expr.__kind__;
+        local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
+        local body = unwrap(generated).elements[0].expr.elements[1].expr.right;
+        local specsField = [f for f in body.fields if f.id == 'linkSpecs'][0];
+        local origin = [manifestLiteral(e.expr).value[1] for e in specsField.expr2.elements][0];
+        {
+          originKeyIsMangled: origin.origin != 'self',
+          originKeyLooksHashed: std.startsWith(origin.origin, 'p_'),
+        },
+      expected: {
+        originKeyIsMangled: true,
+        originKeyLooksHashed: true,
       },
     },
   ],

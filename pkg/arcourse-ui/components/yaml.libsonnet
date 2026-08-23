@@ -46,8 +46,18 @@ local yaml = {
       , value),
 };
 
+local style = |||
+  .yaml {
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+|||;
+
 {
   local c = self,
   data:: error 'Yaml requires data',
-  html: { element: 'pre', children: yaml.children(c.data, 0) },
+  html: [
+    { element: 'style', children: [style] },
+    { element: 'pre', attributes: { class: 'yaml card' }, children: yaml.children(c.data, 0) },
+  ],
 }
