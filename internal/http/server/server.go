@@ -29,8 +29,10 @@ func NewServer(facade pkg.Facade) *Server {
 	s.mux.HandleFunc("GET /api/audit", s.handleListAudit)
 	s.mux.HandleFunc("GET /api/audit/{id}", s.handleGetAudit)
 	s.mux.HandleFunc("GET /observe", s.handleObserve)
+	s.mux.HandleFunc("GET /observe/", redirectTo("/observe"))
 	s.mux.HandleFunc("GET /observe/stream", s.handleObserveStream)
 	s.mux.HandleFunc("GET /audit", s.handleAuditPage)
+	s.mux.HandleFunc("GET /audit/", redirectTo("/audit"))
 	s.mux.HandleFunc("GET /audit/{id}", s.handleAuditEntryPage)
 	s.mux.HandleFunc("GET /{path...}", s.handleBrowse)
 	return s
@@ -144,4 +146,10 @@ func prepareUnixSocket(path string) error {
 		return fmt.Errorf("unix socket exists but could not be checked: %w", err)
 	}
 	return os.Remove(path)
+}
+
+func redirectTo(path string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, path, http.StatusFound)
+	}
 }
