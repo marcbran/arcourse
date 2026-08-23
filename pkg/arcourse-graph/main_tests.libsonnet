@@ -32,7 +32,7 @@ local nodeTests = {
         hasPathTemplate: true,
         hasVisiblePathTemplate: false,
         pathTemplate: ['kubernetes', '$context', 'pods'],
-        queryPath: 'root/kubernetes/context/prod/pods',
+        queryPath: '/root/kubernetes/context/prod/pods',
         vars: ['context'],
       },
     },
@@ -176,7 +176,7 @@ local graphTests = {
       expected: {
         node: {
           _node: true,
-          queryPath: 'root/apps',
+          queryPath: '/root/apps',
           title: 'Apps',
         },
         child: {
@@ -206,7 +206,7 @@ local graphTests = {
       expected: {
         node: {
           _node: true,
-          queryPath: 'root/namespaces',
+          queryPath: '/root/namespaces',
           title: 'Namespaces',
         },
         child: {

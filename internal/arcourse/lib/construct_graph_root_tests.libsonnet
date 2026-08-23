@@ -133,7 +133,7 @@ local construct_graph_root = import './construct_graph_root.libsonnet';
           kind: 'PodList',
         },
         evalPath: 'root.namespaces.name("default").pods',
-        queryPath: 'root/namespaces/name/default/pods',
+        queryPath: '/root/namespaces/name/default/pods',
       },
     },
     {
