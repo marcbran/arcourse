@@ -3,7 +3,7 @@ local ui = import '../arcourse-ui/main.libsonnet';
 local time = import 'time/main.libsonnet';
 local root = import 'root';
 
-local request(input) = std.native('invoke:grafana')('request', [input]);
+local request(input) = std.native('invoke:grafana')('request', [input]).body;
 
 local refId(i) = std.char(std.codepoint('A') + i);
 

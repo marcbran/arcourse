@@ -87,11 +87,13 @@ local arcourseOpenapi = import './main.libsonnet';
           type: std.type(generated),
           kind: generated.__kind__,
           bodyKind: generated.body.__kind__,
+          bodyBodyKind: generated.body.body.__kind__,
         },
       expected: {
         type: 'object',
         kind: 'Local',
-        bodyKind: 'Array',
+        bodyKind: 'Local',
+        bodyBodyKind: 'Array',
       },
     },
     {
@@ -152,7 +154,7 @@ local arcourseOpenapi = import './main.libsonnet';
           path: path,
           nodeElementCount: std.length(specNode.elements),
           fieldNames: [field.id for field in body.fields],
-          dataHide: body.fields[0].Hide,
+          dataHide: [f for f in body.fields if f.id == 'data'][0].Hide,
           specsHide: specsField.Hide,
           specs: [manifestLiteral(e.expr) for e in specsField.expr2.elements],
           viewBase: view.target.target.id,
@@ -166,7 +168,7 @@ local arcourseOpenapi = import './main.libsonnet';
       expected: {
         path: ['demo', 'user', 'repos'],
         nodeElementCount: 2,
-        fieldNames: ['data', 'linkSpecs', 'table'],
+        fieldNames: ['response', 'data', 'linkSpecs', 'table'],
         dataHide: 1,
         specsHide: 0,
         specs: [
@@ -246,7 +248,7 @@ local arcourseOpenapi = import './main.libsonnet';
         },
       expected: {
         nodeElementCount: 2,
-        fieldNames: ['data', 'linkSpecs', 'table'],
+        fieldNames: ['response', 'data', 'linkSpecs', 'table'],
         tableAt: ['items'],
         specAt: [['items']],
       },
@@ -315,7 +317,7 @@ local arcourseOpenapi = import './main.libsonnet';
         },
       expected: {
         nodeElementCount: 2,
-        fieldNames: ['data', 'linkSpecs', 'table'],
+        fieldNames: ['response', 'data', 'linkSpecs', 'table'],
         viewName: 'table',
         columnCount: 2,
         firstColumnFieldNames: ['label', 'path'],
@@ -368,7 +370,7 @@ local arcourseOpenapi = import './main.libsonnet';
         },
       expected: {
         nodeElementCount: 2,
-        fieldNames: ['data', 'linkSpecs'],
+        fieldNames: ['response', 'data', 'linkSpecs'],
         viewName: 'list',
       },
     },
@@ -398,7 +400,7 @@ local arcourseOpenapi = import './main.libsonnet';
             spec: spec,
           },
         }._view.jsonnet;
-        local specs = generated.body.elements;
+        local specs = generated.body.body.elements;
         local path(spec) = [part.expr.value for part in spec.expr.elements[0].expr.elements];
         local bodyFieldCount(spec) = std.length(spec.expr.elements[1].expr.right.fields);
         {
@@ -413,7 +415,7 @@ local arcourseOpenapi = import './main.libsonnet';
         ],
         nodeElements: 2,
         bodyKind: 'Binary',
-        bodyFields: 1,
+        bodyFields: 2,
       },
     },
     {
@@ -443,11 +445,11 @@ local arcourseOpenapi = import './main.libsonnet';
             spec: spec,
           },
         }._view.jsonnet;
-        local specs = generated.body.elements;
+        local specs = generated.body.body.elements;
         local path(spec) = [part.expr.value for part in spec.expr.elements[0].expr.elements];
-        local requestApply(spec) = spec.expr.elements[1].expr.right.fields[0].expr2;
+        local requestApply(spec) = [f for f in spec.expr.elements[1].expr.right.fields if f.id == 'response'][0].expr2;
         local inputObjectExpr(spec) =
-          requestApply(spec).arguments.positional[1].expr.elements[0].expr;
+          requestApply(spec).arguments.positional[0].expr;
         local fieldNames(spec) = [f.id for f in inputObjectExpr(spec).fields];
         local contextField(spec) =
           local fields = inputObjectExpr(spec).fields;
@@ -493,10 +495,10 @@ local arcourseOpenapi = import './main.libsonnet';
             spec: spec,
           },
         }._view.jsonnet;
-        local specs = generated.body.elements;
-        local requestApply(spec) = spec.expr.elements[1].expr.right.fields[0].expr2;
+        local specs = generated.body.body.elements;
+        local requestApply(spec) = [f for f in spec.expr.elements[1].expr.right.fields if f.id == 'response'][0].expr2;
         local inputObjectExpr(spec) =
-          requestApply(spec).arguments.positional[1].expr.elements[0].expr;
+          requestApply(spec).arguments.positional[0].expr;
         local fieldNames(spec) = [f.id for f in inputObjectExpr(spec).fields];
         {
           inputFields: fieldNames(specs[0]),
@@ -555,11 +557,11 @@ local arcourseOpenapi = import './main.libsonnet';
         {
           nodeElementCount: std.length(specNode.elements),
           fieldNames: [field.id for field in body.fields],
-          dataHide: body.fields[0].Hide,
+          dataHide: [f for f in body.fields if f.id == 'data'][0].Hide,
         },
       expected: {
         nodeElementCount: 2,
-        fieldNames: ['data', 'linkSpecs', 'table'],
+        fieldNames: ['response', 'data', 'linkSpecs', 'table'],
         dataHide: 1,
       },
     },
@@ -619,9 +621,9 @@ local arcourseOpenapi = import './main.libsonnet';
           valueFirstSegmentConst: firstValueElements[0].expr.fields[0].expr2.value,
         },
       expected: {
-        localVars: ['a'],
+        localVars: ['a', 'request'],
         nodeElementCount: 2,
-        bodyFieldNames: ['data', 'linkSpecs'],
+        bodyFieldNames: ['response', 'data', 'linkSpecs'],
         dataHide: 1,
         specsHide: 0,
         specsCount: 1,
@@ -687,8 +689,8 @@ local arcourseOpenapi = import './main.libsonnet';
       expected: {
         accountsElementCount: 2,
         teamsElementCount: 2,
-        accountsBodyFieldNames: ['data', 'linkSpecs'],
-        teamsBodyFieldNames: ['data'],
+        accountsBodyFieldNames: ['response', 'data', 'linkSpecs'],
+        teamsBodyFieldNames: ['response', 'data'],
       },
     },
     {
@@ -859,7 +861,7 @@ local arcourseOpenapi = import './main.libsonnet';
         },
       expected: {
         nodeElementCount: 2,
-        fieldNames: ['data', 'table'],
+        fieldNames: ['response', 'data', 'table'],
         viewName: 'table',
         tableAt: ['data'],
       },
@@ -904,7 +906,7 @@ local arcourseOpenapi = import './main.libsonnet';
         },
       expected: {
         nodeElementCount: 2,
-        bodyFieldNames: ['data', 'linkSpecs'],
+        bodyFieldNames: ['response', 'data', 'linkSpecs'],
         dataHide: 1,
       },
     },
@@ -1058,8 +1060,8 @@ local arcourseOpenapi = import './main.libsonnet';
         local specNode = unwrap(generated).elements[0].expr;
         local body = specNode.elements[1].expr.right;
         local specsField = [f for f in body.fields if f.id == '_paramSpecs'][0];
-        local request = body.fields[0].expr2;
-        local inputObject = request.arguments.positional[1].expr.elements[0].expr;
+        local request = [f for f in body.fields if f.id == 'response'][0].expr2;
+        local inputObject = request.arguments.positional[0].expr;
         local queryObject = [f for f in inputObject.fields if f.id == 'query'][0].expr2;
         local offsetExpr = [f for f in queryObject.fields if f.id == 'offset'][0].expr2;
         local offsetArgs = offsetExpr.arguments.positional;
@@ -1115,8 +1117,8 @@ local arcourseOpenapi = import './main.libsonnet';
         local specNode = unwrap(generated).elements[0].expr;
         local body = specNode.elements[1].expr.right;
         local specsField = [f for f in body.fields if f.id == '_paramSpecs'][0];
-        local request = body.fields[0].expr2;
-        local inputObject = request.arguments.positional[1].expr.elements[0].expr;
+        local request = [f for f in body.fields if f.id == 'response'][0].expr2;
+        local inputObject = request.arguments.positional[0].expr;
         local headersObject = [f for f in inputObject.fields if f.id == 'headers'][0].expr2;
         local traceExpr = headersObject.fields[0].expr2;
         {
@@ -1147,10 +1149,10 @@ local arcourseOpenapi = import './main.libsonnet';
           manifest: false,
           data+: { spec: spec },
         }._view.jsonnet;
-        local specs = generated.body.elements;
+        local specs = generated.body.body.elements;
         local bodyFieldNames(spec) = [f.id for f in spec.expr.elements[1].expr.right.fields];
         { bodyFieldNames: bodyFieldNames(specs[0]) },
-      expected: { bodyFieldNames: ['data'] },
+      expected: { bodyFieldNames: ['response', 'data'] },
     },
   ],
 }

@@ -145,10 +145,16 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
     prettyObject(withContext, 6);
 
   local request(op) =
-    callPretty(call(member(var('std'), 'native'), [j.String('invoke:' + service)]), [
-      j.String('request'),
-      prettyArray([inputObject(op)], 4),
-    ], 4);
+    callPretty(var('request'), [inputObject(op)], 4);
+  local requestFunctionBind =
+    j.LocalFunctionBind(
+      'request',
+      [j.Parameter('input')],
+      call(call(member(var('std'), 'native'), [j.String('invoke:' + service)]), [
+        j.String('request'),
+        j.Array([var('input')]),
+      ])
+    );
 
   local paramSegments(link) = [seg for seg in link.value if std.objectHas(seg, 'param')];
   local linksFor(op) = [
@@ -220,6 +226,7 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
     ], 4)) { Hide: 0 };
   local dataField(expr, hidden=false) =
     j.Field('data', expr) { Hide: if hidden then 0 else 1 };
+  local responseField(expr) = j.FieldLocal('response', expr);
   local withLinkPrefix(item) =
     item {
       value: [{ const: service }] +
@@ -236,7 +243,7 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
   local dataObject(op, expr) =
     local ls = linksFor(op);
     local specs = paramSpecsField(op);
-    local fields = [dataField(expr)] +
+    local fields = [responseField(expr), dataField(access(var('response'), 'body'))] +
       (if std.length(ls) == 0 then [] else [linkSpecsField(ls)]) +
       (if specs == null then [] else [specs]);
     prettyObject(fields, 2);
@@ -244,7 +251,7 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
     local ls = linksFor(op);
     local table = tableField(op);
     local specs = paramSpecsField(op);
-    local fields = [dataField(expr)] +
+    local fields = [responseField(expr), dataField(access(var('response'), 'body'))] +
       (if std.length(ls) == 0 then [] else [linkSpecsField(ls)]) +
       (if table != null then [table] else []) +
       (if specs == null then [] else [specs]);
@@ -278,8 +285,8 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
     ]);
 
   local generated = j.Locals(
-    [j.LocalBind('a', j.Import('arcourse-ui/main.libsonnet'))],
-    prettyArray(operationNodes(spec.paths))
+    [j.LocalBind('a', j.Import('arcourse-ui/main.libsonnet')), requestFunctionBind],
+    prettyArray(operationNodes(spec.paths)).fodder(j.Fodder.LineEnd(1, 0))
   );
 
   if manifest then j.manifestJsonnet(generated) else generated;
