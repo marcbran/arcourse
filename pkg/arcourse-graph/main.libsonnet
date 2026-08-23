@@ -9,7 +9,7 @@ local resolvePath(node, path) =
   ]);
 
 local resolveUrlPath(node, path) =
-  std.join('/', ['root'] + std.flatMap(
+  std.join('/', ['/root'] + std.flatMap(
     function(p)
       if isVar(p) then [varNameOf(p), node[varNameOf(p)]]
       else [p],

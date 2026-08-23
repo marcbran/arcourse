@@ -77,7 +77,7 @@ local truncateNode = import './truncate_node.libsonnet';
         _node: 'resource',
         child: {
           _node: 'facet',
-          _queryPath:: 'root/custom/path',
+          _queryPath:: '/root/custom/path',
           value: 10,
         },
       },
@@ -92,7 +92,7 @@ local truncateNode = import './truncate_node.libsonnet';
       expected: {
         hasQueryPath: true,
         hasEvalPath: false,
-        value: 'root/custom/path',
+        value: '/root/custom/path',
       },
     },
     {
@@ -102,7 +102,7 @@ local truncateNode = import './truncate_node.libsonnet';
         child: {
           _node: 'facet',
           _evalPath:: 'root.custom.path',
-          _queryPath:: 'root/custom/path',
+          _queryPath:: '/root/custom/path',
           value: 10,
         },
       },
@@ -120,7 +120,7 @@ local truncateNode = import './truncate_node.libsonnet';
         child: {
           _node: 'facet',
           _evalPath:: 'root.custom.path',
-          _queryPath:: 'root/custom/path',
+          _queryPath:: '/root/custom/path',
           value: 10,
         },
       },
