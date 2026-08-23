@@ -1024,5 +1024,133 @@ local arcourseOpenapi = import './main.libsonnet';
         originKeyLooksHashed: true,
       },
     },
+    {
+      name: 'optional query params get a matching _paramSpecs entry with a null default, read from $._params in the request',
+      input:: function()
+        local spec = {
+          paths: {
+            children: {
+              incidents: {
+                operation: {
+                  pathFormat: '/incidents',
+                  queryParams: [
+                    { name: 'offset', required: false },
+                    { name: 'limit', required: false },
+                  ],
+                },
+              },
+            },
+          },
+        };
+        local generated = arcourseOpenapi.graph {
+          service: 'pagerduty',
+          manifest: false,
+          columns: [{ sourcePath: '/incidents', array: ['incidents'] }],
+          data+: { spec: spec },
+        }._view.jsonnet;
+        local manifestLiteral(expr) =
+          if expr.__kind__ == 'LiteralString' then expr.value
+          else if expr.__kind__ == 'LiteralNull' then null
+          else if expr.__kind__ == 'Array' then [manifestLiteral(e.expr) for e in expr.elements]
+          else if expr.__kind__ == 'Object' then { [f.id]: manifestLiteral(f.expr2) for f in expr.fields }
+          else error 'unexpected kind ' + expr.__kind__;
+        local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
+        local specNode = unwrap(generated).elements[0].expr;
+        local body = specNode.elements[1].expr.right;
+        local specsField = [f for f in body.fields if f.id == '_paramSpecs'][0];
+        local request = body.fields[0].expr2;
+        local inputObject = request.arguments.positional[1].expr.elements[0].expr;
+        local queryObject = [f for f in inputObject.fields if f.id == 'query'][0].expr2;
+        local offsetExpr = [f for f in queryObject.fields if f.id == 'offset'][0].expr2;
+        local offsetArgs = offsetExpr.arguments.positional;
+        {
+          paramSpecsHide: specsField.Hide,
+          paramSpecs: [manifestLiteral(e.expr) for e in specsField.expr2.elements],
+          queryFieldNames: [f.id for f in queryObject.fields],
+          offsetExprKind: offsetExpr.__kind__,
+          offsetCalleeId: offsetExpr.target.id,
+          offsetSourceTargetId: offsetArgs[0].expr.id,
+          offsetSourceTargetTargetKind: offsetArgs[0].expr.target.__kind__,
+          offsetFieldName: manifestLiteral(offsetArgs[1].expr),
+          offsetDefaultKind: offsetArgs[2].expr.__kind__,
+        },
+      expected: {
+        paramSpecsHide: 1,
+        paramSpecs: [
+          { name: 'offset', type: 'string', default: null },
+          { name: 'limit', type: 'string', default: null },
+        ],
+        queryFieldNames: ['offset', 'limit'],
+        offsetExprKind: 'Apply',
+        offsetCalleeId: 'get',
+        offsetSourceTargetId: '_params',
+        offsetSourceTargetTargetKind: 'Dollar',
+        offsetFieldName: 'offset',
+        offsetDefaultKind: 'LiteralNull',
+      },
+    },
+    {
+      name: 'header params also get _paramSpecs entries and are read from $._params in the request',
+      input:: function()
+        local spec = {
+          paths: {
+            children: {
+              widgets: {
+                operation: {
+                  pathFormat: '/widgets',
+                  headerParams: [
+                    { name: 'trace_id', required: false },
+                  ],
+                },
+              },
+            },
+          },
+        };
+        local generated = arcourseOpenapi.graph {
+          service: 'demo',
+          manifest: false,
+          data+: { spec: spec },
+        }._view.jsonnet;
+        local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
+        local specNode = unwrap(generated).elements[0].expr;
+        local body = specNode.elements[1].expr.right;
+        local specsField = [f for f in body.fields if f.id == '_paramSpecs'][0];
+        local request = body.fields[0].expr2;
+        local inputObject = request.arguments.positional[1].expr.elements[0].expr;
+        local headersObject = [f for f in inputObject.fields if f.id == 'headers'][0].expr2;
+        local traceExpr = headersObject.fields[0].expr2;
+        {
+          specCount: std.length(specsField.expr2.elements),
+          headerFieldId: headersObject.fields[0].id,
+          traceExprKind: traceExpr.__kind__,
+        },
+      expected: {
+        specCount: 1,
+        headerFieldId: 'trace_id',
+        traceExprKind: 'Apply',
+      },
+    },
+    {
+      name: 'no _paramSpecs field is added when an operation has no query or header params',
+      input:: function()
+        local spec = {
+          paths: {
+            children: {
+              health: {
+                operation: { pathFormat: '/health' },
+              },
+            },
+          },
+        };
+        local generated = arcourseOpenapi.graph {
+          service: 'demo',
+          manifest: false,
+          data+: { spec: spec },
+        }._view.jsonnet;
+        local specs = generated.body.elements;
+        local bodyFieldNames(spec) = [f.id for f in spec.expr.elements[1].expr.right.fields];
+        { bodyFieldNames: bodyFieldNames(specs[0]) },
+      expected: { bodyFieldNames: ['data'] },
+    },
   ],
 }

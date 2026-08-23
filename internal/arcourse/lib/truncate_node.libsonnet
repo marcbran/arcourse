@@ -2,7 +2,7 @@ local refFor(node, mode) =
   { _node: node._node } +
   (if mode == 'eval' && std.objectHasAll(node, '_evalPath') then { _evalPath: node._evalPath } else {}) +
   (if mode == 'query' && std.objectHasAll(node, '_queryPath') then { _queryPath: node._queryPath } else {}) +
-  (if std.objectHasAll(node, '_params') then { _params:: node._params } else {}) +
+  (if std.objectHasAll(node, '_paramSpecs') then { _paramSpecs: node._paramSpecs } else {}) +
   (if std.objectHas(node, '_summary') then { _summary: node._summary } else {});
 
 local truncateNodeRec(value, isRoot, mode) =
