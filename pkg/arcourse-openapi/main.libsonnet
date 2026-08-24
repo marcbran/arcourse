@@ -1,7 +1,7 @@
 local j = import 'jsonnet/main.libsonnet';
 local openapi = import 'openapi/main.libsonnet';
 
-local generate(service, spec, links=[], columns=[], contextParams=[], manifest=true) =
+local generate(service, spec, links=[], columns=[], contextParams=[], manifest=true, pagination=null) =
   local le(indent=0) = j.Fodder.LineEnd(0, indent);
   local prettyArray(elements, indent=0) =
     j.Array([
@@ -226,7 +226,8 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
     ], 4)) { Hide: 0 };
   local dataField(expr, hidden=false) =
     j.Field('data', expr) { Hide: if hidden then 0 else 1 };
-  local responseField(expr) = j.FieldLocal('response', expr);
+  local responseField(expr) = j.Field('response', expr) { Hide: 0 };
+  local selfResponse = member(j.Self, 'response');
   local withLinkPrefix(item) =
     item {
       value: [{ const: service }] +
@@ -243,7 +244,7 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
   local dataObject(op, expr) =
     local ls = linksFor(op);
     local specs = paramSpecsField(op);
-    local fields = [responseField(expr), dataField(access(var('response'), 'body'))] +
+    local fields = [dataField(access(expr, 'body'))] +
       (if std.length(ls) == 0 then [] else [linkSpecsField(ls)]) +
       (if specs == null then [] else [specs]);
     prettyObject(fields, 2);
@@ -251,7 +252,7 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
     local ls = linksFor(op);
     local table = tableField(op);
     local specs = paramSpecsField(op);
-    local fields = [responseField(expr), dataField(access(var('response'), 'body'))] +
+    local fields = [responseField(expr), dataField(access(selfResponse, 'body'))] +
       (if std.length(ls) == 0 then [] else [linkSpecsField(ls)]) +
       (if table != null then [table] else []) +
       (if specs == null then [] else [specs]);
@@ -284,8 +285,44 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
       for k in childKeys(node)
     ]);
 
-  local generated = j.Locals(
-    [j.LocalBind('a', j.Import('arcourse-ui/main.libsonnet')), requestFunctionBind],
+  local localsWithFodder(specs, body) =
+    std.foldr(
+      function(spec, acc)
+        local node = j.Local(spec.bind, acc);
+        if std.objectHas(spec, 'fodder') then node.fodder(spec.fodder) else node,
+      specs,
+      body
+    );
+
+  local aBind =
+    if pagination == null then
+      j.LocalBind('a', j.Import('arcourse-ui/main.libsonnet'))
+    else
+      j.LocalBind('a', j.Add(var('base'), j.Object([
+        j.Field('table', j.Add(access(var('base'), 'table'), j.Object([
+          j.Field('node', j.Add(access(access(var('base'), 'table'), 'node'), var('withPagination'))),
+        ]))),
+      ])));
+
+  local rawLocalSpecs = (
+    if pagination == null then [] else [
+      { bind: j.LocalBind('withPagination', j.parseJsonnet(pagination)) },
+      { bind: j.LocalBind('base', j.Import('arcourse-ui/main.libsonnet')), fodder: j.Fodder.LineEnd(1, 0) },
+    ]
+  ) + [
+    { bind: aBind },
+    { bind: requestFunctionBind },
+  ];
+  local localSpecs = [
+    rawLocalSpecs[i] + (
+      if i == 0 then {}
+      else { fodder: std.get(rawLocalSpecs[i], 'fodder', j.Fodder.LineEnd(0, 0)) }
+    )
+    for i in std.range(0, std.length(rawLocalSpecs) - 1)
+  ];
+
+  local generated = localsWithFodder(
+    localSpecs,
     prettyArray(operationNodes(spec.paths)).fodder(j.Fodder.LineEnd(1, 0))
   );
 
@@ -294,13 +331,14 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
 local graph = {
   manifest: true,
   contextParams: [],
+  pagination: null,
   data: {
     spec: openapi.nestedSpec($.spec),
     links: std.get($, 'links', []),
     columns: std.get($, 'columns', []),
   },
   _view:: {
-    jsonnet: generate($.service, $.data.spec, $.data.links, $.data.columns, $.contextParams, $.manifest),
+    jsonnet: generate($.service, $.data.spec, $.data.links, $.data.columns, $.contextParams, $.manifest, $.pagination),
   },
 };
 

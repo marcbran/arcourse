@@ -415,7 +415,7 @@ local arcourseOpenapi = import './main.libsonnet';
         ],
         nodeElements: 2,
         bodyKind: 'Binary',
-        bodyFields: 2,
+        bodyFields: 1,
       },
     },
     {
@@ -447,7 +447,7 @@ local arcourseOpenapi = import './main.libsonnet';
         }._view.jsonnet;
         local specs = generated.body.body.elements;
         local path(spec) = [part.expr.value for part in spec.expr.elements[0].expr.elements];
-        local requestApply(spec) = [f for f in spec.expr.elements[1].expr.right.fields if f.id == 'response'][0].expr2;
+        local requestApply(spec) = [f for f in spec.expr.elements[1].expr.right.fields if f.id == 'data'][0].expr2.target;
         local inputObjectExpr(spec) =
           requestApply(spec).arguments.positional[0].expr;
         local fieldNames(spec) = [f.id for f in inputObjectExpr(spec).fields];
@@ -496,7 +496,7 @@ local arcourseOpenapi = import './main.libsonnet';
           },
         }._view.jsonnet;
         local specs = generated.body.body.elements;
-        local requestApply(spec) = [f for f in spec.expr.elements[1].expr.right.fields if f.id == 'response'][0].expr2;
+        local requestApply(spec) = [f for f in spec.expr.elements[1].expr.right.fields if f.id == 'data'][0].expr2.target;
         local inputObjectExpr(spec) =
           requestApply(spec).arguments.positional[0].expr;
         local fieldNames(spec) = [f.id for f in inputObjectExpr(spec).fields];
@@ -623,7 +623,7 @@ local arcourseOpenapi = import './main.libsonnet';
       expected: {
         localVars: ['a', 'request'],
         nodeElementCount: 2,
-        bodyFieldNames: ['response', 'data', 'linkSpecs'],
+        bodyFieldNames: ['data', 'linkSpecs'],
         dataHide: 1,
         specsHide: 0,
         specsCount: 1,
@@ -689,8 +689,8 @@ local arcourseOpenapi = import './main.libsonnet';
       expected: {
         accountsElementCount: 2,
         teamsElementCount: 2,
-        accountsBodyFieldNames: ['response', 'data', 'linkSpecs'],
-        teamsBodyFieldNames: ['response', 'data'],
+        accountsBodyFieldNames: ['data', 'linkSpecs'],
+        teamsBodyFieldNames: ['data'],
       },
     },
     {
@@ -906,7 +906,7 @@ local arcourseOpenapi = import './main.libsonnet';
         },
       expected: {
         nodeElementCount: 2,
-        bodyFieldNames: ['response', 'data', 'linkSpecs'],
+        bodyFieldNames: ['data', 'linkSpecs'],
         dataHide: 1,
       },
     },
@@ -1117,7 +1117,7 @@ local arcourseOpenapi = import './main.libsonnet';
         local specNode = unwrap(generated).elements[0].expr;
         local body = specNode.elements[1].expr.right;
         local specsField = [f for f in body.fields if f.id == '_paramSpecs'][0];
-        local request = [f for f in body.fields if f.id == 'response'][0].expr2;
+        local request = [f for f in body.fields if f.id == 'data'][0].expr2.target;
         local inputObject = request.arguments.positional[0].expr;
         local headersObject = [f for f in inputObject.fields if f.id == 'headers'][0].expr2;
         local traceExpr = headersObject.fields[0].expr2;
@@ -1152,7 +1152,66 @@ local arcourseOpenapi = import './main.libsonnet';
         local specs = generated.body.body.elements;
         local bodyFieldNames(spec) = [f.id for f in spec.expr.elements[1].expr.right.fields];
         { bodyFieldNames: bodyFieldNames(specs[0]) },
-      expected: { bodyFieldNames: ['response', 'data'] },
+      expected: { bodyFieldNames: ['data'] },
+    },
+    {
+      name: 'pagination source is parsed once and spliced into a.table.node, not applied per-operation',
+      input:: function()
+        local spec = {
+          paths: {
+            children: {
+              incidents: {
+                operation: { pathFormat: '/incidents' },
+              },
+              health: {
+                operation: { pathFormat: '/health' },
+              },
+            },
+          },
+        };
+        local generated = arcourseOpenapi.graph {
+          service: 'demo',
+          manifest: false,
+          pagination: '{ links+: { pagination: { x: 1 } } }',
+          columns: [{ sourcePath: '/incidents', array: ['incidents'] }],
+          data+: { spec: spec },
+        }._view.jsonnet;
+        local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
+        local binds(node, acc=[]) =
+          if node.__kind__ == 'Local' then binds(node.body, acc + [b.variable for b in node.binds])
+          else acc;
+        local bindExpr(node, name) =
+          if node.__kind__ == 'Local' then
+            local matches = [b for b in node.binds if b.variable == name];
+            if std.length(matches) > 0 then matches[0].body else bindExpr(node.body, name)
+          else error 'bind not found: ' + name;
+        local specs = unwrap(generated).elements;
+        local pathOf(spec) = [part.expr.value for part in spec.expr.elements[0].expr.elements];
+        local nodeFor(target) = [s for s in specs if pathOf(s) == target][0];
+        local bodyExpr(spec) = spec.expr.elements[1].expr;
+        local aExpr = bindExpr(generated, 'a');
+        local tableField = [f for f in aExpr.right.fields if f.id == 'table'][0];
+        local nodeField = [f for f in tableField.expr2.right.fields if f.id == 'node'][0];
+        {
+          localVars: binds(generated),
+          aExprKind: aExpr.__kind__,
+          tableFieldValueKind: tableField.expr2.__kind__,
+          nodeFieldValueRightId: nodeField.expr2.right.id,
+          incidentsBodyKind: bodyExpr(nodeFor(['demo', 'incidents'])).__kind__,
+          incidentsRightKind: bodyExpr(nodeFor(['demo', 'incidents'])).right.__kind__,
+          healthBodyKind: bodyExpr(nodeFor(['demo', 'health'])).__kind__,
+          healthRightKind: bodyExpr(nodeFor(['demo', 'health'])).right.__kind__,
+        },
+      expected: {
+        localVars: ['withPagination', 'base', 'a', 'request'],
+        aExprKind: 'Binary',
+        tableFieldValueKind: 'Binary',
+        nodeFieldValueRightId: 'withPagination',
+        incidentsBodyKind: 'Binary',
+        incidentsRightKind: 'Object',
+        healthBodyKind: 'Binary',
+        healthRightKind: 'Object',
+      },
     },
   ],
 }
