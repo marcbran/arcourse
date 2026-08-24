@@ -102,6 +102,7 @@ local tableView = baseView {
         items:: items,
         columns:: std.get(table, 'columns', []),
         rowLink:: linkspecs.rowLinkFor($, std.get($, 'linkSpecs', []), at),
+        pagination:: std.get(std.get($, 'links', {}), 'pagination', null),
       },
   },
 };
