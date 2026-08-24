@@ -56,7 +56,7 @@ local resolveParam(spec, params) =
     error 'required parameter %s is missing' % name;
 
 function(node, params)
-  local specs = if std.objectHasAll(node, '_params') then node._params else [];
+  local specs = if std.objectHasAll(node, '_paramSpecs') then node._paramSpecs else [];
   local paramKeys = std.objectFields(params);
 
   if std.length(specs) == 0 then
@@ -73,8 +73,13 @@ function(node, params)
       paramKeys,
       {},
     );
-    local resolved = {
+    local resolvedAll = {
       [spec.name]: resolveParam(spec, params)
       for spec in specs
     };
-    node + validated + resolved
+    local resolved = {
+      [k]: resolvedAll[k]
+      for k in std.objectFields(resolvedAll)
+      if resolvedAll[k] != null
+    };
+    node + validated + { _params: resolved }

@@ -87,11 +87,13 @@ local arcourseOpenapi = import './main.libsonnet';
           type: std.type(generated),
           kind: generated.__kind__,
           bodyKind: generated.body.__kind__,
+          bodyBodyKind: generated.body.body.__kind__,
         },
       expected: {
         type: 'object',
         kind: 'Local',
-        bodyKind: 'Array',
+        bodyKind: 'Local',
+        bodyBodyKind: 'Array',
       },
     },
     {
@@ -152,7 +154,7 @@ local arcourseOpenapi = import './main.libsonnet';
           path: path,
           nodeElementCount: std.length(specNode.elements),
           fieldNames: [field.id for field in body.fields],
-          dataHide: body.fields[0].Hide,
+          dataHide: [f for f in body.fields if f.id == 'data'][0].Hide,
           specsHide: specsField.Hide,
           specs: [manifestLiteral(e.expr) for e in specsField.expr2.elements],
           viewBase: view.target.target.id,
@@ -166,7 +168,7 @@ local arcourseOpenapi = import './main.libsonnet';
       expected: {
         path: ['demo', 'user', 'repos'],
         nodeElementCount: 2,
-        fieldNames: ['data', 'linkSpecs', 'table'],
+        fieldNames: ['response', 'data', 'linkSpecs', 'table'],
         dataHide: 1,
         specsHide: 0,
         specs: [
@@ -246,7 +248,7 @@ local arcourseOpenapi = import './main.libsonnet';
         },
       expected: {
         nodeElementCount: 2,
-        fieldNames: ['data', 'linkSpecs', 'table'],
+        fieldNames: ['response', 'data', 'linkSpecs', 'table'],
         tableAt: ['items'],
         specAt: [['items']],
       },
@@ -315,7 +317,7 @@ local arcourseOpenapi = import './main.libsonnet';
         },
       expected: {
         nodeElementCount: 2,
-        fieldNames: ['data', 'linkSpecs', 'table'],
+        fieldNames: ['response', 'data', 'linkSpecs', 'table'],
         viewName: 'table',
         columnCount: 2,
         firstColumnFieldNames: ['label', 'path'],
@@ -368,7 +370,7 @@ local arcourseOpenapi = import './main.libsonnet';
         },
       expected: {
         nodeElementCount: 2,
-        fieldNames: ['data', 'linkSpecs'],
+        fieldNames: ['response', 'data', 'linkSpecs'],
         viewName: 'list',
       },
     },
@@ -398,7 +400,7 @@ local arcourseOpenapi = import './main.libsonnet';
             spec: spec,
           },
         }._view.jsonnet;
-        local specs = generated.body.elements;
+        local specs = generated.body.body.elements;
         local path(spec) = [part.expr.value for part in spec.expr.elements[0].expr.elements];
         local bodyFieldCount(spec) = std.length(spec.expr.elements[1].expr.right.fields);
         {
@@ -443,11 +445,11 @@ local arcourseOpenapi = import './main.libsonnet';
             spec: spec,
           },
         }._view.jsonnet;
-        local specs = generated.body.elements;
+        local specs = generated.body.body.elements;
         local path(spec) = [part.expr.value for part in spec.expr.elements[0].expr.elements];
-        local requestApply(spec) = spec.expr.elements[1].expr.right.fields[0].expr2;
+        local requestApply(spec) = [f for f in spec.expr.elements[1].expr.right.fields if f.id == 'data'][0].expr2.target;
         local inputObjectExpr(spec) =
-          requestApply(spec).arguments.positional[1].expr.elements[0].expr;
+          requestApply(spec).arguments.positional[0].expr;
         local fieldNames(spec) = [f.id for f in inputObjectExpr(spec).fields];
         local contextField(spec) =
           local fields = inputObjectExpr(spec).fields;
@@ -493,10 +495,10 @@ local arcourseOpenapi = import './main.libsonnet';
             spec: spec,
           },
         }._view.jsonnet;
-        local specs = generated.body.elements;
-        local requestApply(spec) = spec.expr.elements[1].expr.right.fields[0].expr2;
+        local specs = generated.body.body.elements;
+        local requestApply(spec) = [f for f in spec.expr.elements[1].expr.right.fields if f.id == 'data'][0].expr2.target;
         local inputObjectExpr(spec) =
-          requestApply(spec).arguments.positional[1].expr.elements[0].expr;
+          requestApply(spec).arguments.positional[0].expr;
         local fieldNames(spec) = [f.id for f in inputObjectExpr(spec).fields];
         {
           inputFields: fieldNames(specs[0]),
@@ -555,11 +557,11 @@ local arcourseOpenapi = import './main.libsonnet';
         {
           nodeElementCount: std.length(specNode.elements),
           fieldNames: [field.id for field in body.fields],
-          dataHide: body.fields[0].Hide,
+          dataHide: [f for f in body.fields if f.id == 'data'][0].Hide,
         },
       expected: {
         nodeElementCount: 2,
-        fieldNames: ['data', 'linkSpecs', 'table'],
+        fieldNames: ['response', 'data', 'linkSpecs', 'table'],
         dataHide: 1,
       },
     },
@@ -619,7 +621,7 @@ local arcourseOpenapi = import './main.libsonnet';
           valueFirstSegmentConst: firstValueElements[0].expr.fields[0].expr2.value,
         },
       expected: {
-        localVars: ['a'],
+        localVars: ['a', 'request'],
         nodeElementCount: 2,
         bodyFieldNames: ['data', 'linkSpecs'],
         dataHide: 1,
@@ -859,7 +861,7 @@ local arcourseOpenapi = import './main.libsonnet';
         },
       expected: {
         nodeElementCount: 2,
-        fieldNames: ['data', 'table'],
+        fieldNames: ['response', 'data', 'table'],
         viewName: 'table',
         tableAt: ['data'],
       },
@@ -1022,6 +1024,193 @@ local arcourseOpenapi = import './main.libsonnet';
       expected: {
         originKeyIsMangled: true,
         originKeyLooksHashed: true,
+      },
+    },
+    {
+      name: 'optional query params get a matching _paramSpecs entry with a null default, read from $._params in the request',
+      input:: function()
+        local spec = {
+          paths: {
+            children: {
+              incidents: {
+                operation: {
+                  pathFormat: '/incidents',
+                  queryParams: [
+                    { name: 'offset', required: false },
+                    { name: 'limit', required: false },
+                  ],
+                },
+              },
+            },
+          },
+        };
+        local generated = arcourseOpenapi.graph {
+          service: 'pagerduty',
+          manifest: false,
+          columns: [{ sourcePath: '/incidents', array: ['incidents'] }],
+          data+: { spec: spec },
+        }._view.jsonnet;
+        local manifestLiteral(expr) =
+          if expr.__kind__ == 'LiteralString' then expr.value
+          else if expr.__kind__ == 'LiteralNull' then null
+          else if expr.__kind__ == 'Array' then [manifestLiteral(e.expr) for e in expr.elements]
+          else if expr.__kind__ == 'Object' then { [f.id]: manifestLiteral(f.expr2) for f in expr.fields }
+          else error 'unexpected kind ' + expr.__kind__;
+        local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
+        local specNode = unwrap(generated).elements[0].expr;
+        local body = specNode.elements[1].expr.right;
+        local specsField = [f for f in body.fields if f.id == '_paramSpecs'][0];
+        local request = [f for f in body.fields if f.id == 'response'][0].expr2;
+        local inputObject = request.arguments.positional[0].expr;
+        local queryObject = [f for f in inputObject.fields if f.id == 'query'][0].expr2;
+        local offsetExpr = [f for f in queryObject.fields if f.id == 'offset'][0].expr2;
+        local offsetArgs = offsetExpr.arguments.positional;
+        {
+          paramSpecsHide: specsField.Hide,
+          paramSpecs: [manifestLiteral(e.expr) for e in specsField.expr2.elements],
+          queryFieldNames: [f.id for f in queryObject.fields],
+          offsetExprKind: offsetExpr.__kind__,
+          offsetCalleeId: offsetExpr.target.id,
+          offsetSourceTargetId: offsetArgs[0].expr.id,
+          offsetSourceTargetTargetKind: offsetArgs[0].expr.target.__kind__,
+          offsetFieldName: manifestLiteral(offsetArgs[1].expr),
+          offsetDefaultKind: offsetArgs[2].expr.__kind__,
+        },
+      expected: {
+        paramSpecsHide: 1,
+        paramSpecs: [
+          { name: 'offset', type: 'string', default: null },
+          { name: 'limit', type: 'string', default: null },
+        ],
+        queryFieldNames: ['offset', 'limit'],
+        offsetExprKind: 'Apply',
+        offsetCalleeId: 'get',
+        offsetSourceTargetId: '_params',
+        offsetSourceTargetTargetKind: 'Dollar',
+        offsetFieldName: 'offset',
+        offsetDefaultKind: 'LiteralNull',
+      },
+    },
+    {
+      name: 'header params also get _paramSpecs entries and are read from $._params in the request',
+      input:: function()
+        local spec = {
+          paths: {
+            children: {
+              widgets: {
+                operation: {
+                  pathFormat: '/widgets',
+                  headerParams: [
+                    { name: 'trace_id', required: false },
+                  ],
+                },
+              },
+            },
+          },
+        };
+        local generated = arcourseOpenapi.graph {
+          service: 'demo',
+          manifest: false,
+          data+: { spec: spec },
+        }._view.jsonnet;
+        local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
+        local specNode = unwrap(generated).elements[0].expr;
+        local body = specNode.elements[1].expr.right;
+        local specsField = [f for f in body.fields if f.id == '_paramSpecs'][0];
+        local request = [f for f in body.fields if f.id == 'data'][0].expr2.target;
+        local inputObject = request.arguments.positional[0].expr;
+        local headersObject = [f for f in inputObject.fields if f.id == 'headers'][0].expr2;
+        local traceExpr = headersObject.fields[0].expr2;
+        {
+          specCount: std.length(specsField.expr2.elements),
+          headerFieldId: headersObject.fields[0].id,
+          traceExprKind: traceExpr.__kind__,
+        },
+      expected: {
+        specCount: 1,
+        headerFieldId: 'trace_id',
+        traceExprKind: 'Apply',
+      },
+    },
+    {
+      name: 'no _paramSpecs field is added when an operation has no query or header params',
+      input:: function()
+        local spec = {
+          paths: {
+            children: {
+              health: {
+                operation: { pathFormat: '/health' },
+              },
+            },
+          },
+        };
+        local generated = arcourseOpenapi.graph {
+          service: 'demo',
+          manifest: false,
+          data+: { spec: spec },
+        }._view.jsonnet;
+        local specs = generated.body.body.elements;
+        local bodyFieldNames(spec) = [f.id for f in spec.expr.elements[1].expr.right.fields];
+        { bodyFieldNames: bodyFieldNames(specs[0]) },
+      expected: { bodyFieldNames: ['data'] },
+    },
+    {
+      name: 'pagination source is parsed once and spliced into a.table.node, not applied per-operation',
+      input:: function()
+        local spec = {
+          paths: {
+            children: {
+              incidents: {
+                operation: { pathFormat: '/incidents' },
+              },
+              health: {
+                operation: { pathFormat: '/health' },
+              },
+            },
+          },
+        };
+        local generated = arcourseOpenapi.graph {
+          service: 'demo',
+          manifest: false,
+          pagination: '{ links+: { pagination: { x: 1 } } }',
+          columns: [{ sourcePath: '/incidents', array: ['incidents'] }],
+          data+: { spec: spec },
+        }._view.jsonnet;
+        local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
+        local binds(node, acc=[]) =
+          if node.__kind__ == 'Local' then binds(node.body, acc + [b.variable for b in node.binds])
+          else acc;
+        local bindExpr(node, name) =
+          if node.__kind__ == 'Local' then
+            local matches = [b for b in node.binds if b.variable == name];
+            if std.length(matches) > 0 then matches[0].body else bindExpr(node.body, name)
+          else error 'bind not found: ' + name;
+        local specs = unwrap(generated).elements;
+        local pathOf(spec) = [part.expr.value for part in spec.expr.elements[0].expr.elements];
+        local nodeFor(target) = [s for s in specs if pathOf(s) == target][0];
+        local bodyExpr(spec) = spec.expr.elements[1].expr;
+        local aExpr = bindExpr(generated, 'a');
+        local tableField = [f for f in aExpr.right.fields if f.id == 'table'][0];
+        local nodeField = [f for f in tableField.expr2.right.fields if f.id == 'node'][0];
+        {
+          localVars: binds(generated),
+          aExprKind: aExpr.__kind__,
+          tableFieldValueKind: tableField.expr2.__kind__,
+          nodeFieldValueRightId: nodeField.expr2.right.id,
+          incidentsBodyKind: bodyExpr(nodeFor(['demo', 'incidents'])).__kind__,
+          incidentsRightKind: bodyExpr(nodeFor(['demo', 'incidents'])).right.__kind__,
+          healthBodyKind: bodyExpr(nodeFor(['demo', 'health'])).__kind__,
+          healthRightKind: bodyExpr(nodeFor(['demo', 'health'])).right.__kind__,
+        },
+      expected: {
+        localVars: ['withPagination', 'base', 'a', 'request'],
+        aExprKind: 'Binary',
+        tableFieldValueKind: 'Binary',
+        nodeFieldValueRightId: 'withPagination',
+        incidentsBodyKind: 'Binary',
+        incidentsRightKind: 'Object',
+        healthBodyKind: 'Binary',
+        healthRightKind: 'Object',
       },
     },
   ],

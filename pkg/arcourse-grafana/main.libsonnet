@@ -3,7 +3,7 @@ local ui = import '../arcourse-ui/main.libsonnet';
 local time = import 'time/main.libsonnet';
 local root = import 'root';
 
-local request(input) = std.native('invoke:grafana')('request', [input]);
+local request(input) = std.native('invoke:grafana')('request', [input]).body;
 
 local refId(i) = std.char(std.codepoint('A') + i);
 
@@ -93,7 +93,7 @@ local scaleSeries(series, factor, decimals) = [
   for s in series
 ];
 
-local timeParams = [
+local timeParamSpecs = [
   { name: 'from', type: 'string', default: 'now-1h' },
   { name: 'to', type: 'string', default: 'now' },
 ];
@@ -109,8 +109,8 @@ local chartNode = a.chart.view {
   type:: 'line',
   decimals:: 2,
   unit:: null,
-  _params:: timeParams,
-  data: query($.datasource, $.queries, $.from, $.to),
+  _paramSpecs: timeParamSpecs,
+  data: query($.datasource, $.queries, $._params.from, $._params.to),
   links::
     local results = $.data.results;
     std.foldl(
@@ -160,7 +160,7 @@ local chartNode = a.chart.view {
     },
   _view+:: {
     local base = super.fragment,
-    fragment: base { child:: [timeRangeNav($.from, $.to), base.child] },
+    fragment: base { child:: [timeRangeNav($._params.from, $._params.to), base.child] },
   },
 };
 
@@ -191,12 +191,12 @@ local resolveTree(node, results, index) =
 local dashboardNode = a.dashboard.view {
   local n = self,
   layout:: error 'Dashboard requires layout',
-  _params:: timeParams,
-  data: query(n.datasource, collectQueries(n.layout), n.from, n.to),
+  _paramSpecs: timeParamSpecs,
+  data: query(n.datasource, collectQueries(n.layout), n._params.from, n._params.to),
   tree:: resolveTree(n.layout, n.data.results, 0).node,
   _view+:: {
     local base = super.fragment,
-    fragment: base { child:: [timeRangeNav(n.from, n.to), base.child] },
+    fragment: base { child:: [timeRangeNav(n._params.from, n._params.to), base.child] },
   },
 };
 

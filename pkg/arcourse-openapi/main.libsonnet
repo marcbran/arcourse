@@ -1,7 +1,7 @@
 local j = import 'jsonnet/main.libsonnet';
 local openapi = import 'openapi/main.libsonnet';
 
-local generate(service, spec, links=[], columns=[], contextParams=[], manifest=true) =
+local generate(service, spec, links=[], columns=[], contextParams=[], manifest=true, pagination=null) =
   local le(indent=0) = j.Fodder.LineEnd(0, indent);
   local prettyArray(elements, indent=0) =
     j.Array([
@@ -115,20 +115,13 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
       for i in std.range(0, std.length(parts) - 1)
     ]);
 
-  local bucketExpr(bucketKey) =
-    j.Std.get(j.Dollar, j.String(bucketKey)).default(emptyObject);
-  local argField(bucketKey, p) =
-    local bucket = bucketExpr(bucketKey);
-    objectField(
-      p.name,
-      if p.required then j.Index(bucket, j.String(p.name))
-      else j.Std.get(bucket, j.String(p.name)).default(j.Null)
-    );
-  local paramObject(bucketKey, params) =
+  local paramsExpr = access(j.Dollar, '_params');
+  local argField(p) = objectField(p.name, j.Std.get(paramsExpr, j.String(p.name)).default(j.Null));
+  local paramObject(params) =
     if std.length(params) == 0 then
       emptyObject
     else
-      prettyObject([argField(bucketKey, p) for p in params], 6);
+      prettyObject([argField(p) for p in params], 6);
 
   local contextObject =
     if std.length(contextParams) == 0 then null
@@ -144,18 +137,24 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
       j.Field('path', pathExpr(op)),
     ];
     local withQuery =
-      if std.length(q) > 0 then base + [j.Field('query', paramObject('query', q))] else base;
+      if std.length(q) > 0 then base + [j.Field('query', paramObject(q))] else base;
     local withHeaders =
-      if std.length(h) > 0 then withQuery + [j.Field('headers', paramObject('headers', h))] else withQuery;
+      if std.length(h) > 0 then withQuery + [j.Field('headers', paramObject(h))] else withQuery;
     local withContext =
       if contextObject == null then withHeaders else withHeaders + [j.Field('context', contextObject)];
     prettyObject(withContext, 6);
 
   local request(op) =
-    callPretty(call(member(var('std'), 'native'), [j.String('invoke:' + service)]), [
-      j.String('request'),
-      prettyArray([inputObject(op)], 4),
-    ], 4);
+    callPretty(var('request'), [inputObject(op)], 4);
+  local requestFunctionBind =
+    j.LocalFunctionBind(
+      'request',
+      [j.Parameter('input')],
+      call(call(member(var('std'), 'native'), [j.String('invoke:' + service)]), [
+        j.String('request'),
+        j.Array([var('input')]),
+      ])
+    );
 
   local paramSegments(link) = [seg for seg in link.value if std.objectHas(seg, 'param')];
   local linksFor(op) = [
@@ -174,6 +173,14 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
       for field in std.objectFields(value)
     ])
     else error 'unsupported literal type: ' + std.type(value);
+  local paramSpecEntry(p) =
+    { name: p.name, type: 'string' } + (if p.required then {} else { default: null });
+  local paramSpecsFor(op) =
+    std.get(op, 'queryParams', []) + std.get(op, 'headerParams', []);
+  local paramSpecsField(op) =
+    local specs = paramSpecsFor(op);
+    if std.length(specs) == 0 then null
+    else j.Field('_paramSpecs', prettyArray([compactLiteral(paramSpecEntry(p)) for p in specs], 4));
   local columnsFor(op) =
     local entry = collectionFor(templatePath(op));
     if entry == null then null else std.get(entry, 'columns', null);
@@ -219,6 +226,8 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
     ], 4)) { Hide: 0 };
   local dataField(expr, hidden=false) =
     j.Field('data', expr) { Hide: if hidden then 0 else 1 };
+  local responseField(expr) = j.Field('response', expr) { Hide: 0 };
+  local selfResponse = member(j.Self, 'response');
   local withLinkPrefix(item) =
     item {
       value: [{ const: service }] +
@@ -234,15 +243,19 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
     ) { Hide: 0 };
   local dataObject(op, expr) =
     local ls = linksFor(op);
-    local fields = [dataField(expr)] +
-      (if std.length(ls) == 0 then [] else [linkSpecsField(ls)]);
+    local specs = paramSpecsField(op);
+    local fields = [dataField(access(expr, 'body'))] +
+      (if std.length(ls) == 0 then [] else [linkSpecsField(ls)]) +
+      (if specs == null then [] else [specs]);
     prettyObject(fields, 2);
   local listObject(op, expr) =
     local ls = linksFor(op);
     local table = tableField(op);
-    local fields = [dataField(expr)] +
+    local specs = paramSpecsField(op);
+    local fields = [responseField(expr), dataField(access(selfResponse, 'body'))] +
       (if std.length(ls) == 0 then [] else [linkSpecsField(ls)]) +
-      (if table != null then [table] else []);
+      (if table != null then [table] else []) +
+      (if specs == null then [] else [specs]);
     prettyObject(fields, 2);
   local resourceOperationNode(path, op) =
     j.Array([
@@ -272,9 +285,45 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
       for k in childKeys(node)
     ]);
 
-  local generated = j.Locals(
-    [j.LocalBind('a', j.Import('arcourse-ui/main.libsonnet'))],
-    prettyArray(operationNodes(spec.paths))
+  local localsWithFodder(specs, body) =
+    std.foldr(
+      function(spec, acc)
+        local node = j.Local(spec.bind, acc);
+        if std.objectHas(spec, 'fodder') then node.fodder(spec.fodder) else node,
+      specs,
+      body
+    );
+
+  local aBind =
+    if pagination == null then
+      j.LocalBind('a', j.Import('arcourse-ui/main.libsonnet'))
+    else
+      j.LocalBind('a', j.Add(var('base'), j.Object([
+        j.Field('table', j.Add(access(var('base'), 'table'), j.Object([
+          j.Field('node', j.Add(access(access(var('base'), 'table'), 'node'), var('withPagination'))),
+        ]))),
+      ])));
+
+  local rawLocalSpecs = (
+    if pagination == null then [] else [
+      { bind: j.LocalBind('withPagination', j.parseJsonnet(pagination)) },
+      { bind: j.LocalBind('base', j.Import('arcourse-ui/main.libsonnet')), fodder: j.Fodder.LineEnd(1, 0) },
+    ]
+  ) + [
+    { bind: aBind },
+    { bind: requestFunctionBind },
+  ];
+  local localSpecs = [
+    rawLocalSpecs[i] + (
+      if i == 0 then {}
+      else { fodder: std.get(rawLocalSpecs[i], 'fodder', j.Fodder.LineEnd(0, 0)) }
+    )
+    for i in std.range(0, std.length(rawLocalSpecs) - 1)
+  ];
+
+  local generated = localsWithFodder(
+    localSpecs,
+    prettyArray(operationNodes(spec.paths)).fodder(j.Fodder.LineEnd(1, 0))
   );
 
   if manifest then j.manifestJsonnet(generated) else generated;
@@ -282,13 +331,14 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
 local graph = {
   manifest: true,
   contextParams: [],
+  pagination: null,
   data: {
     spec: openapi.nestedSpec($.spec),
     links: std.get($, 'links', []),
     columns: std.get($, 'columns', []),
   },
   _view:: {
-    jsonnet: generate($.service, $.data.spec, $.data.links, $.data.columns, $.contextParams, $.manifest),
+    jsonnet: generate($.service, $.data.spec, $.data.links, $.data.columns, $.contextParams, $.manifest, $.pagination),
   },
 };
 

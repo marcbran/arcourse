@@ -2,7 +2,7 @@ local applyParams = import './apply_params.libsonnet';
 
 local nodeWithParams(params, extra={}) = {
   _node: true,
-  _params:: params,
+  _paramSpecs: params,
 } + extra;
 
 {
@@ -24,7 +24,8 @@ local nodeWithParams(params, extra={}) = {
       },
       expected: {
         _node: true,
-        filter: 'active',
+        _paramSpecs: [{ name: 'filter', type: 'string' }],
+        _params: { filter: 'active' },
       },
     },
     {
@@ -35,7 +36,8 @@ local nodeWithParams(params, extra={}) = {
       },
       expected: {
         _node: true,
-        page: 2,
+        _paramSpecs: [{ name: 'page', type: 'number', default: 1 }],
+        _params: { page: 2 },
       },
     },
     {
@@ -46,7 +48,8 @@ local nodeWithParams(params, extra={}) = {
       },
       expected: {
         _node: true,
-        enabled: true,
+        _paramSpecs: [{ name: 'enabled', type: 'boolean' }],
+        _params: { enabled: true },
       },
     },
     {
@@ -57,7 +60,8 @@ local nodeWithParams(params, extra={}) = {
       },
       expected: {
         _node: true,
-        tags: ['a', 'b'],
+        _paramSpecs: [{ name: 'tags', type: 'array', items: 'string' }],
+        _params: { tags: ['a', 'b'] },
       },
     },
     {
@@ -68,7 +72,8 @@ local nodeWithParams(params, extra={}) = {
       },
       expected: {
         _node: true,
-        ids: [1, 2],
+        _paramSpecs: [{ name: 'ids', type: 'array', items: 'number' }],
+        _params: { ids: [1, 2] },
       },
     },
     {
@@ -79,7 +84,8 @@ local nodeWithParams(params, extra={}) = {
       },
       expected: {
         _node: true,
-        ids: [1, 2],
+        _paramSpecs: [{ name: 'ids', type: 'array', items: 'number' }],
+        _params: { ids: [1, 2] },
       },
     },
     {
@@ -90,7 +96,8 @@ local nodeWithParams(params, extra={}) = {
       },
       expected: {
         _node: true,
-        page: 2,
+        _paramSpecs: [{ name: 'page', type: 'number' }],
+        _params: { page: 2 },
       },
     },
     {
@@ -101,7 +108,26 @@ local nodeWithParams(params, extra={}) = {
       },
       expected: {
         _node: true,
-        page: 1,
+        _paramSpecs: [{ name: 'page', type: 'number', default: 1 }],
+        _params: { page: 1 },
+      },
+    },
+    {
+      name: 'unset optional param with a null default is omitted from _params',
+      input:: {
+        node: nodeWithParams([
+          { name: 'severity', type: 'string', default: null },
+          { name: 'page', type: 'number', default: 1 },
+        ]),
+        params: {},
+      },
+      expected: {
+        _node: true,
+        _paramSpecs: [
+          { name: 'severity', type: 'string', default: null },
+          { name: 'page', type: 'number', default: 1 },
+        ],
+        _params: { page: 1 },
       },
     },
     {
@@ -112,7 +138,8 @@ local nodeWithParams(params, extra={}) = {
       },
       expected: {
         _node: true,
-        pageSize: 100,
+        _paramSpecs: [{ name: 'pageSize', type: 'number' }],
+        _params: { pageSize: 100 },
       },
     },
     {
@@ -126,27 +153,11 @@ local nodeWithParams(params, extra={}) = {
       },
       expected: {
         _node: true,
-        page: 1,
-        pageSize: 50,
-      },
-    },
-    {
-      name: 'params spec remains on node',
-      input:: {
-        node: nodeWithParams([{ name: 'page', type: 'number', default: 1 }]),
-        params: { page: '3' },
-      },
-      output(input)::
-        local result = applyParams(input.node, input.params);
-        {
-          page: result.page,
-          hasParamsSpec: std.objectHasAll(result, '_params'),
-          paramsSpec: result._params,
-        },
-      expected: {
-        page: 3,
-        hasParamsSpec: true,
-        paramsSpec: [{ name: 'page', type: 'number', default: 1 }],
+        _paramSpecs: [
+          { name: 'page', type: 'number', default: 1 },
+          { name: 'pageSize', type: 'number' },
+        ],
+        _params: { page: 1, pageSize: 50 },
       },
     },
   ],
