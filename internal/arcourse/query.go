@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
@@ -33,13 +34,18 @@ func (uc *Query) Exec(ctx context.Context, path string, params map[string]any, f
 	observed := uc.lastQuery.ObservedFormats()
 	formats := mergeFormats(format, observed, uc.cfg.AuditFormats)
 
+	path, queryParams, err := splitPathAndQuery(path)
+	if err != nil {
+		return pkg.Result{}, err
+	}
+
 	parts := strings.Split(strings.Trim(path, "/"), "/")
 	segments := parts[1:]
 	pathJSON, err := json.Marshal(segments)
 	if err != nil {
 		return pkg.Result{}, err
 	}
-	paramsJSON, err := json.Marshal(normalizeParams(params))
+	paramsJSON, err := json.Marshal(mergeParams(queryParams, params))
 	if err != nil {
 		return pkg.Result{}, err
 	}
@@ -119,11 +125,35 @@ func mergeFormats(primary pkg.Format, sets ...[]pkg.Format) []pkg.Format {
 	return formats
 }
 
-func normalizeParams(params map[string]any) map[string]any {
-	if params == nil {
-		return map[string]any{}
+func splitPathAndQuery(path string) (string, map[string]any, error) {
+	base, query, found := strings.Cut(path, "?")
+	if !found {
+		return base, map[string]any{}, nil
 	}
-	return params
+	values, err := url.ParseQuery(query)
+	if err != nil {
+		return "", nil, err
+	}
+	params := map[string]any{}
+	for key, vs := range values {
+		if len(vs) == 1 {
+			params[key] = vs[0]
+		} else if len(vs) > 1 {
+			params[key] = vs
+		}
+	}
+	return base, params, nil
+}
+
+func mergeParams(base map[string]any, overrides map[string]any) map[string]any {
+	merged := make(map[string]any, len(base)+len(overrides))
+	for k, v := range base {
+		merged[k] = v
+	}
+	for k, v := range overrides {
+		merged[k] = v
+	}
+	return merged
 }
 
 func decodeField(format pkg.Format, raw json.RawMessage) (string, error) {

@@ -136,6 +136,47 @@ func TestQueryNodeWithParams(t *testing.T) {
 	}
 }
 
+func TestQueryPathWithEmbeddedQueryString(t *testing.T) {
+	given, when, then := scenario(t)
+
+	given.
+		a_graph_root(`{
+			child: {
+				_node: true,
+				_paramSpecs: [
+					{ name: 'page', type: 'number', default: 1 },
+					{ name: 'pageSize', type: 'number', default: 25 },
+				],
+				value: 42,
+			},
+		}`)
+
+	when.
+		a_path_is_queried("root/child?page=3&pageSize=50")
+
+	then.
+		the_output_is(`{"_node":true,"_paramSpecs":[{"name":"page","type":"number","default":1},{"name":"pageSize","type":"number","default":25}],"_params":{"page":3,"pageSize":50},"value":42}`)
+}
+
+func TestQueryPathWithEmbeddedQueryStringOverriddenByExplicitParams(t *testing.T) {
+	given, when, then := scenario(t)
+
+	given.
+		a_graph_root(`{
+			child: {
+				_node: true,
+				_paramSpecs: [{ name: 'page', type: 'number', default: 1 }],
+				value: 42,
+			},
+		}`)
+
+	when.
+		a_path_is_queried_with_params("root/child?page=3", map[string]any{"page": "9"})
+
+	then.
+		the_output_is(`{"_node":true,"_paramSpecs":[{"name":"page","type":"number","default":1}],"_params":{"page":9},"value":42}`)
+}
+
 func TestQueryInvalidParams(t *testing.T) {
 	cases := []struct {
 		name   string
