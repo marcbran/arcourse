@@ -31,14 +31,27 @@ local nestKeys(keySegs, item, value) =
   ];
   nestValue(labels, 0, value);
 
-local resolveTarget(root, node, item, valueSegs) =
+local splitPrefix(valueSegs) =
+  if std.length(valueSegs) == 0 then { prefix: [], suffix: [] }
+  else if std.objectHas(valueSegs[0], 'param') then { prefix: [], suffix: valueSegs }
+  else
+    local rest = splitPrefix(valueSegs[1:]);
+    { prefix: [valueSegs[0]] + rest.prefix, suffix: rest.suffix };
+
+local resolveBase(root, node, prefixSegs) =
   std.foldl(
     function(acc, seg)
       if std.objectHas(seg, 'const') then acc[seg.const]
-      else if std.objectHas(seg, 'origin') then acc[seg.origin](std.toString(node[seg.origin]))
-      else acc[seg.param](std.toString(itemPath(item, seg.path))),
-    valueSegs,
+      else acc[seg.origin](std.toString(node[seg.origin])),
+    prefixSegs,
     root
+  );
+
+local resolveFromBase(base, item, suffixSegs) =
+  std.foldl(
+    function(acc, seg) acc[seg.param](std.toString(itemPath(item, seg.path))),
+    suffixSegs,
+    base
   );
 
 local resolvable(item, valueSegs) =
@@ -51,12 +64,14 @@ local resolvable(item, valueSegs) =
 local buildLinks(node, specs, root=import 'root') =
   std.foldl(
     function(acc, spec)
+      local split = splitPrefix(spec.value);
+      local base = resolveBase(root, node, split.prefix);
       acc + walk(
         node.data,
         spec.at,
         function(item)
           if resolvable(item, spec.value)
-          then nestKeys(spec.keys, item, resolveTarget(root, node, item, spec.value))
+          then nestKeys(spec.keys, item, resolveFromBase(base, item, split.suffix))
           else {}
       ),
     specs,
@@ -70,8 +85,11 @@ local rowLinkSpec(specs, at) =
 local rowLinkFor(node, specs, at, root=import 'root') =
   local spec = rowLinkSpec(specs, at);
   if spec == null then null
-  else function(item)
-    if resolvable(item, spec.value) then resolveTarget(root, node, item, spec.value) else null;
+  else
+    local split = splitPrefix(spec.value);
+    local base = resolveBase(root, node, split.prefix);
+    function(item)
+      if resolvable(item, spec.value) then resolveFromBase(base, item, split.suffix) else null;
 
 {
   buildLinks: buildLinks,

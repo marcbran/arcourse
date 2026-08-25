@@ -29,4 +29,7 @@ test-e2e:
 test-e2e-facade facade:
     ARCO_BINARY="$(pwd)/arco" ARCOURSE_E2E_FACADE="{{facade}}" go test -v -tags e2e ./tests/...
 
+bench:
+    go test -tags e2e -bench=. -benchmem -run=^$ ./tests/...
+
 ci: lint test build test-e2e
