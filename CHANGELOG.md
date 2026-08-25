@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.12.0](https://github.com/marcbran/arcourse/compare/v0.11.0...v0.12.0) (2026-08-25)
+
+
+### Features
+
+* add pagination to tables ([#84](https://github.com/marcbran/arcourse/issues/84)) ([9053f31](https://github.com/marcbran/arcourse/commit/9053f318e1ad78dafa46618b986b25e1fd739a8c))
+* tweak table query performance ([#85](https://github.com/marcbran/arcourse/issues/85)) ([431041a](https://github.com/marcbran/arcourse/commit/431041a83d7ccb44ff928a022a6ff24c9acc3c3e))
+
+
+### Bug Fixes
+
+* redirect audit/ and observe/ ([#82](https://github.com/marcbran/arcourse/issues/82)) ([e26f6bf](https://github.com/marcbran/arcourse/commit/e26f6bfb4fa5421a8ba2fd06ebfab397f5cd4aa7))
+* remove slash prefix from queryPath ([#80](https://github.com/marcbran/arcourse/issues/80)) ([e880e94](https://github.com/marcbran/arcourse/commit/e880e942d18d36c8caa1228968328608d0c11981))
+* revert: remove slash prefix from queryPath ([#83](https://github.com/marcbran/arcourse/issues/83)) ([4ab9246](https://github.com/marcbran/arcourse/commit/4ab9246feee15d0fd1cd1a238af0029165a37669))
+
 ## [0.11.0](https://github.com/marcbran/arcourse/compare/v0.10.0...v0.11.0) (2026-08-23)
 
 
