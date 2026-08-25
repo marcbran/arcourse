@@ -20,6 +20,7 @@ local nodeBody(entry) = entry.expr.elements[1].expr.right;
 local nodeKind(entry) = [nodeView(entry).id, nodeView(entry).target.id, nodeView(entry).target.target.id];
 local fieldNames(body) = [f.id for f in body.fields];
 local field(body, name) = [f for f in body.fields if f.id == name][0].expr2;
+local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.target.target.target.id];
 
 {
   output(input):: input(),
@@ -66,6 +67,20 @@ local field(body, name) = [f for f in body.fields if f.id == name][0].expr2;
         paths: [['kubernetes', '$context', 'widgets'], ['kubernetes', '$context', '$widget']],
         listKind: ['node', 'list', 'a'],
         detailKind: ['node', 'resource', 'a'],
+      },
+    },
+    {
+      name: 'a cluster-scoped resource list and detail node both fetch data through kubernetes.neat.get',
+      input:: function()
+        local resource = { name: 'widgets', kind: 'Widget', namespaced: false, verbs: ['list', 'get'], version: 'v1' };
+        local entries = nodes([{ group: '', resources: [resource] }]);
+        {
+          listDataChain: applyTargetChain(field(nodeBody(entries[2]), 'data')),
+          detailDataChain: applyTargetChain(field(nodeBody(entries[3]), 'data')),
+        },
+      expected: {
+        listDataChain: ['get', 'neat', 'kubernetes'],
+        detailDataChain: ['get', 'neat', 'kubernetes'],
       },
     },
     {
@@ -125,6 +140,9 @@ local field(body, name) = [f for f in body.fields if f.id == name][0].expr2;
           allNsLinkValue: manifestLiteral(field(nodeBody(allNs), 'linkSpecs'))[0].value,
           oneNsLinkValue: manifestLiteral(field(nodeBody(oneNs), 'linkSpecs'))[0].value,
           detailKind: nodeKind(detail),
+          allNsDataChain: applyTargetChain(field(nodeBody(allNs), 'data')),
+          oneNsDataChain: applyTargetChain(field(nodeBody(oneNs), 'data')),
+          detailDataChain: applyTargetChain(field(nodeBody(detail), 'data')),
         },
       expected: {
         paths: [
@@ -145,6 +163,9 @@ local field(body, name) = [f for f in body.fields if f.id == name][0].expr2;
           { param: 'widget', path: ['metadata', 'name'] },
         ],
         detailKind: ['node', 'resource', 'a'],
+        allNsDataChain: ['get', 'neat', 'kubernetes'],
+        oneNsDataChain: ['get', 'neat', 'kubernetes'],
+        detailDataChain: ['get', 'neat', 'kubernetes'],
       },
     },
     {

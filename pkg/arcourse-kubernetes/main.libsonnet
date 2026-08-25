@@ -94,8 +94,6 @@ local generate(resources, group) =
     if group == '' then '/api/' + resource.version
     else '/apis/' + group + '/' + resource.version;
 
-  local k8sGet(pathExpr) =
-    call(member(var('kubernetes'), 'get'), [access(j.Dollar, 'context'), pathExpr]);
   local k8sNeatGet(pathExpr) =
     call(member(member(var('kubernetes'), 'neat'), 'get'), [access(j.Dollar, 'context'), pathExpr]);
 
@@ -158,7 +156,7 @@ local generate(resources, group) =
     if std.length(std.get(resource, 'columns', [])) > 0 then nodeView('table') else nodeView('list');
 
   local namespacedAllList(resource) =
-    local data = k8sGet(namespacedAllPath(resource));
+    local data = k8sNeatGet(namespacedAllPath(resource));
     node(
       ['kubernetes', '$context'] + resourcePrefix + [route(resource)],
       listView(resource),
@@ -166,7 +164,7 @@ local generate(resources, group) =
     );
 
   local namespacedList(resource) =
-    local data = k8sGet(namespacedListPath(resource));
+    local data = k8sNeatGet(namespacedListPath(resource));
     node(
       ['kubernetes', '$context', '$namespace'] + resourcePrefix + [route(resource)],
       listView(resource),
@@ -181,7 +179,7 @@ local generate(resources, group) =
     );
 
   local clusterList(resource) =
-    local data = k8sGet(clusterListPath(resource));
+    local data = k8sNeatGet(clusterListPath(resource));
     node(
       ['kubernetes', '$context'] + resourcePrefix + [route(resource)],
       listView(resource),
