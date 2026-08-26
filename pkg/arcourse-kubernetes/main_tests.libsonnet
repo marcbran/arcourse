@@ -183,5 +183,53 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
         ],
       },
     },
+    {
+      name: 'a bundled specs.json entry for a core resource derives a namespaced resource with list and get verbs from its OpenAPI paths',
+      input:: function()
+        local spec = {
+          paths: {
+            '/api/v1/namespaces/{namespace}/widgets': { get: { 'x-kubernetes-group-version-kind': { kind: 'Widget' } } },
+            '/api/v1/namespaces/{namespace}/widgets/{name}': { get: {} },
+          },
+        };
+        local entries = unwrap(arcourseKubernetes.graph {
+          manifest: false,
+          contexts: [],
+          specs: { 'api/v1': spec },
+        }._view.jsonnet).elements;
+        {
+          paths: [nodePath(e) for e in entries[2:]],
+        },
+      expected: {
+        paths: [
+          ['kubernetes', '$context', 'widgets'],
+          ['kubernetes', '$context', '$namespace', 'widgets'],
+          ['kubernetes', '$context', '$namespace', '$widget'],
+        ],
+      },
+    },
+    {
+      name: 'a bundled specs.json entry for a group resource derives the group and version from its key',
+      input:: function()
+        local spec = {
+          paths: {
+            '/apis/acme.io/v1/widgets': { get: { 'x-kubernetes-group-version-kind': { kind: 'Widget' } } },
+            '/apis/acme.io/v1/widgets/{name}': { get: {} },
+          },
+        };
+        local entries = unwrap(arcourseKubernetes.graph {
+          manifest: false,
+          contexts: [],
+          specs: { 'apis/acme.io/v1': spec },
+        }._view.jsonnet).elements;
+        { paths: [nodePath(e) for e in entries[2:]] },
+      expected: {
+        paths: [
+          ['kubernetes', '$context', 'acme.io'],
+          ['kubernetes', '$context', 'acme.io', 'widgets'],
+          ['kubernetes', '$context', 'acme.io', '$widget'],
+        ],
+      },
+    },
   ],
 }

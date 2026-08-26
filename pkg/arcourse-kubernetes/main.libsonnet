@@ -260,15 +260,12 @@ local generateAll(groups, manifest=true) =
   );
   if manifest then j.manifestJsonnet(generated) else generated;
 
-local groupVersionFromSpec(specStr) =
-  local spec = std.parseJson(specStr);
-  local firstPath = std.objectFields(spec.paths)[0];
-  local parts = [p for p in std.split(firstPath, '/') if p != ''];
+local groupVersionFromKey(key) =
+  local parts = [p for p in std.split(key, '/') if p != ''];
   if parts[0] == 'api' then { group: '', version: parts[1] }
   else { group: parts[1], version: parts[2] };
 
-local linksFromSpec(specStr) =
-  local spec = std.parseJson(specStr);
+local linksFromSpec(spec) =
   local suffix = '/{name}';
   local suffixLen = std.length(suffix);
   local endsWith(s) =
@@ -280,25 +277,30 @@ local linksFromSpec(specStr) =
     if endsWith(p) && std.objectHas(spec.paths, std.substr(p, 0, std.length(p) - suffixLen))
   ];
 
-local resourcesFromSpecAndLinks(specStr, links, columns, group) =
-  local spec = std.parseJson(specStr);
-  local effectiveLinks = if links != null then links else linksFromSpec(specStr);
+local resourceNameFromPath(path) =
+  local parts = [p for p in std.split(path, '/') if p != ''];
+  parts[std.length(parts) - 1];
+
+local resourcesFromSpec(spec, group, version, columns, links) =
+  local groupVersion = if group == '' then version else group + '/' + version;
+  local columnsForGroup = std.get(columns, groupVersion, []);
+  local linksForGroup = std.get(links, groupVersion, null);
+  local effectiveLinks = if linksForGroup != null then linksForGroup else linksFromSpec(spec);
   local isNamespacedPath(path) =
     std.length(std.findSubstr('/namespaces/{', path)) > 0;
-  local resourceNameFromPath(path) =
-    local parts = [p for p in std.split(path, '/') if p != ''];
-    parts[std.length(parts) - 1];
   local findKind(path) =
     local pathEntry = std.get(spec.paths, path, {});
     local getOp = std.get(pathEntry, 'get', null);
     if getOp == null then null
     else std.get(getOp, 'x-kubernetes-group-version-kind', null);
+  local hasGet(path) =
+    std.objectHas(spec.paths, path) && std.objectHas(spec.paths[path], 'get');
   local defaultColumns(path) =
     [{ key: 'metadata.name', kind: 'name', label: 'Name', path: ['metadata', 'name'], priority: 'primary' }] +
     (if isNamespacedPath(path) then [{ key: 'metadata.namespace', kind: 'text', label: 'Namespace', path: ['metadata', 'namespace'], priority: 'secondary' }] else []) +
     [{ key: 'metadata.creationTimestamp', kind: 'timestamp', label: 'Created', path: ['metadata', 'creationTimestamp'], priority: 'tertiary' }];
   local findColumns(path) =
-    local matching = [c for c in columns if c.sourcePath == path];
+    local matching = [c for c in columnsForGroup if c.sourcePath == path];
     if std.length(matching) > 0 then matching[0].columns else defaultColumns(path);
   local resourceFromLink(link) =
     local name = resourceNameFromPath(link.sourcePath);
@@ -307,8 +309,9 @@ local resourcesFromSpecAndLinks(specStr, links, columns, group) =
       name: name,
       kind: if gvk != null then gvk.kind else 'Unknown',
       namespaced: isNamespacedPath(link.sourcePath),
-      verbs: ['get', 'list'],
+      verbs: (if hasGet(link.sourcePath) then ['list'] else []) + (if hasGet(link.targetPath) then ['get'] else []),
       group: group,
+      version: version,
       columns: findColumns(link.sourcePath),
     };
   dedupeResources([resourceFromLink(link) for link in effectiveLinks]);
@@ -373,17 +376,25 @@ local groupsFromContext(ctx, columns, links) =
     for g in apis.groups
   ]);
 
+local groupsFromSpecs(specs, columns, links) =
+  mergeGroups([
+    local gv = groupVersionFromKey(key);
+    { group: gv.group, resources: resourcesFromSpec(specs[key], gv.group, gv.version, columns, links) }
+    for key in std.objectFields(specs)
+  ]);
+
 local graph = {
   manifest: true,
-  contexts: error 'contexts is required',
+  contexts: [],
+  specs: {},
   data:
     local columns = if std.objectHas(self, 'columns') then self.columns else {};
     local links = if std.objectHas(self, 'links') then self.links else {};
     {
-      groups: mergeGroups(std.flattenArrays([
-        groupsFromContext(ctx, columns, links)
-        for ctx in $.contexts
-      ])),
+      groups: mergeGroups(
+        std.flattenArrays([groupsFromContext(ctx, columns, links) for ctx in $.contexts]) +
+        groupsFromSpecs($.specs, columns, links)
+      ),
     },
   _view:: {
     jsonnet: generateAll($.data.groups, $.manifest),
