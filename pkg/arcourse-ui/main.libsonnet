@@ -17,26 +17,6 @@ local collectNeighbors(obj, textPrefix='', exclude=[]) =
     std.objectFields(obj)
   );
 
-local neighbors(obj) =
-  local links = std.get(obj, 'links', {});
-  (if std.type(links) == 'object' then collectNeighbors(links) else []) +
-  collectNeighbors(obj, exclude=['data', '_view', 'links']);
-
-local baseView = {
-  local n = self,
-  _view:: {
-    fragment: error 'view requires a fragment',
-    page: c.page { fragment:: n._view.fragment },
-    html: html.manifestHtml(self.page),
-  },
-};
-
-local neighborView = baseView {
-  _view+:: {
-    fragment: c.list { items:: neighbors($) },
-  },
-};
-
 local isNode(value) =
   std.type(value) == 'object' && std.objectHas(value, '_node') && std.objectHasAll(value, '_queryPath');
 
@@ -69,10 +49,29 @@ local linksGroups(obj) =
     std.objectFields(links)
   );
 
-local groupView = baseView {
+local neighborItems(obj) = directNeighbors(obj, exclude=['data', '_view', 'links']) + linksItems(obj);
+
+local safeGet(obj, path) =
+  std.foldl(
+    function(acc, k)
+      if acc != null && std.isObject(acc) && std.objectHasAll(acc, k) then acc[k] else null,
+    path,
+    obj
+  );
+
+local baseView = {
+  local n = self,
+  _view:: {
+    fragment: error 'view requires a fragment',
+    page: c.page { fragment:: n._view.fragment },
+    html: html.manifestHtml(self.page),
+  },
+};
+
+local listView = baseView {
   _view+:: {
-    fragment: c.groupList {
-      items:: directNeighbors($, exclude=['data', '_view', 'links']) + linksItems($),
+    fragment: c.list {
+      items:: neighborItems($),
       groups:: linksGroups($),
     },
   },
@@ -83,14 +82,6 @@ local yamlView = baseView {
     fragment: c.yaml { data:: $.data },
   },
 };
-
-local safeGet(obj, path) =
-  std.foldl(
-    function(acc, k)
-      if acc != null && std.isObject(acc) && std.objectHasAll(acc, k) then acc[k] else null,
-    path,
-    obj
-  );
 
 local tableView = baseView {
   _view+:: {
@@ -109,19 +100,19 @@ local tableView = baseView {
 
 local resourceView = baseView {
   _view+:: {
-    fragment:
-      local items = neighbors($);
-      local listCard = if std.length(items) > 0 then [c.list { items:: items, style:: ' min-width: 8em;' }] else [];
-      listCard + [c.yaml { data:: $.data }],
+    fragment: c.resource {
+      data:: $.data,
+      items:: neighborItems($),
+      groups:: linksGroups($),
+    },
   },
 };
 
 local withNode = { node: self.view + linkspecs.withLinkSpecs };
 
 {
-  default: { view: neighborView } + withNode,
-  list: { view: neighborView } + withNode,
-  groupList: { view: groupView } + withNode,
+  default: { view: listView } + withNode,
+  list: { view: listView } + withNode,
   table: { view: tableView } + withNode,
   yaml: { view: yamlView } + withNode,
   resource: { view: resourceView } + withNode,
