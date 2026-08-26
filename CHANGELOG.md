@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.0](https://github.com/marcbran/arcourse/compare/v0.12.0...v0.13.0) (2026-08-26)
+
+
+### Features
+
+* support pregenerated specs in k8s generation ([#88](https://github.com/marcbran/arcourse/issues/88)) ([420e189](https://github.com/marcbran/arcourse/commit/420e18965487e6d23e685653a58b75163e907f0d))
+* use neat for kubernetes lists ([#86](https://github.com/marcbran/arcourse/issues/86)) ([8e7c143](https://github.com/marcbran/arcourse/commit/8e7c14351144fa63e75dd44e39cc12c0baf68313))
+
 ## [0.12.0](https://github.com/marcbran/arcourse/compare/v0.11.0...v0.12.0) (2026-08-25)
 
 
