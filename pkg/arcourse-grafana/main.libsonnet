@@ -218,7 +218,7 @@ local frameLabelNames(frames) =
 
 local defaultGroup(n) = n._pathTemplate[std.length(n._pathTemplate) - 1];
 
-local listNode = ui.groupList.view {
+local listNode = ui.list.view {
   local n = self,
   expr:: error 'List requires expr',
   label:: error 'List requires label',
@@ -228,7 +228,7 @@ local listNode = ui.groupList.view {
   links: { [n.group]: { [name]: n.link(name) for name in n.data } },
 };
 
-local labelsNode = ui.groupList.view {
+local labelsNode = ui.list.view {
   local n = self,
   expr:: error 'Labels requires expr',
   link:: error 'Labels requires link',
