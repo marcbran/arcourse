@@ -331,6 +331,50 @@ local pagerduty = { const: 'pagerduty' };
       expected: {},
     },
     {
+      name: 'a bare path+transform segment resolves a computed property-access key from the item, no param call involved',
+      input:: function()
+        local root = { acme: { apps: { services: { id(v): { _node: true, kind: 'service', group: 'apps', id: v } } } } };
+        local node = {
+          data: { source: 'apps/v1', service_id: 'svc_1' },
+        };
+        linkspecs.buildLinks(node, [
+          {
+            at: [],
+            keys: [{ const: 'service' }],
+            value: [
+              { const: 'acme' },
+              { path: ['source'], transform: function(v) std.split(v, '/')[0] },
+              { const: 'services' },
+              { param: 'id', path: ['service_id'] },
+            ],
+          },
+        ], root),
+      expected: {
+        service: { _node: true, kind: 'service', group: 'apps', id: 'svc_1' },
+      },
+    },
+    {
+      name: 'a param segment with a nested path+transform spec resolves the method name from the item, distinct from the arg path',
+      input:: function()
+        local root = { acme: { replicaset(v): { _node: true, kind: 'ReplicaSet', name: v }, daemonset(v): { _node: true, kind: 'DaemonSet', name: v } } };
+        local node = {
+          data: { owner: { kind: 'ReplicaSet', name: 'my-rs' } },
+        };
+        linkspecs.buildLinks(node, [
+          {
+            at: [],
+            keys: [{ const: 'owner' }],
+            value: [
+              { const: 'acme' },
+              { param: { path: ['owner', 'kind'], transform: std.asciiLower }, path: ['owner', 'name'] },
+            ],
+          },
+        ], root),
+      expected: {
+        owner: { _node: true, kind: 'ReplicaSet', name: 'my-rs' },
+      },
+    },
+    {
       name: 'withLinkSpecs merged standalone defaults to no links without forcing root',
       input:: function()
         local node = linkspecs.withLinkSpecs { data: { id: 'x' } };

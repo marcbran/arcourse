@@ -37,7 +37,8 @@ local pageStyle = |||
   .deck {
     display: contents;
   }
-  .deck:has(.card ~ .card) {
+  .deck:has(.card ~ .card),
+  .deck:has(.list):has(.yaml) {
     display: inline-flex;
     gap: 0.25em;
     border: 1px solid var(--border-color);
