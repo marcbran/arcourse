@@ -18,7 +18,25 @@ local dedupeResources(resources) =
   );
   [byKey[k] for k in std.sort(std.objectFields(byKey))];
 
-local generate(resources, group, links=[]) =
+local namespaceLinkSpec = {
+  at: ['metadata'],
+  keys: [{ const: 'namespace' }],
+  value: [{ const: 'kubernetes' }, { origin: 'context' }, { param: 'namespace', path: ['namespace'] }],
+};
+
+local ownerReferenceLinkSpec = {
+  at: ['metadata', 'ownerReferences'],
+  keys: [{ const: 'owner' }, { path: ['name'] }],
+  value: [
+    { const: 'kubernetes' },
+    { origin: 'context' },
+    { origin: 'namespace' },
+    { path: ['apiVersion'], transform: "function(v) local p = std.split(v, '/'); if std.length(p) > 1 then p[0] else ''" },
+    { param: { path: ['kind'], transform: 'std.asciiLower' }, path: ['name'] },
+  ],
+};
+
+local generate(resources, group, links=[], globalLinkSpecs=[]) =
   local le(indent=0) = j.Fodder.LineEnd(0, indent);
   local prettyArray(elements, indent=0) =
     j.Array([elem.fodder(le(indent + 2)) for elem in elements]).closeFodder(le(indent));
@@ -161,7 +179,7 @@ local generate(resources, group, links=[]) =
     else if std.type(value) == 'number' then j.Number(std.toString(value))
     else if std.type(value) == 'array' then j.Array([compactLiteral(item) for item in value])
     else if std.type(value) == 'object' then j.Object([
-      objectField(field, compactLiteral(value[field]))
+      objectField(field, if field == 'transform' then j.parseJsonnet(value[field]) else compactLiteral(value[field]))
       for field in std.objectFields(value)
     ])
     else error 'unsupported literal type: ' + std.type(value);
@@ -217,7 +235,7 @@ local generate(resources, group, links=[]) =
     node(
       ['kubernetes', '$context', '$namespace'] + resourcePrefix + ['$' + itemVar(resource)],
       nodeView('resource'),
-      dataObject(k8sNeatGet(namespacedDetailPath(resource)), linksAt(namespacedDetailPathStr(resource)))
+      dataObject(k8sNeatGet(namespacedDetailPath(resource)), globalLinkSpecs + linksAt(namespacedDetailPathStr(resource)))
     );
 
   local clusterList(resource) =
@@ -232,7 +250,7 @@ local generate(resources, group, links=[]) =
     node(
       ['kubernetes', '$context'] + resourcePrefix + ['$' + itemVar(resource)],
       nodeView('resource'),
-      dataObject(k8sNeatGet(clusterDetailPath(resource)), linksAt(clusterDetailPathStr(resource)))
+      dataObject(k8sNeatGet(clusterDetailPath(resource)), globalLinkSpecs + linksAt(clusterDetailPathStr(resource)))
     );
 
   local resourceNodes(resource) =
@@ -254,7 +272,7 @@ local generate(resources, group, links=[]) =
   groupNamespaceNodes +
   std.flattenArrays([resourceNodes(r) for r in resources]);
 
-local generateAll(groups, manifest=true) =
+local generateAll(groups, manifest=true, globalLinkSpecs=[]) =
   local le(indent=0) = j.Fodder.LineEnd(0, indent);
   local prettyArray(elements, indent=0) =
     j.Array([elem.fodder(le(indent + 2)) for elem in elements]).closeFodder(le(indent));
@@ -289,7 +307,7 @@ local generateAll(groups, manifest=true) =
   ]);
 
   local allRouteNodes = [contextsNode, contextNode] + std.flattenArrays([
-    generate(g.resources, g.group, std.get(g, 'links', []))
+    generate(g.resources, g.group, std.get(g, 'links', []), globalLinkSpecs)
     for g in groups
   ]);
   local generated = j.Locals(
@@ -459,6 +477,7 @@ local graph = {
   manifest: true,
   contexts: [],
   specs: {},
+  globalLinkSpecs: [namespaceLinkSpec, ownerReferenceLinkSpec],
   data:
     local columns = if std.objectHas(self, 'columns') then self.columns else {};
     local links = if std.objectHas(self, 'links') then self.links else {};
@@ -469,7 +488,7 @@ local graph = {
       ),
     },
   _view:: {
-    jsonnet: generateAll($.data.groups, $.manifest),
+    jsonnet: generateAll($.data.groups, $.manifest, $.globalLinkSpecs),
   },
 };
 

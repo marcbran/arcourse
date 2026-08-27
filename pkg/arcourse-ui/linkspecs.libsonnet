@@ -33,7 +33,7 @@ local nestKeys(keySegs, item, value) =
 
 local splitPrefix(valueSegs) =
   if std.length(valueSegs) == 0 then { prefix: [], suffix: [] }
-  else if std.objectHas(valueSegs[0], 'param') then { prefix: [], suffix: valueSegs }
+  else if std.objectHas(valueSegs[0], 'param') || std.objectHas(valueSegs[0], 'path') then { prefix: [], suffix: valueSegs }
   else
     local rest = splitPrefix(valueSegs[1:]);
     { prefix: [valueSegs[0]] + rest.prefix, suffix: rest.suffix };
@@ -47,19 +47,34 @@ local resolveBase(root, node, prefixSegs) =
     root
   );
 
+local resolveKey(spec, item) =
+  if std.type(spec) == 'string' then spec
+  else
+    local raw = itemPath(item, spec.path);
+    if std.objectHas(spec, 'transform') then spec.transform(raw) else raw;
+
 local resolveFromBase(base, item, suffixSegs) =
   std.foldl(
-    function(acc, seg) acc[seg.param](std.toString(itemPath(item, seg.path))),
+    function(acc, seg)
+      if std.objectHas(seg, 'param') then
+        acc[resolveKey(seg.param, item)](std.toString(itemPath(item, seg.path)))
+      else if std.objectHas(seg, 'const') then
+        acc[seg.const]
+      else
+        acc[resolveKey(seg, item)],
     suffixSegs,
     base
   );
 
 local resolvable(item, valueSegs) =
-  std.all([
-    itemPath(item, seg.path) != null
-    for seg in valueSegs
-    if std.objectHas(seg, 'path')
-  ]);
+  std.all(
+    [itemPath(item, seg.path) != null for seg in valueSegs if std.objectHas(seg, 'path')] +
+    [
+      itemPath(item, seg.param.path) != null
+      for seg in valueSegs
+      if std.objectHas(seg, 'param') && std.type(seg.param) == 'object'
+    ]
+  );
 
 local buildLinks(node, specs, root=import 'root') =
   std.foldl(

@@ -8,9 +8,10 @@ local manifestLiteral(expr) =
 
 local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
 
-local nodes(groups) =
+local nodes(groups, globalLinkSpecs=[]) =
   unwrap(arcourseKubernetes.graph {
     manifest: false,
+    globalLinkSpecs: globalLinkSpecs,
     data+: { groups: groups },
   }._view.jsonnet).elements;
 
@@ -354,6 +355,84 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
           ],
         },
       ],
+    },
+    {
+      name: 'a namespace linkSpec (isolated from the default ownerReference one) is applied to both namespaced and cluster-scoped detail nodes ahead of any inferred linkSpecs',
+      input:: function()
+        local namespacedResource = { name: 'widgets', kind: 'Widget', namespaced: true, verbs: ['get'], version: 'v1' };
+        local clusterResource = { name: 'gadgets', kind: 'Gadget', namespaced: false, verbs: ['get'], version: 'v1' };
+        local namespaceOnlyLinkSpec = {
+          at: ['metadata'],
+          keys: [{ const: 'namespace' }],
+          value: [{ const: 'kubernetes' }, { origin: 'context' }, { param: 'namespace', path: ['namespace'] }],
+        };
+        local entries = unwrap(arcourseKubernetes.graph {
+          manifest: false,
+          globalLinkSpecs: [namespaceOnlyLinkSpec],
+          data+: { groups: [{ group: '', resources: [namespacedResource, clusterResource] }] },
+        }._view.jsonnet).elements;
+        local namespacedDetail = [e for e in entries if nodePath(e) == ['kubernetes', '$context', '$namespace', '$widget']][0];
+        local clusterDetail = [e for e in entries if nodePath(e) == ['kubernetes', '$context', '$gadget']][0];
+        {
+          namespacedLinkSpecs: manifestLiteral(field(nodeBody(namespacedDetail), 'linkSpecs')),
+          clusterLinkSpecs: manifestLiteral(field(nodeBody(clusterDetail), 'linkSpecs')),
+        },
+      expected: {
+        namespacedLinkSpecs: [{
+          at: ['metadata'],
+          keys: [{ const: 'namespace' }],
+          value: [{ const: 'kubernetes' }, { origin: 'context' }, { param: 'namespace', path: ['namespace'] }],
+        }],
+        clusterLinkSpecs: [{
+          at: ['metadata'],
+          keys: [{ const: 'namespace' }],
+          value: [{ const: 'kubernetes' }, { origin: 'context' }, { param: 'namespace', path: ['namespace'] }],
+        }],
+      },
+    },
+    {
+      name: 'graph defaults globalLinkSpecs to a namespace linkSpec plus an ownerReference linkSpec that computes its group/method from the item, source held as parseable jsonnet text rather than a live function',
+      input:: function()
+        local specs = arcourseKubernetes.graph.globalLinkSpecs;
+        {
+          count: std.length(specs),
+          ownerReference: specs[1],
+        },
+      expected: {
+        count: 2,
+        ownerReference: {
+          at: ['metadata', 'ownerReferences'],
+          keys: [{ const: 'owner' }, { path: ['name'] }],
+          value: [
+            { const: 'kubernetes' },
+            { origin: 'context' },
+            { origin: 'namespace' },
+            { path: ['apiVersion'], transform: "function(v) local p = std.split(v, '/'); if std.length(p) > 1 then p[0] else ''" },
+            { param: { path: ['kind'], transform: 'std.asciiLower' }, path: ['name'] },
+          ],
+        },
+      },
+    },
+    {
+      name: 'globalLinkSpecs can be overridden by the caller to add more or to clear the default',
+      input:: function()
+        local resource = { name: 'widgets', kind: 'Widget', namespaced: true, verbs: ['get'], version: 'v1' };
+        local extraLinkSpec = {
+          at: [],
+          keys: [{ const: 'owner' }],
+          value: [{ const: 'kubernetes' }, { origin: 'context' }, { const: 'acme.io' }, { param: 'owner', path: ['metadata', 'annotations', 'acme.io/owner'] }],
+        };
+        local withExtra = nodes([{ group: '', resources: [resource] }], [{ at: ['metadata'], keys: [{ const: 'namespace' }], value: [{ const: 'kubernetes' }, { origin: 'context' }, { param: 'namespace', path: ['namespace'] }] }, extraLinkSpec]);
+        local withNone = nodes([{ group: '', resources: [resource] }], []);
+        local detailFrom(entries) = [e for e in entries if nodePath(e) == ['kubernetes', '$context', '$namespace', '$widget']][0];
+        {
+          extraCount: std.length(manifestLiteral(field(nodeBody(detailFrom(withExtra)), 'linkSpecs'))),
+          noneFieldNames: fieldNames(nodeBody(detailFrom(withNone))),
+        },
+      expected: {
+        extraCount: 2,
+        noneFieldNames: ['data'],
+      },
     },
   ],
 }
