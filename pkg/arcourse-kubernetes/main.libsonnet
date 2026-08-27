@@ -18,7 +18,7 @@ local dedupeResources(resources) =
   );
   [byKey[k] for k in std.sort(std.objectFields(byKey))];
 
-local generate(resources, group) =
+local generate(resources, group, links=[]) =
   local le(indent=0) = j.Fodder.LineEnd(0, indent);
   local prettyArray(elements, indent=0) =
     j.Array([elem.fodder(le(indent + 2)) for elem in elements]).closeFodder(le(indent));
@@ -113,6 +113,44 @@ local generate(resources, group) =
       toStr(access(j.Dollar, itemVar(resource))),
     ]);
 
+  local clusterDetailPathStr(resource) = apiPrefix(resource) + '/' + resource.name + '/{name}';
+  local namespacedDetailPathStr(resource) = apiPrefix(resource) + '/namespaces/{namespace}/' + resource.name + '/{name}';
+
+  local isNamespacesConst(seg) = std.objectHas(seg, 'const') && seg.const == 'namespaces';
+  local resourceItemVarByName = { [r.name]: itemVar(r) for r in resources };
+  local wellKnownItemVars = { namespaces: 'namespace', nodes: 'node' };
+  local targetItemVarFor(name) =
+    if std.objectHas(resourceItemVarByName, name) then resourceItemVarByName[name]
+    else if std.objectHas(wellKnownItemVars, name) then wellKnownItemVars[name]
+    else null;
+  local renameParam(seg, name) = if std.objectHas(seg, 'param') then seg { param: name } else seg;
+  local rewriteLinkValue(value) =
+    local isCore = value[0].const == 'api';
+    local targetGroupSegment = if isCore then [] else [value[1]];
+    local afterPrefix = std.slice(value, if isCore then 2 else 3, std.length(value), 1);
+    local hasNamespace = std.length(afterPrefix) >= 2 && isNamespacesConst(afterPrefix[0]);
+    local namespaceValueSeg = if hasNamespace then renameParam(afterPrefix[1], 'namespace') else null;
+    local afterNamespace = if hasNamespace then std.slice(afterPrefix, 2, std.length(afterPrefix), 1) else afterPrefix;
+    if std.length(afterNamespace) == 0 then
+      if namespaceValueSeg == null then null
+      else [{ const: 'kubernetes' }, contextOrigin] + targetGroupSegment + [namespaceValueSeg]
+    else
+      local rawIdSeg = afterNamespace[std.length(afterNamespace) - 1];
+      local rawResourceNameSeg = if std.length(afterNamespace) >= 2 then afterNamespace[std.length(afterNamespace) - 2] else null;
+      local targetItemVar =
+        if rawResourceNameSeg != null && std.objectHas(rawResourceNameSeg, 'const')
+        then targetItemVarFor(rawResourceNameSeg.const)
+        else null;
+      if targetItemVar == null then null
+      else
+        [{ const: 'kubernetes' }, contextOrigin] +
+        (if hasNamespace then [namespaceValueSeg] else []) +
+        targetGroupSegment +
+        [renameParam(rawIdSeg, targetItemVar)];
+  local linksAt(path) =
+    local candidates = [l { value: rewriteLinkValue(l.value) } for l in links if l.sourcePath == path];
+    [l for l in candidates if l.value != null];
+
   local objectField(name, expr) =
     if isUnquotedFieldName(name) then j.Field(name, expr) else j.Field(j.String(name), expr);
 
@@ -130,9 +168,13 @@ local generate(resources, group) =
 
   local dataField(expr, hidden=false) =
     j.Field('data', expr) { Hide: if hidden then 0 else 1 };
-  local dataObject(expr) = prettyObject([dataField(expr)], 2);
   local linkSpecEntry(spec) =
     prettyObject([objectField(field, compactLiteral(spec[field])) for field in ['at', 'keys', 'value']], 6);
+  local dataObject(expr, linkSpecs=[]) = prettyObject(
+    [dataField(expr)] +
+    (if std.length(linkSpecs) > 0 then [j.Field('linkSpecs', prettyArray([linkSpecEntry(s) for s in linkSpecs], 4)) { Hide: 0 }] else []),
+    2
+  );
   local listObject(dataExpr, linkSpecs, columnsExpr=null) = prettyObject(
     [dataField(dataExpr), j.Field('linkSpecs', prettyArray([linkSpecEntry(s) for s in linkSpecs], 4)) { Hide: 0 }] +
     (if columnsExpr != null then [j.Field('table', prettyObject([
@@ -175,7 +217,7 @@ local generate(resources, group) =
     node(
       ['kubernetes', '$context', '$namespace'] + resourcePrefix + ['$' + itemVar(resource)],
       nodeView('resource'),
-      dataObject(k8sNeatGet(namespacedDetailPath(resource)))
+      dataObject(k8sNeatGet(namespacedDetailPath(resource)), linksAt(namespacedDetailPathStr(resource)))
     );
 
   local clusterList(resource) =
@@ -190,7 +232,7 @@ local generate(resources, group) =
     node(
       ['kubernetes', '$context'] + resourcePrefix + ['$' + itemVar(resource)],
       nodeView('resource'),
-      dataObject(k8sNeatGet(clusterDetailPath(resource)))
+      dataObject(k8sNeatGet(clusterDetailPath(resource)), linksAt(clusterDetailPathStr(resource)))
     );
 
   local resourceNodes(resource) =
@@ -247,7 +289,7 @@ local generateAll(groups, manifest=true) =
   ]);
 
   local allRouteNodes = [contextsNode, contextNode] + std.flattenArrays([
-    generate(g.resources, g.group)
+    generate(g.resources, g.group, std.get(g, 'links', []))
     for g in groups
   ]);
   local generated = j.Locals(
@@ -279,15 +321,28 @@ local linksFromSpec(spec) =
 
 local resourceNameFromPath(path) =
   local parts = [p for p in std.split(path, '/') if p != ''];
-  parts[std.length(parts) - 1];
+  local last = parts[std.length(parts) - 1];
+  local isParam(s) = std.length(s) >= 1 && std.substr(s, 0, 1) == '{';
+  if isParam(last) then parts[std.length(parts) - 2] else last;
+
+local isSubresourcePath(path) =
+  local parts = [p for p in std.split(path, '/') if p != ''];
+  std.length(parts) >= 2 &&
+  parts[std.length(parts) - 2] == '{name}' &&
+  std.substr(parts[std.length(parts) - 1], 0, 1) != '{';
 
 local resourcesFromSpec(spec, group, version, columns, links) =
   local groupVersion = if group == '' then version else group + '/' + version;
   local columnsForGroup = std.get(columns, groupVersion, []);
   local linksForGroup = std.get(links, groupVersion, null);
   local effectiveLinks = if linksForGroup != null then linksForGroup else linksFromSpec(spec);
+  local nodeLinks = if linksForGroup != null then linksForGroup else [];
   local isNamespacedPath(path) =
     std.length(std.findSubstr('/namespaces/{', path)) > 0;
+  local apiPrefix = if group == '' then '/api/' + version else '/apis/' + group + '/' + version;
+  local collectionPath(name, namespaced) =
+    apiPrefix + (if namespaced then '/namespaces/{namespace}/' else '/') + name;
+  local detailPath(name, namespaced) = collectionPath(name, namespaced) + '/{name}';
   local findKind(path) =
     local pathEntry = std.get(spec.paths, path, {});
     local getOp = std.get(pathEntry, 'get', null);
@@ -295,26 +350,34 @@ local resourcesFromSpec(spec, group, version, columns, links) =
     else std.get(getOp, 'x-kubernetes-group-version-kind', null);
   local hasGet(path) =
     std.objectHas(spec.paths, path) && std.objectHas(spec.paths[path], 'get');
-  local defaultColumns(path) =
+  local defaultColumns(namespaced) =
     [{ key: 'metadata.name', kind: 'name', label: 'Name', path: ['metadata', 'name'], priority: 'primary' }] +
-    (if isNamespacedPath(path) then [{ key: 'metadata.namespace', kind: 'text', label: 'Namespace', path: ['metadata', 'namespace'], priority: 'secondary' }] else []) +
+    (if namespaced then [{ key: 'metadata.namespace', kind: 'text', label: 'Namespace', path: ['metadata', 'namespace'], priority: 'secondary' }] else []) +
     [{ key: 'metadata.creationTimestamp', kind: 'timestamp', label: 'Created', path: ['metadata', 'creationTimestamp'], priority: 'tertiary' }];
-  local findColumns(path) =
+  local findColumns(path, namespaced) =
     local matching = [c for c in columnsForGroup if c.sourcePath == path];
-    if std.length(matching) > 0 then matching[0].columns else defaultColumns(path);
+    if std.length(matching) > 0 then matching[0].columns else defaultColumns(namespaced);
   local resourceFromLink(link) =
     local name = resourceNameFromPath(link.sourcePath);
+    local namespaced = isNamespacedPath(link.sourcePath);
     local gvk = findKind(link.sourcePath);
     {
       name: name,
       kind: if gvk != null then gvk.kind else 'Unknown',
-      namespaced: isNamespacedPath(link.sourcePath),
-      verbs: (if hasGet(link.sourcePath) then ['list'] else []) + (if hasGet(link.targetPath) then ['get'] else []),
+      namespaced: namespaced,
+      verbs: (if hasGet(collectionPath(name, namespaced)) then ['list'] else []) + (if hasGet(detailPath(name, namespaced)) then ['get'] else []),
       group: group,
       version: version,
-      columns: findColumns(link.sourcePath),
+      columns: findColumns(collectionPath(name, namespaced), namespaced),
     };
-  dedupeResources([resourceFromLink(link) for link in effectiveLinks]);
+  {
+    resources: dedupeResources([
+      resourceFromLink(link)
+      for link in effectiveLinks
+      if !isSubresourcePath(link.sourcePath)
+    ]),
+    links: nodeLinks,
+  };
 
 local defaultColumns(namespaced) =
   [{ key: 'metadata.name', kind: 'name', label: 'Name', path: ['metadata', 'name'], priority: 'primary' }] +
@@ -341,11 +404,14 @@ local resourcesFromDiscovery(discovery, group, columns, links) =
     parts[std.length(parts) - 1]
     for l in effectiveLinks
   ]);
-  dedupeResources([
-    r { group: group, version: bareVersion, columns: findColumns(r) }
-    for r in discovery.resources
-    if std.length(std.findSubstr('/', r.name)) == 0
-  ]);
+  {
+    resources: dedupeResources([
+      r { group: group, version: bareVersion, columns: findColumns(r) }
+      for r in discovery.resources
+      if std.length(std.findSubstr('/', r.name)) == 0
+    ]),
+    links: effectiveLinks,
+  };
 
 local mergeGroups(groups) =
   local byKey = std.foldl(
@@ -353,7 +419,10 @@ local mergeGroups(groups) =
       local key = g.group;
       acc {
         [key]: if std.objectHas(acc, key)
-          then acc[key] { resources: dedupeResources(acc[key].resources + g.resources) }
+          then acc[key] {
+            resources: dedupeResources(acc[key].resources + g.resources),
+            links: std.get(acc[key], 'links', []) + std.get(g, 'links', []),
+          }
           else g,
       },
     groups,
@@ -367,10 +436,12 @@ local groupVersionsOrdered(g) =
 local groupsFromContext(ctx, columns, links) =
   local core = kubernetes.get(ctx, '/api/v1');
   local apis = kubernetes.get(ctx, '/apis');
-  [{ group: '', resources: resourcesFromDiscovery(core, '', columns, links) }] + std.flattenArrays([
+  local coreResult = resourcesFromDiscovery(core, '', columns, links);
+  [{ group: '', resources: coreResult.resources, links: coreResult.links }] + std.flattenArrays([
     [
       local discovery = kubernetes.get(ctx, '/apis/' + v.groupVersion);
-      { group: g.name, resources: resourcesFromDiscovery(discovery, g.name, columns, links) }
+      local result = resourcesFromDiscovery(discovery, g.name, columns, links);
+      { group: g.name, resources: result.resources, links: result.links }
       for v in groupVersionsOrdered(g)
     ]
     for g in apis.groups
@@ -379,7 +450,8 @@ local groupsFromContext(ctx, columns, links) =
 local groupsFromSpecs(specs, columns, links) =
   mergeGroups([
     local gv = groupVersionFromKey(key);
-    { group: gv.group, resources: resourcesFromSpec(specs[key], gv.group, gv.version, columns, links) }
+    local result = resourcesFromSpec(specs[key], gv.group, gv.version, columns, links);
+    { group: gv.group, resources: result.resources, links: result.links }
     for key in std.objectFields(specs)
   ]);
 
