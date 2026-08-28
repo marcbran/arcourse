@@ -16,15 +16,15 @@ type AuditRepo interface {
 	Get(ctx context.Context, id string) (pkg.AuditEntry, error)
 }
 
-type AppendAudit struct {
+type appendAudit struct {
 	auditRepo AuditRepo
 }
 
-func NewAppendAudit(auditRepo AuditRepo) *AppendAudit {
-	return &AppendAudit{auditRepo: auditRepo}
+func newAppendAudit(auditRepo AuditRepo) *appendAudit {
+	return &appendAudit{auditRepo: auditRepo}
 }
 
-func (uc *AppendAudit) Exec(ctx context.Context, path string, results map[pkg.Format]pkg.Result) {
+func (uc *appendAudit) Exec(ctx context.Context, path string, results map[pkg.Format]pkg.Result) {
 	entry := pkg.AuditEntry{
 		ID:        uuid.Must(uuid.NewV7()).String(),
 		Path:      path,
@@ -37,15 +37,15 @@ func (uc *AppendAudit) Exec(ctx context.Context, path string, results map[pkg.Fo
 	}
 }
 
-type ListAudit struct {
+type listAudit struct {
 	auditRepo AuditRepo
 }
 
-func NewListAudit(auditRepo AuditRepo) *ListAudit {
-	return &ListAudit{auditRepo: auditRepo}
+func newListAudit(auditRepo AuditRepo) *listAudit {
+	return &listAudit{auditRepo: auditRepo}
 }
 
-func (uc *ListAudit) Exec(ctx context.Context) ([]pkg.AuditEntry, error) {
+func (uc *listAudit) Exec(ctx context.Context) ([]pkg.AuditEntry, error) {
 	entries, err := uc.auditRepo.List(ctx)
 	if err != nil {
 		return nil, err
@@ -56,14 +56,14 @@ func (uc *ListAudit) Exec(ctx context.Context) ([]pkg.AuditEntry, error) {
 	return entries, nil
 }
 
-type GetAudit struct {
+type getAudit struct {
 	auditRepo AuditRepo
 }
 
-func NewGetAudit(auditRepo AuditRepo) *GetAudit {
-	return &GetAudit{auditRepo: auditRepo}
+func newGetAudit(auditRepo AuditRepo) *getAudit {
+	return &getAudit{auditRepo: auditRepo}
 }
 
-func (uc *GetAudit) Exec(ctx context.Context, id string) (pkg.AuditEntry, error) {
+func (uc *getAudit) Exec(ctx context.Context, id string) (pkg.AuditEntry, error) {
 	return uc.auditRepo.Get(ctx, id)
 }

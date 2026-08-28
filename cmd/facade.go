@@ -29,7 +29,7 @@ func buildFacade(cfg Config, plugins []*jpoet.Plugin) pkg.Facade {
 }
 
 func buildLocalFacade(cfg Config, plugins []*jpoet.Plugin) pkg.Facade {
-	jpaths := []string{filepath.Join(cfg.Evaluate.Dir, "vendor")}
+	jpaths := []string{filepath.Join(cfg.Root.Dir, "vendor")}
 	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib, jpaths, plugins)
 	lastQuery := broadcast.NewLastQuery()
 	auditRepo := jsonfileinfra.NewAuditRepo(cfg.Audit.Dir)
@@ -148,7 +148,9 @@ func defaultConfig() Config {
 			Port:     "1183",
 		},
 		Config: arcourse.Config{
-			Evaluate: arcourse.EvaluateConfig{},
+			Root: arcourse.RootConfig{
+				Mode: arcourse.ModeCompiledGraph,
+			},
 			Audit: arcourse.AuditConfig{
 				Dir:     "audit",
 				Formats: []pkg.Format{pkg.FormatJSON, pkg.FormatHTML},
@@ -159,11 +161,11 @@ func defaultConfig() Config {
 
 func resolveConfigValues(cfg Config, home string) (Config, error) {
 	cfg = mergeConfigDefaults(cfg)
-	evaluateDir, err := resolveRelativeDir(home, cfg.Evaluate.Dir)
+	evaluateDir, err := resolveRelativeDir(home, cfg.Root.Dir)
 	if err != nil {
 		return Config{}, err
 	}
-	cfg.Evaluate.Dir = evaluateDir
+	cfg.Root.Dir = evaluateDir
 	auditDir, err := resolveRelativeDir(home, cfg.Audit.Dir)
 	if err != nil {
 		return Config{}, err
@@ -194,8 +196,11 @@ func mergeConfigDefaults(cfg Config) Config {
 	if strings.TrimSpace(cfg.HTTP.Port) == "" {
 		cfg.HTTP.Port = def.HTTP.Port
 	}
-	if strings.TrimSpace(cfg.Evaluate.Dir) == "" {
-		cfg.Evaluate.Dir = def.Evaluate.Dir
+	if strings.TrimSpace(cfg.Root.Dir) == "" {
+		cfg.Root.Dir = def.Root.Dir
+	}
+	if cfg.Root.Mode == "" {
+		cfg.Root.Mode = def.Root.Mode
 	}
 	if strings.TrimSpace(cfg.Audit.Dir) == "" {
 		cfg.Audit.Dir = def.Audit.Dir

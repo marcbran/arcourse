@@ -1,7 +1,12 @@
-local construct_graph_root = import './construct_graph_root.libsonnet';
+local compile_graph = import './compile_graph.libsonnet';
+local construct_compiled_graph_root = import './construct_compiled_graph_root.libsonnet';
+
+local viaShape(graphSpec) =
+  local compiledShape = std.parseJson(std.manifestJsonEx(compile_graph(graphSpec), ''));
+  construct_compiled_graph_root(graphSpec, compiledShape);
 
 {
-  output(input):: construct_graph_root(input),
+  output(input):: viaShape(input),
   tests: [
     {
       name: 'empty nodeSpecs yields root shell',
@@ -120,7 +125,7 @@ local construct_graph_root = import './construct_graph_root.libsonnet';
       name: 'nodeSpec can have variable descendant nodeSpec',
       input:: [[[['namespaces'], { title: 'Namespaces' }], [['namespaces', '$name', 'pods'], { kind: 'PodList' }]]],
       output(input)::
-        local pods = construct_graph_root(input).namespaces.name('default').pods;
+        local pods = viaShape(input).namespaces.name('default').pods;
         {
           node: pods,
           evalPath: pods._evalPath,
@@ -164,14 +169,14 @@ local construct_graph_root = import './construct_graph_root.libsonnet';
     {
       name: 'layer with _view from later spec suppresses defaultView',
       input:: [[[['demo'], { n: 1 }], [['demo'], { _view:: 'custom' }]], { _view: 'default' }],
-      output(input):: construct_graph_root(input).demo._view,
+      output(input):: viaShape(input).demo._view,
       expected: 'custom',
     },
     {
       name: 'specs with different var names at same position stay as siblings',
       input:: [[[['parents', '$a'], { from: 'a' }], [['parents', '$b'], { from: 'b' }]]],
       output(input)::
-        local parents = construct_graph_root(input).parents;
+        local parents = viaShape(input).parents;
         {
           a: parents.a('x'),
           b: parents.b('y'),
@@ -188,6 +193,12 @@ local construct_graph_root = import './construct_graph_root.libsonnet';
           from: 'b',
         },
       },
+    },
+    {
+      name: 'body function stays callable after the shape round-trip',
+      input:: [[[['demo'], { render: function(x) x + 1 }]]],
+      output(input):: viaShape(input).demo.render(41),
+      expected: 42,
     },
   ],
 }

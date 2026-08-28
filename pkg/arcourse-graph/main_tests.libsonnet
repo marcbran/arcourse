@@ -300,9 +300,133 @@ local graphTests = {
   ],
 };
 
+local viaShape(input) =
+  local nodeSpecs = input.nodeSpecs;
+  local defaultView = std.get(input, 'defaultView', {});
+  local layers = g.toLayers(nodeSpecs);
+  local compiledShape = std.parseJson(std.manifestJsonEx(g.shape(layers), ''));
+  g.graphFromShape(nodeSpecs, compiledShape, defaultView);
+
+local shapeTests = {
+  name: 'shape + graphFromShape',
+  output(input):: viaShape(input),
+  tests: [
+    {
+      name: 'turns variable path segments into functions',
+      input:: {
+        nodeSpecs: [
+          [['kubernetes', '$context', '$namespace', 'pods'], { kind: 'Pod' }],
+        ],
+      },
+      output(input):: viaShape(input).kubernetes.context('prod').namespace('default').pods,
+      expected: {
+        _node: true,
+        context: 'prod',
+        namespace: 'default',
+        kind: 'Pod',
+      },
+    },
+    {
+      name: 'keeps static siblings beside variable segments',
+      input:: {
+        nodeSpecs: [
+          [['kubernetes', '$context', 'pods'], { kind: 'Pod' }],
+          [['kubernetes', 'api-resources'], { kind: 'APIResourceList' }],
+        ],
+      },
+      output(input)::
+        local root = viaShape(input).kubernetes;
+        {
+          static: root['api-resources'],
+          dynamic: root.context('prod').pods,
+        },
+      expected: {
+        static: {
+          _node: true,
+          kind: 'APIResourceList',
+        },
+        dynamic: {
+          _node: true,
+          context: 'prod',
+          kind: 'Pod',
+        },
+      },
+    },
+    {
+      name: 'default view applies to root, containers, and nodes',
+      input:: {
+        nodeSpecs: [
+          [['group', '$name', 'detail'], { value: 1 }],
+        ],
+        defaultView: { _view: 'default' },
+      },
+      output(input)::
+        local root = viaShape(input);
+        {
+          rootView: root._view,
+          groupView: root.group._view,
+          nameView: root.group.name('demo')._view,
+          detail: root.group.name('demo').detail,
+        },
+      expected: {
+        rootView: 'default',
+        groupView: 'default',
+        nameView: 'default',
+        detail: {
+          _node: true,
+          _view: 'default',
+          name: 'demo',
+          value: 1,
+        },
+      },
+    },
+    {
+      name: 'variadic spec merges layers in source order',
+      input:: {
+        nodeSpecs: [
+          [['demo'], { value: 'base' }, { value: 'middle' }, { value: 'final', extra: true }],
+        ],
+      },
+      output(input):: viaShape(input).demo,
+      expected: {
+        _node: true,
+        value: 'final',
+        extra: true,
+      },
+    },
+    {
+      name: 'multiple specs at the same path merge in source order',
+      input:: {
+        nodeSpecs: [
+          [['demo'], { n: 1, label: 'first' }],
+          [['demo'], { label: 'second', extra: true }],
+        ],
+      },
+      output(input):: viaShape(input).demo,
+      expected: {
+        _node: true,
+        n: 1,
+        label: 'second',
+        extra: true,
+      },
+    },
+    {
+      name: 'shape never forces layer bodies (functions survive round-trip)',
+      input:: {
+        nodeSpecs: [
+          [['demo'], { render: function(x) x + 1 }],
+        ],
+      },
+      output(input):: viaShape(input).demo.render(41),
+      expected: 42,
+    },
+  ],
+};
+
 {
   tests: [
     nodeTests,
     graphTests,
+    shapeTests,
   ],
 }

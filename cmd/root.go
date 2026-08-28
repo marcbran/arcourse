@@ -19,6 +19,7 @@ func newRootCmd(plugins []*jpoet.Plugin) *cobra.Command {
 	cmd.PersistentFlags().BoolP("quiet", "q", false, "Suppress progress messages on stderr")
 	cmd.AddCommand(newEvalCmd(plugins))
 	cmd.AddCommand(newQueryCmd(plugins))
+	cmd.AddCommand(newCompileCmd(plugins))
 	cmd.AddCommand(newServeCmd(plugins))
 	cmd.AddCommand(newObserveCmd(plugins))
 	cmd.AddCommand(newAuditCmd(plugins))
