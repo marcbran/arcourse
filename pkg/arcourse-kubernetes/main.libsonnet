@@ -112,8 +112,17 @@ local generate(resources, group, links=[], globalLinkSpecs=[]) =
     if group == '' then '/api/' + resource.version
     else '/apis/' + group + '/' + resource.version;
 
-  local k8sNeatGet(pathExpr) =
-    call(member(member(var('kubernetes'), 'neat'), 'get'), [access(j.Dollar, 'context'), pathExpr]);
+  local k8sNeatGet(pathExpr, fieldsExpr=null) =
+    call(
+      member(member(var('kubernetes'), 'neat'), 'get'),
+      [access(j.Dollar, 'context'), pathExpr] + (if fieldsExpr == null then [] else [fieldsExpr])
+    );
+
+  local k8sGet(pathExpr, fieldsExpr) =
+    call(
+      member(var('kubernetes'), 'get'),
+      [access(j.Dollar, 'context'), pathExpr, fieldsExpr]
+    );
 
   local staticPath(path) = j.String(path);
   local formatPath(fmt, args) = j.Std.format(j.String(fmt), j.Array(args));
@@ -215,20 +224,36 @@ local generate(resources, group, links=[], globalLinkSpecs=[]) =
   local listView(resource) =
     if std.length(std.get(resource, 'columns', [])) > 0 then nodeView('table') else nodeView('list');
 
+  local pathSegments(seg) = if std.objectHas(seg, 'path') then [std.join('.', seg.path)] else [];
+  local linkSpecPaths(linkSpecs) = std.flattenArrays([
+    std.flattenArrays([pathSegments(k) for k in std.get(spec, 'keys', [])]) +
+    std.flattenArrays([pathSegments(v) for v in std.get(spec, 'value', [])])
+    for spec in linkSpecs
+  ]);
+  local columnPaths(resource) =
+    [std.join('.', c.path) for c in std.get(resource, 'columns', []) if std.objectHas(c, 'path')];
+  local fieldsFor(resource, linkSpecs) = std.set(columnPaths(resource) + linkSpecPaths(linkSpecs));
+
   local namespacedAllList(resource) =
-    local data = k8sNeatGet(namespacedAllPath(resource));
+    local linkSpecs = [allNamespacesLinkSpec(resource)];
+    local columnsExpr = resourceColumns(resource);
+    local fieldsExpr = if columnsExpr != null then compactLiteral(fieldsFor(resource, linkSpecs)) else null;
+    local data = if fieldsExpr != null then k8sGet(namespacedAllPath(resource), fieldsExpr) else k8sNeatGet(namespacedAllPath(resource));
     node(
       ['kubernetes', '$context'] + resourcePrefix + [route(resource)],
       listView(resource),
-      listObject(data, [allNamespacesLinkSpec(resource)], resourceColumns(resource))
+      listObject(data, linkSpecs, columnsExpr)
     );
 
   local namespacedList(resource) =
-    local data = k8sNeatGet(namespacedListPath(resource));
+    local linkSpecs = [singleNamespaceLinkSpec(resource)];
+    local columnsExpr = resourceColumns(resource);
+    local fieldsExpr = if columnsExpr != null then compactLiteral(fieldsFor(resource, linkSpecs)) else null;
+    local data = if fieldsExpr != null then k8sGet(namespacedListPath(resource), fieldsExpr) else k8sNeatGet(namespacedListPath(resource));
     node(
       ['kubernetes', '$context', '$namespace'] + resourcePrefix + [route(resource)],
       listView(resource),
-      listObject(data, [singleNamespaceLinkSpec(resource)], resourceColumns(resource))
+      listObject(data, linkSpecs, columnsExpr)
     );
 
   local namespacedDetail(resource) =
@@ -239,11 +264,14 @@ local generate(resources, group, links=[], globalLinkSpecs=[]) =
     );
 
   local clusterList(resource) =
-    local data = k8sNeatGet(clusterListPath(resource));
+    local linkSpecs = [clusterLinkSpec(resource)];
+    local columnsExpr = resourceColumns(resource);
+    local fieldsExpr = if columnsExpr != null then compactLiteral(fieldsFor(resource, linkSpecs)) else null;
+    local data = if fieldsExpr != null then k8sGet(clusterListPath(resource), fieldsExpr) else k8sNeatGet(clusterListPath(resource));
     node(
       ['kubernetes', '$context'] + resourcePrefix + [route(resource)],
       listView(resource),
-      listObject(data, [clusterLinkSpec(resource)], resourceColumns(resource))
+      listObject(data, linkSpecs, columnsExpr)
     );
 
   local clusterDetail(resource) =
