@@ -77,7 +77,7 @@ func benchPodsData(n int) string {
 	return b.String()
 }
 
-func newBenchFacade(b *testing.B, evaluateDir string) pkg.Facade {
+func newBenchFacade(b *testing.B, evaluateDir string, warm bool) pkg.Facade {
 	b.Helper()
 	pkgDir, err := filepath.Abs("../pkg")
 	if err != nil {
@@ -87,39 +87,48 @@ func newBenchFacade(b *testing.B, evaluateDir string) pkg.Facade {
 	lastQuery := broadcast.NewLastQuery()
 	auditRepo := jsonfileinfra.NewAuditRepo(b.TempDir())
 	cfg := arcourse.Config{
-		Evaluate: arcourse.EvaluateConfig{Dir: evaluateDir},
-		Audit:    arcourse.AuditConfig{Formats: nil},
+		Root:  arcourse.RootConfig{Dir: evaluateDir, Mode: arcourse.ModeCompiledGraph},
+		Audit: arcourse.AuditConfig{Formats: nil},
 	}
-	return arcourse.NewFacade(cfg, evaluator, lastQuery, auditRepo)
-}
-
-func BenchmarkQueryPodsTable(b *testing.B) {
-	evaluateDir := b.TempDir()
-	err := os.WriteFile(filepath.Join(evaluateDir, "graph.jsonnet"), []byte(benchGraphTemplate), 0o600)
-	if err != nil {
-		b.Fatal(err)
-	}
-	facade := newBenchFacade(b, evaluateDir)
-
-	sizes := []int{100, 1000, 3000}
-	formats := []pkg.Format{pkg.FormatJSON, pkg.FormatHTML}
-
-	for _, n := range sizes {
-		err := os.WriteFile(filepath.Join(evaluateDir, "data.jsonnet"), []byte(benchPodsData(n)), 0o600)
+	facade := arcourse.NewFacade(cfg, evaluator, lastQuery, auditRepo)
+	if warm {
+		err := facade.Warm(context.Background())
 		if err != nil {
 			b.Fatal(err)
 		}
-		for _, format := range formats {
-			b.Run(fmt.Sprintf("n=%d/format=%s", n, format), func(b *testing.B) {
-				ctx := context.Background()
-				b.ResetTimer()
-				for i := 0; i < b.N; i++ {
-					_, err := facade.Query(ctx, "root/kubernetes/context/demo/pods", nil, format)
-					if err != nil {
-						b.Fatal(err)
+	}
+	return facade
+}
+
+func BenchmarkQueryPodsTable(b *testing.B) {
+	sizes := []int{100, 1000, 3000}
+	formats := []pkg.Format{pkg.FormatJSON, pkg.FormatHTML}
+
+	for _, warm := range []bool{false, true} {
+		evaluateDir := b.TempDir()
+		err := os.WriteFile(filepath.Join(evaluateDir, "root.jsonnet"), []byte(benchGraphTemplate), 0o600)
+		if err != nil {
+			b.Fatal(err)
+		}
+		facade := newBenchFacade(b, evaluateDir, warm)
+
+		for _, n := range sizes {
+			err := os.WriteFile(filepath.Join(evaluateDir, "data.jsonnet"), []byte(benchPodsData(n)), 0o600)
+			if err != nil {
+				b.Fatal(err)
+			}
+			for _, format := range formats {
+				b.Run(fmt.Sprintf("warm=%t/n=%d/format=%s", warm, n, format), func(b *testing.B) {
+					ctx := context.Background()
+					b.ResetTimer()
+					for i := 0; i < b.N; i++ {
+						_, err := facade.Query(ctx, "root/kubernetes/context/demo/pods", nil, format)
+						if err != nil {
+							b.Fatal(err)
+						}
 					}
-				}
-			})
+				})
+			}
 		}
 	}
 }

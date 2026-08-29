@@ -32,48 +32,64 @@ local node(path, body={}) =
   } +
   mergeLayers(layers);
 
-local compile(ls) =
-  local firstSegments(ls) =
-    std.set([l.path[0] for l in ls if std.length(l.path) > 0], function(k) k);
-  {
-    leafs:: [l for l in ls if std.length(l.path) == 0],
-    children:: {
-      [k]: compile([
-        l { path: std.slice(l.path, 1, null, 1) }
-        for l in ls
-        if std.length(l.path) > 0 && l.path[0] == k
-      ])
-      for k in firstSegments(ls)
-    },
-  };
-
-local graph(nodeSpecs, defaultView={}) =
-  local layers = std.flatMap(
+local toLayers(nodeSpecs) =
+  std.flatMap(
     function(spec)
       local bodies = std.slice(spec, 1, null, 1);
       local effective = if std.length(bodies) == 0 then [{}] else bodies;
       [{ path: spec[0], fullPath: spec[0], layer: b } for b in effective],
     nodeSpecs,
   );
-  local compiled = compile(layers);
+
+local shape(layers) =
+  local build(ls) =
+    local firstSegments(ls) =
+      std.set([l.path[0] for l in ls if std.length(l.path) > 0], function(k) k);
+    {
+      leafs: [l.index for l in ls if std.length(l.path) == 0],
+      children: {
+        [k]: build([
+          l { path: std.slice(l.path, 1, null, 1) }
+          for l in ls
+          if std.length(l.path) > 0 && l.path[0] == k
+        ])
+        for k in firstSegments(ls)
+      },
+    };
+  build([{ path: layers[i].path, index: i } for i in std.range(0, std.length(layers) - 1)]);
+
+local instantiateFromShape(shapeNode, layers, defaultView={}, vars={}) =
   local withDefaultView(obj) =
     if std.objectHasAll(obj, '_view') then obj else obj + defaultView;
-  local instantiate(compiledNode, vars={}) =
-    local leafs = compiledNode.leafs;
-    local children = {
-      [if isVar(k) then varNameOf(k) else k]:
-        if isVar(k) then
-          local vName = varNameOf(k);
-          function(val) instantiate(compiledNode.children[k], vars + { [vName]: val })
-        else
-          instantiate(compiledNode.children[k], vars)
-      for k in std.objectFields(compiledNode.children)
-    };
-    if std.length(leafs) == 0 then withDefaultView(children)
-    else withDefaultView(node(leafs[0].fullPath, [l.layer for l in leafs]) + vars + children);
-  withDefaultView(node([]) + instantiate(compiled));
+  local leafs = [layers[i] for i in shapeNode.leafs];
+  local children = {
+    [if isVar(k) then varNameOf(k) else k]:
+      if isVar(k) then
+        local vName = varNameOf(k);
+        function(val) instantiateFromShape(shapeNode.children[k], layers, defaultView, vars + { [vName]: val })
+      else
+        instantiateFromShape(shapeNode.children[k], layers, defaultView, vars)
+    for k in std.objectFields(shapeNode.children)
+  };
+  if std.length(leafs) == 0 then withDefaultView(children)
+  else withDefaultView(node(leafs[0].fullPath, [l.layer for l in leafs]) + vars + children);
+
+local rootFromShape(layers, compiledShape, defaultView={}) =
+  local withDefaultView(obj) =
+    if std.objectHasAll(obj, '_view') then obj else obj + defaultView;
+  withDefaultView(node([]) + instantiateFromShape(compiledShape, layers, defaultView));
+
+local graphFromShape(nodeSpecs, compiledShape, defaultView={}) =
+  rootFromShape(toLayers(nodeSpecs), compiledShape, defaultView);
+
+local graph(nodeSpecs, defaultView={}) =
+  local layers = toLayers(nodeSpecs);
+  rootFromShape(layers, shape(layers), defaultView);
 
 {
   node: node,
   graph: graph,
+  toLayers: toLayers,
+  shape: shape,
+  graphFromShape: graphFromShape,
 }

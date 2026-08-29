@@ -14,18 +14,19 @@ type QueryConfig struct {
 	AuditFormats []pkg.Format `json:"auditFormats"`
 }
 
-type Query struct {
+type query struct {
 	cfg         QueryConfig
-	evaluate    *Evaluate
+	evaluator   Evaluator
+	root        *root
 	lastQuery   LastQuery
-	appendAudit *AppendAudit
+	appendAudit *appendAudit
 }
 
-func NewQuery(cfg QueryConfig, evaluate *Evaluate, lastQuery LastQuery, appendAudit *AppendAudit) *Query {
-	return &Query{cfg: cfg, evaluate: evaluate, lastQuery: lastQuery, appendAudit: appendAudit}
+func newQuery(cfg QueryConfig, evaluator Evaluator, root *root, lastQuery LastQuery, appendAudit *appendAudit) *query {
+	return &query{cfg: cfg, evaluator: evaluator, root: root, lastQuery: lastQuery, appendAudit: appendAudit}
 }
 
-func (uc *Query) Exec(ctx context.Context, path string, params map[string]any, format pkg.Format) (pkg.Result, error) {
+func (uc *query) Exec(ctx context.Context, path string, params map[string]any, format pkg.Format) (pkg.Result, error) {
 	err := ctx.Err()
 	if err != nil {
 		return pkg.Result{}, err
@@ -60,7 +61,11 @@ func (uc *Query) Exec(ctx context.Context, path string, params map[string]any, f
 		string(formatsJSON),
 	)
 
-	result, err := uc.evaluate.exec(ctx, expression)
+	rootSnippet, err := uc.root.Snippet(ctx)
+	if err != nil {
+		return pkg.Result{}, err
+	}
+	result, err := runExpression(ctx, uc.evaluator, rootSnippet, expression)
 	if err != nil {
 		return pkg.Result{}, err
 	}

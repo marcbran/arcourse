@@ -39,6 +39,11 @@ func NewServer(facade pkg.Facade) *Server {
 }
 
 func Serve(ctx context.Context, facade pkg.Facade, cfg archttp.Config) error {
+	err := facade.Warm(ctx)
+	if err != nil {
+		return err
+	}
+
 	listeners, err := listen(cfg)
 	if err != nil {
 		return err

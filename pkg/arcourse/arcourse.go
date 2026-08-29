@@ -8,9 +8,10 @@ import (
 )
 
 var (
-	ErrGraphEntryNotFound = errors.New("neither graph.jsonnet nor root.jsonnet found in evaluate dir")
+	ErrGraphEntryNotFound = errors.New("root.jsonnet not found in evaluate dir")
 	ErrEvaluateDirNotSet  = errors.New("evaluate dir not set")
 	ErrAuditEntryNotFound = errors.New("audit entry not found")
+	ErrShapeNotSupported  = errors.New("compiling a root shape requires immediateGraph or compiledGraph mode (root.jsonnet must be a node-spec list, not a finished value)")
 )
 
 type Format string
@@ -50,4 +51,6 @@ type Facade interface {
 	Observe(ctx context.Context, format Format) (<-chan Result, func())
 	ListAudit(ctx context.Context) ([]AuditEntry, error)
 	GetAudit(ctx context.Context, id string) (AuditEntry, error)
+	Compile(ctx context.Context) (Result, error)
+	Warm(ctx context.Context) error
 }

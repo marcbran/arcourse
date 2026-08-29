@@ -20,6 +20,7 @@ import (
 	"time"
 
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
+	"sigs.k8s.io/yaml"
 )
 
 type CLIFacade struct {
@@ -49,7 +50,7 @@ func NewLocalCLIFacadeWithPath(binaryPath, homeDir string) (*CLIFacade, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to access ARCO_BINARY %q: %w", binaryPath, err)
 	}
-	config := "mode: local\nevaluate: {}\n"
+	config := "mode: local\nroot: {}\n"
 	err = os.WriteFile(filepath.Join(homeDir, "config.yaml"), []byte(config), 0o600)
 	if err != nil {
 		return nil, err
@@ -63,7 +64,7 @@ func NewTCPClientCLIFacade(t *testing.T, binaryPath, serverHome string) (*Server
 		return nil, err
 	}
 	clientHome := t.TempDir()
-	err = writeConfig(serverHome, fmt.Sprintf("mode: local\nhttp:\n  hostname: localhost\n  port: %q\nevaluate: {}\n", port))
+	err = writeConfig(serverHome, fmt.Sprintf("mode: local\nhttp:\n  hostname: localhost\n  port: %q\nroot: {}\n", port))
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +83,7 @@ func NewUnixClientCLIFacade(t *testing.T, binaryPath, serverHome string) (*Serve
 		return nil, err
 	}
 	clientHome := t.TempDir()
-	err = writeConfig(serverHome, fmt.Sprintf("mode: local\nhttp:\n  hostname: localhost\n  port: %q\n  unixSocket: %q\nevaluate: {}\n", "0", socketPath))
+	err = writeConfig(serverHome, fmt.Sprintf("mode: local\nhttp:\n  hostname: localhost\n  port: %q\n  unixSocket: %q\nroot: {}\n", "0", socketPath))
 	if err != nil {
 		return nil, err
 	}
@@ -160,6 +161,22 @@ func (f *ServerBackedCLIFacade) GetAudit(ctx context.Context, id string) (pkg.Au
 	return f.client.GetAudit(ctx, id)
 }
 
+func (f *ServerBackedCLIFacade) Compile(ctx context.Context) (pkg.Result, error) {
+	err := f.start()
+	if err != nil {
+		return pkg.Result{}, err
+	}
+	return f.client.Compile(ctx)
+}
+
+func (f *ServerBackedCLIFacade) Warm(ctx context.Context) error {
+	err := f.start()
+	if err != nil {
+		return err
+	}
+	return f.client.Warm(ctx)
+}
+
 func (f *ServerBackedCLIFacade) start() error {
 	f.startOnce.Do(func() {
 		f.startErr = f.startServer()
@@ -202,6 +219,30 @@ func (f *ServerBackedCLIFacade) stop() {
 
 func writeConfig(home string, content string) error {
 	return os.WriteFile(filepath.Join(home, "config.yaml"), []byte(content), 0o600)
+}
+
+func mergeRootMode(home string, mode string) error {
+	configPath := filepath.Join(home, "config.yaml")
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return err
+	}
+	var cfg map[string]any
+	err = yaml.Unmarshal(data, &cfg)
+	if err != nil {
+		return err
+	}
+	root, _ := cfg["root"].(map[string]any)
+	if root == nil {
+		root = map[string]any{}
+	}
+	root["mode"] = mode
+	cfg["root"] = root
+	out, err := yaml.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(configPath, out, 0o600)
 }
 
 func freePort() (string, error) {
@@ -392,6 +433,30 @@ func (f *CLIFacade) GetAudit(ctx context.Context, id string) (pkg.AuditEntry, er
 		return pkg.AuditEntry{}, err
 	}
 	return entry, nil
+}
+
+func (f *CLIFacade) Compile(ctx context.Context) (pkg.Result, error) {
+	cmd := exec.CommandContext(ctx, f.binaryPath, "compile")
+	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		if stderr.String() != "" {
+			return pkg.Result{}, errors.New(stderr.String())
+		}
+		return pkg.Result{}, err
+	}
+
+	return pkg.Result{Output: strings.TrimSuffix(stdout.String(), "\n")}, nil
+}
+
+func (f *CLIFacade) Warm(ctx context.Context) error {
+	return nil
 }
 
 func appendParamArgs(args []string, params map[string]any) []string {
