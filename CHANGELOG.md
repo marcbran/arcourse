@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.14.0](https://github.com/marcbran/arcourse/compare/v0.13.1...v0.14.0) (2026-08-30)
+
+
+### Features
+
+* compiled graph for better performance ([#93](https://github.com/marcbran/arcourse/issues/93)) ([2754f00](https://github.com/marcbran/arcourse/commit/2754f00a396e6a25ab7a727528e845143e673a76))
+* improved performance with persistent environment ([#95](https://github.com/marcbran/arcourse/issues/95)) ([7067b04](https://github.com/marcbran/arcourse/commit/7067b0444b194fae7523ac929eaf4edc34c9fc93))
+* links from kubernetes resources ([#91](https://github.com/marcbran/arcourse/issues/91)) ([4cf6fb1](https://github.com/marcbran/arcourse/commit/4cf6fb1c01fdc40464623574daeab63b5a5859a7))
+* use kubernetes projection ([#94](https://github.com/marcbran/arcourse/issues/94)) ([5a2275f](https://github.com/marcbran/arcourse/commit/5a2275f44d9e17d8714fdcffbf05b8dda2c88e2b))
+
 ## [0.13.1](https://github.com/marcbran/arcourse/compare/v0.13.0...v0.13.1) (2026-08-26)
 
 
