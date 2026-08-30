@@ -9,7 +9,8 @@ local collectNeighbors(obj, textPrefix='', exclude=[]) =
       else
         local value = obj[k];
         local textPath = if textPrefix == '' then k else '%s/%s' % [textPrefix, k];
-        if std.type(value) != 'object' then []
+        if std.type(value) == 'string' then [{ link: value, text: textPath, external: true }]
+        else if std.type(value) != 'object' then []
         else
           if std.objectHas(value, '_node') && std.objectHasAll(value, '_queryPath') then
             [{ link: value._queryPath, text: textPath }]
@@ -34,7 +35,11 @@ local linksItems(obj) =
   local links = std.get(obj, 'links', {});
   if std.type(links) != 'object' then []
   else std.flatMap(
-    function(k) if isNode(links[k]) then [{ link: links[k]._queryPath, text: k }] else [],
+    function(k)
+      local value = links[k];
+      if isNode(value) then [{ link: value._queryPath, text: k }]
+      else if std.type(value) == 'string' then [{ link: value, text: k, external: true }]
+      else [],
     std.objectFields(links)
   );
 

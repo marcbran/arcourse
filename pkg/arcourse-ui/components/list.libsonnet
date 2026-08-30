@@ -30,7 +30,11 @@ local itemList = {
         element: 'li',
         children: [{
           element: 'a',
-          attributes: { href: item.link },
+          attributes: { href: item.link } + (
+            if std.get(item, 'external', false)
+            then { target: '_blank', rel: 'noopener noreferrer' }
+            else {}
+          ),
           children: [item.text],
         }],
       }
