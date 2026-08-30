@@ -16,14 +16,13 @@ type QueryConfig struct {
 
 type query struct {
 	cfg         QueryConfig
-	evaluator   Evaluator
-	root        *root
+	environment *environment
 	lastQuery   LastQuery
 	appendAudit *appendAudit
 }
 
-func newQuery(cfg QueryConfig, evaluator Evaluator, root *root, lastQuery LastQuery, appendAudit *appendAudit) *query {
-	return &query{cfg: cfg, evaluator: evaluator, root: root, lastQuery: lastQuery, appendAudit: appendAudit}
+func newQuery(cfg QueryConfig, environment *environment, lastQuery LastQuery, appendAudit *appendAudit) *query {
+	return &query{cfg: cfg, environment: environment, lastQuery: lastQuery, appendAudit: appendAudit}
 }
 
 func (uc *query) Exec(ctx context.Context, path string, params map[string]any, format pkg.Format) (pkg.Result, error) {
@@ -61,17 +60,13 @@ func (uc *query) Exec(ctx context.Context, path string, params map[string]any, f
 		string(formatsJSON),
 	)
 
-	rootSnippet, err := uc.root.Snippet(ctx)
-	if err != nil {
-		return pkg.Result{}, err
-	}
-	result, err := runExpression(ctx, uc.evaluator, rootSnippet, expression)
+	out, err := uc.environment.Evaluate(ctx, expression)
 	if err != nil {
 		return pkg.Result{}, err
 	}
 
 	var raw map[string]json.RawMessage
-	err = json.Unmarshal([]byte(result.Output), &raw)
+	err = json.Unmarshal([]byte(out), &raw)
 	if err != nil {
 		return pkg.Result{}, err
 	}

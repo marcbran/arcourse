@@ -29,14 +29,15 @@ type facade struct {
 func NewFacade(cfg Config, evaluator Evaluator, lastQuery LastQuery, auditRepo AuditRepo) pkg.Facade {
 	compile := newCompile(cfg.Root, evaluator)
 	root := newRoot(cfg.Root, compile)
-	evaluate := newEvaluate(evaluator, root)
+	environment := newEnvironment(cfg.Root, root, evaluator)
+	evaluate := newEvaluate(environment)
 	appendAudit := newAppendAudit(auditRepo)
 	queryCfg := QueryConfig{AuditFormats: cfg.Audit.Formats}
-	query := newQuery(queryCfg, evaluator, root, lastQuery, appendAudit)
+	query := newQuery(queryCfg, environment, lastQuery, appendAudit)
 	observe := newObserve(lastQuery)
 	listAudit := newListAudit(auditRepo)
 	getAudit := newGetAudit(auditRepo)
-	warm := newWarm(root)
+	warm := newWarm(environment)
 	return &facade{
 		evaluate:  evaluate,
 		query:     query,
