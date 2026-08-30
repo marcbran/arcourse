@@ -375,6 +375,146 @@ local pagerduty = { const: 'pagerduty' };
       },
     },
     {
+      name: 'a literal spec builds a URL from scheme and host segments, root is never forced',
+      input:: function()
+        local node = {
+          data: { host: 'my-app.example.com' },
+        };
+        linkspecs.buildLinks(node, [
+          {
+            at: [],
+            keys: [{ const: 'externalLink' }],
+            value: { scheme: 'https', host: [{ path: ['host'] }] },
+          },
+        ]),
+      expected: {
+        externalLink: 'https://my-app.example.com',
+      },
+    },
+    {
+      name: 'a literal spec reads an origin segment into the query string, not from item data',
+      input:: function()
+        local node = {
+          cluster: 'eu-west',
+          data: { host: 'my-app.example.com' },
+        };
+        linkspecs.buildLinks(node, [
+          {
+            at: [],
+            keys: [{ const: 'externalLink' }],
+            value: {
+              scheme: 'https',
+              host: [{ path: ['host'] }],
+              query: { cluster: [{ origin: 'cluster' }] },
+            },
+          },
+        ]),
+      expected: {
+        externalLink: 'https://my-app.example.com?cluster=eu-west',
+      },
+    },
+    {
+      name: 'a literal spec crossing an array yields one URL per item, keyed like any other spec',
+      input:: function()
+        local node = {
+          data: {
+            rules: [{ host: 'a.example.com' }, { host: 'b.example.com' }],
+          },
+        };
+        linkspecs.buildLinks(node, [
+          {
+            at: ['rules'],
+            keys: [{ const: 'ingress' }, { path: ['host'] }],
+            value: { scheme: 'https', host: [{ path: ['host'] }] },
+          },
+        ]),
+      expected: {
+        ingress: {
+          'a.example.com': 'https://a.example.com',
+          'b.example.com': 'https://b.example.com',
+        },
+      },
+    },
+    {
+      name: 'a literal spec percent-encodes path segments, unlike host and query which pass through the raw value',
+      input:: function()
+        local node = {
+          data: { section: 'a b/c' },
+        };
+        linkspecs.buildLinks(node, [
+          {
+            at: [],
+            keys: [{ const: 'externalLink' }],
+            value: {
+              scheme: 'https',
+              host: [{ const: 'docs.example.com' }],
+              path: [{ path: ['section'] }],
+            },
+          },
+        ]),
+      expected: {
+        externalLink: 'https://docs.example.com/a%20b%2Fc',
+      },
+    },
+    {
+      name: 'a URL link opens in a new tab with rel=noopener, unlike a node-backed link',
+      input:: function()
+        local c = import './components/main.libsonnet';
+        local l = c.list {
+          items:: [
+            { link: 'https://docs.example.com/x', text: 'externalLink', external: true },
+            { link: 'kubernetes/ctx/ns', text: 'internalLink' },
+          ],
+        };
+        local anchors = l.html[1].children[0].children[0].html.children;
+        [
+          {
+            href: li.children[0].attributes.href,
+            target: std.get(li.children[0].attributes, 'target', null),
+            rel: std.get(li.children[0].attributes, 'rel', null),
+          }
+          for li in anchors
+        ],
+      expected: [
+        { href: 'https://docs.example.com/x', target: '_blank', rel: 'noopener noreferrer' },
+        { href: 'kubernetes/ctx/ns', target: null, rel: null },
+      ],
+    },
+    {
+      name: 'a top-level URL link renders as an item alongside node-backed links',
+      input:: function()
+        local node = a.resource.node {
+          data: { id: 'x' },
+          linkSpecs:: [
+            {
+              at: [],
+              keys: [{ const: 'externalLink' }],
+              value: { scheme: 'https', host: [{ const: 'docs.example.com' }], path: [{ const: 'x' }] },
+            },
+          ],
+        };
+        [{ link: i.link, text: i.text } for i in node._view.fragment.items],
+      expected: [{ link: 'https://docs.example.com/x', text: 'externalLink' }],
+    },
+    {
+      name: 'a grouped URL link renders under its titled group alongside node-backed groups',
+      input:: function()
+        local node = a.resource.node {
+          data: { rules: [{ host: 'a.example.com' }] },
+          linkSpecs:: [
+            {
+              at: ['rules'],
+              keys: [{ const: 'ingress' }, { path: ['host'] }],
+              value: { scheme: 'https', host: [{ path: ['host'] }] },
+            },
+          ],
+        };
+        [{ title: g.title, items: [{ link: i.link, text: i.text } for i in g.items] } for g in node._view.fragment.groups],
+      expected: [
+        { title: 'ingress', items: [{ link: 'https://a.example.com', text: 'a.example.com' }] },
+      ],
+    },
+    {
       name: 'withLinkSpecs merged standalone defaults to no links without forcing root',
       input:: function()
         local node = linkspecs.withLinkSpecs { data: { id: 'x' } };
