@@ -8,6 +8,12 @@ test-race:
 test-jsonnet:
     jpoet test .
 
+build-push-all-pkgs:
+    for dir in pkg/*/; do \
+        [ -f "$dir/main.libsonnet" ] || continue; \
+        rm -rf "$dir/build" && jpoet pkg build "$dir" && jpoet pkg push "$dir" || exit 1; \
+    done
+
 test-node:
     node --test
 
