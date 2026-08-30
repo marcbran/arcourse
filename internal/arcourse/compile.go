@@ -43,7 +43,7 @@ func (c *compile) Exec(ctx context.Context) (pkg.Result, error) {
 
 	slash := filepath.ToSlash(entryPath)
 	shapeSnippet := fmt.Sprintf(`local root = import 'root'; (import 'lib/compile_graph.libsonnet')(import %q)`, slash)
-	shapeJSON, err := c.evaluator.EvaluateSnippet(shapeSnippet, map[string]string{"root": immediateGraphSnippet(entryPath)})
+	shapeJSON, err := c.evaluator.EvaluateOnce(map[string]string{"root": immediateGraphSnippet(entryPath)}, shapeSnippet)
 	if err != nil {
 		return pkg.Result{}, err
 	}

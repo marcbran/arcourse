@@ -2,6 +2,9 @@
 test-go:
     go test -v -cover -timeout=120s -parallel=10 ./...
 
+test-race:
+    go test -v -race -timeout=120s ./...
+
 test-jsonnet:
     jpoet test .
 
@@ -32,4 +35,4 @@ test-e2e-facade facade:
 bench:
     go test -tags e2e -bench=. -benchmem -run=^$ ./tests/...
 
-ci: lint test build test-e2e
+ci: lint test test-race build test-e2e
