@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.15.0](https://github.com/marcbran/arcourse/compare/v0.14.0...v0.15.0) (2026-09-05)
+
+
+### Features
+
+* external links ([#97](https://github.com/marcbran/arcourse/issues/97)) ([7b4534f](https://github.com/marcbran/arcourse/commit/7b4534f506e942d46dfe58ea8f4c09d7a7601932))
+* watch support ([#100](https://github.com/marcbran/arcourse/issues/100)) ([7dc77b1](https://github.com/marcbran/arcourse/commit/7dc77b1f4065508a0ecf03d63e6d64d9cda03a99))
+
 ## [0.14.0](https://github.com/marcbran/arcourse/compare/v0.13.1...v0.14.0) (2026-08-30)
 
 
