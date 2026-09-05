@@ -1,3 +1,4 @@
 /arco
 /.gocache
 build
+/examples/plugin-binary/plugin-binary

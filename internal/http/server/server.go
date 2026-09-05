@@ -28,6 +28,7 @@ func NewServer(facade pkg.Facade) *Server {
 	s.mux.HandleFunc("POST /api/query", s.handleQuery)
 	s.mux.HandleFunc("GET /api/audit", s.handleListAudit)
 	s.mux.HandleFunc("GET /api/audit/{id}", s.handleGetAudit)
+	s.mux.HandleFunc("GET /api/watch", s.handleWatch)
 	s.mux.HandleFunc("GET /observe", s.handleObserve)
 	s.mux.HandleFunc("GET /observe/", redirectTo("/observe"))
 	s.mux.HandleFunc("GET /observe/stream", s.handleObserveStream)
