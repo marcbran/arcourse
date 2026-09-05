@@ -15,6 +15,7 @@ func newCompileCmd(plugins []*jpoet.Plugin) *cobra.Command {
 		RunE: func(c *cobra.Command, args []string) error {
 			c.SilenceUsage = true
 			c.SilenceErrors = true
+			defer closePlugins(plugins)
 
 			cfg, err := loadConfig()
 			if err != nil {

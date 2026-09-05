@@ -34,57 +34,25 @@ func (uc *query) Exec(ctx context.Context, path string, params map[string]any, f
 	observed := uc.lastQuery.ObservedFormats()
 	formats := mergeFormats(format, observed, uc.cfg.AuditFormats)
 
-	path, queryParams, err := splitPathAndQuery(path)
+	queryPath, segments, paramsJSON, key, err := queryParts(path, params, format)
 	if err != nil {
 		return pkg.Result{}, err
 	}
 
-	parts := strings.Split(strings.Trim(path, "/"), "/")
-	segments := parts[1:]
-	pathJSON, err := json.Marshal(segments)
-	if err != nil {
-		return pkg.Result{}, err
-	}
-	paramsJSON, err := json.Marshal(mergeParams(queryParams, params))
-	if err != nil {
-		return pkg.Result{}, err
-	}
-	formatsJSON, err := json.Marshal(formats)
-	if err != nil {
-		return pkg.Result{}, err
-	}
-	expression := fmt.Sprintf(
-		"(import 'lib/query.libsonnet')(root, %s, %s, %s)",
-		string(pathJSON),
-		string(paramsJSON),
-		string(formatsJSON),
-	)
-
-	out, err := uc.environment.Evaluate(ctx, expression)
+	expression, err := buildExpression(segments, paramsJSON, formats)
 	if err != nil {
 		return pkg.Result{}, err
 	}
 
-	var raw map[string]json.RawMessage
-	err = json.Unmarshal([]byte(out), &raw)
+	out, _, unregister, err := uc.environment.Watch(ctx, key, expression)
 	if err != nil {
 		return pkg.Result{}, err
 	}
+	unregister()
 
-	decoded := make(map[pkg.Format]string, len(raw))
-	for _, f := range formats {
-		rawValue, ok := raw[string(f)]
-		if !ok {
-			if f == format {
-				return pkg.Result{}, fmt.Errorf("node has no %s view", f)
-			}
-			continue
-		}
-		value, err := decodeField(f, rawValue)
-		if err != nil {
-			return pkg.Result{}, err
-		}
-		decoded[f] = value
+	decoded, err := decodeOutput(out, formats, format)
+	if err != nil {
+		return pkg.Result{}, err
 	}
 
 	for _, f := range observed {
@@ -104,7 +72,7 @@ func (uc *query) Exec(ctx context.Context, path string, params map[string]any, f
 			}
 			results[f] = pkg.Result{Output: value}
 		}
-		uc.appendAudit.Exec(ctx, path, results)
+		uc.appendAudit.Exec(ctx, queryPath, results)
 	}
 
 	return pkg.Result{Output: decoded[format]}, nil
@@ -145,6 +113,39 @@ func splitPathAndQuery(path string) (string, map[string]any, error) {
 	return base, params, nil
 }
 
+func queryParts(path string, params map[string]any, format pkg.Format) (queryPath string, segments []string, paramsJSON string, key string, err error) {
+	queryPath, queryParams, err := splitPathAndQuery(path)
+	if err != nil {
+		return "", nil, "", "", err
+	}
+	parts := strings.Split(strings.Trim(queryPath, "/"), "/")
+	segments = parts[1:]
+	paramsBytes, err := json.Marshal(mergeParams(queryParams, params))
+	if err != nil {
+		return "", nil, "", "", err
+	}
+	paramsJSON = string(paramsBytes)
+	key = queryPath + "|" + paramsJSON + "|" + string(format)
+	return queryPath, segments, paramsJSON, key, nil
+}
+
+func buildExpression(segments []string, paramsJSON string, formats []pkg.Format) (string, error) {
+	pathJSON, err := json.Marshal(segments)
+	if err != nil {
+		return "", err
+	}
+	formatsJSON, err := json.Marshal(formats)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf(
+		"(import 'lib/query.libsonnet')(root, %s, %s, %s)",
+		string(pathJSON),
+		paramsJSON,
+		string(formatsJSON),
+	), nil
+}
+
 func mergeParams(base map[string]any, overrides map[string]any) map[string]any {
 	merged := make(map[string]any, len(base)+len(overrides))
 	for k, v := range base {
@@ -154,6 +155,30 @@ func mergeParams(base map[string]any, overrides map[string]any) map[string]any {
 		merged[k] = v
 	}
 	return merged
+}
+
+func decodeOutput(out string, formats []pkg.Format, primary pkg.Format) (map[pkg.Format]string, error) {
+	var raw map[string]json.RawMessage
+	err := json.Unmarshal([]byte(out), &raw)
+	if err != nil {
+		return nil, err
+	}
+	decoded := make(map[pkg.Format]string, len(raw))
+	for _, f := range formats {
+		rawValue, ok := raw[string(f)]
+		if !ok {
+			if f == primary {
+				return nil, fmt.Errorf("node has no %s view", f)
+			}
+			continue
+		}
+		value, err := decodeField(f, rawValue)
+		if err != nil {
+			return nil, err
+		}
+		decoded[f] = value
+	}
+	return decoded, nil
 }
 
 func decodeField(format pkg.Format, raw json.RawMessage) (string, error) {

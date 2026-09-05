@@ -1,12 +1,23 @@
 package server
 
 import (
+	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
+
+const browseTemplate = `<div id="node">%s</div>
+<script>
+  new EventSource(%s).onmessage = e => {
+    document.getElementById('node').innerHTML = JSON.parse(e.data).output;
+  };
+</script>
+`
 
 func (s *Server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimRight(r.PathValue("path"), "/")
@@ -27,10 +38,28 @@ func (s *Server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 		returnError(w, err)
 		return
 	}
+	watchURL, err := browseWatchURL(path, params)
+	if err != nil {
+		returnError(w, err)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	_, err = w.Write([]byte(result.Output))
+	_, err = fmt.Fprintf(w, browseTemplate, result.Output, watchURL)
 	if err != nil {
 		slog.Warn("write browse response", "err", err)
 	}
+}
+
+func browseWatchURL(path string, params map[string]any) ([]byte, error) {
+	paramsJSON, err := json.Marshal(params)
+	if err != nil {
+		return nil, err
+	}
+	values := url.Values{
+		"path":   {path},
+		"format": {string(pkg.FormatHTML)},
+		"params": {string(paramsJSON)},
+	}
+	return json.Marshal("/api/watch?" + values.Encode())
 }

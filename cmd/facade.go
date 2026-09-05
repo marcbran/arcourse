@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,6 +35,15 @@ func buildLocalFacade(cfg Config, plugins []*jpoet.Plugin) pkg.Facade {
 	lastQuery := broadcast.NewLastQuery()
 	auditRepo := jsonfileinfra.NewAuditRepo(cfg.Audit.Dir)
 	return arcourse.NewFacade(cfg.Config, evaluator, lastQuery, auditRepo)
+}
+
+func closePlugins(plugins []*jpoet.Plugin) {
+	for _, p := range plugins {
+		err := p.Close()
+		if err != nil {
+			slog.Warn("close plugin", "err", err)
+		}
+	}
 }
 
 type Config struct {

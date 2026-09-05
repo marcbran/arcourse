@@ -17,6 +17,7 @@ func newEvalCmd(plugins []*jpoet.Plugin) *cobra.Command {
 		RunE: func(c *cobra.Command, args []string) error {
 			c.SilenceUsage = true
 			c.SilenceErrors = true
+			defer closePlugins(plugins)
 
 			format, err := c.Flags().GetString("format")
 			if err != nil {
