@@ -1,13 +1,6 @@
 local a = import '../arcourse-echarts/main.libsonnet';
 local ui = import '../arcourse-ui/main.libsonnet';
 local time = import 'time/main.libsonnet';
-local root = import 'root';
-
-local request(input) = std.native('invoke:grafana')('request', [input]).body;
-
-local refId(i) = std.char(std.codepoint('A') + i);
-
-local queryDefaults = { instant: false, range: !self.instant };
 
 local resolveTime(nowMs, value) =
   if value == 'now' then std.toString(nowMs)
@@ -16,54 +9,20 @@ local resolveTime(nowMs, value) =
   else
     std.toString(time.parseRFC3339(value));
 
-local query(datasource, queries, from='now-1h', to='now') =
+local query(datasource, items, from='now-1h', to='now') =
   local nowMs = time.now();
-  local reqQueries = [
-    queryDefaults + queries[i] { refId: refId(i) }
-    for i in std.range(0, std.length(queries) - 1)
-  ];
-  request({
-    method: 'POST',
-    path: '/api/ds/query',
-    readonly: true,
-    context: { datasource: datasource },
-    body: { queries: reqQueries, from: resolveTime(nowMs, from), to: resolveTime(nowMs, to) },
-  });
-
-local seriesName(frame) =
-  std.get(frame.schema.fields[1].config, 'displayNameFromDS', frame.schema.refId);
-
-local hasSeries(frame) = std.length(frame.schema.fields) > 1;
+  local resolvedFrom = resolveTime(nowMs, from);
+  local resolvedTo = resolveTime(nowMs, to);
+  std.native('invoke:telemetry')('query', [[
+    item { datasource: datasource, from: resolvedFrom, to: resolvedTo }
+    for item in items
+  ]]);
 
 local round(v, decimals) =
   if v == null || decimals == null then v
   else
     local factor = std.pow(10, decimals);
     std.round(v * factor) / factor;
-
-local seriesFromFrames(frames, type, decimals) = [
-  {
-    name: seriesName(frame),
-    type: type,
-    showSymbol: true,
-    symbolSize: 16,
-    itemStyle: { opacity: 0 },
-    data: [
-      [frame.data.values[0][j], round(frame.data.values[1][j], decimals)]
-      for j in std.range(0, std.length(frame.data.values[0]) - 1)
-    ],
-  }
-  for frame in frames
-  if hasSeries(frame)
-];
-
-local linksFromFrames(frames, linkFn) =
-  if linkFn == null then {}
-  else {
-    [seriesName(frame)]: linkFn(frame.schema.fields[1].labels)._queryPath
-    for frame in frames
-    if hasSeries(frame) && linkFn(frame.schema.fields[1].labels) != null
-  };
 
 local siPrefixes = [
   { factor: 1e12, suffix: 'TB' },
@@ -105,23 +64,73 @@ local timeRangeNav(from, to) = [
   { element: 'script', children: [{ html: timeRangeNavScript }] },
 ];
 
-local chartNode = a.chart.view {
+local defaultSeriesName(labels) =
+  local name = std.get(labels, '__name__', null);
+  local rest = std.join(', ', ['%s="%s"' % [k, labels[k]] for k in std.objectFields(labels) if k != '__name__']);
+  if name != null && rest != '' then '%s{%s}' % [name, rest]
+  else if name != null then name
+  else if rest != '' then '{%s}' % rest
+  else 'value';
+
+local applyLegendFormat(legendFormat, labels) =
+  std.foldl(
+    function(acc, k) std.strReplace(acc, '{{%s}}' % k, labels[k]),
+    std.objectFields(labels),
+    legendFormat
+  );
+
+local seriesName(labels, legendFormat) =
+  if legendFormat != null then applyLegendFormat(legendFormat, labels)
+  else defaultSeriesName(labels);
+
+local hasPoints(series) = std.length(series.points) > 0;
+
+local seriesFromResult(result, type, decimals, legendFormat) = [
+  {
+    name: seriesName(s.labels, legendFormat),
+    type: type,
+    showSymbol: true,
+    symbolSize: 16,
+    itemStyle: { opacity: 0 },
+    data: [[p[0], round(p[1], decimals)] for p in s.points],
+  }
+  for s in result.series
+  if hasPoints(s)
+];
+
+local linksFromResult(result, linkFn, legendFormat) =
+  if linkFn == null then {}
+  else {
+    [seriesName(s.labels, legendFormat)]: linkFn(s.labels)._queryPath
+    for s in result.series
+    if hasPoints(s) && linkFn(s.labels) != null
+  };
+
+local promqlChartNode = a.chart.view {
   type:: 'line',
   decimals:: 2,
   unit:: null,
+  datasource:: 'default',
+  queries:: error 'Chart requires queries',
   _paramSpecs: timeParamSpecs,
-  data: query($.datasource, $.queries, $._params.from, $._params.to),
+  _telemetryItems:: [
+    { type: 'promql', expr: q.expr, instant: std.get(q, 'instant', false) }
+    for q in $.queries
+  ],
+  data: query($.datasource, $._telemetryItems, $._params.from, $._params.to),
   links::
-    local results = $.data.results;
     std.foldl(
-      function(acc, i) acc + linksFromFrames(results[refId(i)].frames, std.get($.queries[i], 'link', null)),
+      function(acc, i) acc + linksFromResult(
+        $.data.results[i],
+        std.get($.queries[i], 'link', null),
+        std.get($.queries[i], 'legendFormat', null)
+      ),
       std.range(0, std.length($.queries) - 1),
       {}
     ),
   option::
-    local results = $.data.results;
     local rawSeries = std.flattenArrays([
-      seriesFromFrames(results[refId(i)].frames, $.type, null)
+      seriesFromResult($.data.results[i], $.type, null, std.get($.queries[i], 'legendFormat', null))
       for i in std.range(0, std.length($.queries) - 1)
     ]);
     local scale = if $.unit == 'bytes' then siScale(maxAbsValue(rawSeries)) else { factor: 1, suffix: null };
@@ -164,19 +173,14 @@ local chartNode = a.chart.view {
   },
 };
 
-local collectQueries(node) =
-  if node.type == 'panel' then node.chart.queries
-  else std.flattenArrays([collectQueries(child) for child in node.children]);
-
-local remapResults(results, offset, count) = {
-  [refId(i)]: results[refId(offset + i)]
-  for i in std.range(0, count - 1)
-};
+local collectItems(node) =
+  if node.type == 'panel' then node.chart._telemetryItems
+  else std.flattenArrays([collectItems(child) for child in node.children]);
 
 local resolveTree(node, results, index) =
   if node.type == 'panel' then
-    local count = std.length(node.chart.queries);
-    local resolved = chartNode + node.chart { data: { results: remapResults(results, index, count) } };
+    local count = std.length(node.chart._telemetryItems);
+    local resolved = node.chart { data: { results: results[index:index + count] } };
     { node: node { chart: { option: resolved.option, links: resolved.links } }, next: index + count }
   else
     local acc = std.foldl(
@@ -190,9 +194,10 @@ local resolveTree(node, results, index) =
 
 local dashboardNode = a.dashboard.view {
   local n = self,
+  datasource:: 'default',
   layout:: error 'Dashboard requires layout',
   _paramSpecs: timeParamSpecs,
-  data: query(n.datasource, collectQueries(n.layout), n._params.from, n._params.to),
+  data: query(n.datasource, collectItems(n.layout), n._params.from, n._params.to),
   tree:: resolveTree(n.layout, n.data.results, 0).node,
   _view+:: {
     local base = super.fragment,
@@ -200,78 +205,61 @@ local dashboardNode = a.dashboard.view {
   },
 };
 
-local instantFrames(datasource, expr, from='now-5m', to='now') =
-  query(datasource, [{ expr: expr, instant: true, range: false }], from, to).results.A.frames;
+local instantResult(datasource, expr, from='now-5m', to='now') =
+  query(datasource, [{ type: 'promql', expr: expr, instant: true }], from, to).results[0];
 
-local frameLabelValues(frames, label) = [
+local labelValues(result, label) = [
   v
-  for frame in frames
-  for v in [std.get(frame.schema.fields[1].labels, label, null)]
+  for s in result.series
+  for v in [std.get(s.labels, label, null)]
   if v != null
 ];
 
-local frameLabelNames(frames) =
+local labelNames(result) =
   std.set(std.flattenArrays([
-    [k for k in std.objectFields(frame.schema.fields[1].labels) if k != '__name__']
-    for frame in frames
+    [k for k in std.objectFields(s.labels) if k != '__name__']
+    for s in result.series
   ]));
 
 local defaultGroup(n) = n._pathTemplate[std.length(n._pathTemplate) - 1];
 
 local listNode = ui.list.view {
   local n = self,
+  datasource:: 'default',
   expr:: error 'List requires expr',
   label:: error 'List requires label',
   link:: error 'List requires link',
   group:: defaultGroup(n),
-  data: frameLabelValues(instantFrames(n.datasource, n.expr, std.get(n, 'from', 'now-5m'), std.get(n, 'to', 'now')), n.label),
+  data: labelValues(instantResult(n.datasource, n.expr, std.get(n, 'from', 'now-5m'), std.get(n, 'to', 'now')), n.label),
   links: { [n.group]: { [name]: n.link(name) for name in n.data } },
 };
 
 local labelsNode = ui.list.view {
   local n = self,
+  datasource:: 'default',
   expr:: error 'Labels requires expr',
   link:: error 'Labels requires link',
   group:: defaultGroup(n),
-  data: frameLabelNames(instantFrames(n.datasource, n.expr, std.get(n, 'from', 'now-5m'), std.get(n, 'to', 'now'))),
+  data: labelNames(instantResult(n.datasource, n.expr, std.get(n, 'from', 'now-5m'), std.get(n, 'to', 'now'))),
   links: { [n.group]: { [name]: n.link(name) for name in n.data } },
 };
 
 local valuesNode = ui.yaml.view {
   local n = self,
+  datasource:: 'default',
   expr:: error 'Values requires expr',
   label:: error 'Values requires label',
-  data: frameLabelValues(instantFrames(n.datasource, n.expr, std.get(n, 'from', 'now-5m'), std.get(n, 'to', 'now')), n.label),
+  data: labelValues(instantResult(n.datasource, n.expr, std.get(n, 'from', 'now-5m'), std.get(n, 'to', 'now')), n.label),
 };
 
-local graph(datasourceNames) = [
-  [['grafana']],
-  [['grafana', 'datasources'], {
-    data: datasourceNames,
-    links: { [name]: root.grafana.datasource(name) for name in datasourceNames },
-  }, ui.list.view],
-  [['grafana', '$datasource']],
-  [['grafana', '$datasource', 'metrics'], listNode {
-    expr:: 'count by (__name__) ({__name__=~".+"})',
-    label:: '__name__',
-    link:: function(name) root.grafana.datasource($.datasource).metric(name),
-  }],
-  [['grafana', '$datasource', '$metric'], labelsNode {
-    expr:: $.metric,
-    group:: 'labels',
-    link:: function(name) root.grafana.datasource($.datasource).metric($.metric).label(name),
-  }],
-  [['grafana', '$datasource', '$metric', '$label'], valuesNode {
-    expr:: $.metric,
-    label:: $.label,
-  }],
-];
-
 {
-  chart: { node: chartNode },
-  dashboard: { node: dashboardNode },
-  list: { node: listNode },
-  labels: { node: labelsNode },
-  values: { node: valuesNode },
-  graph: graph,
+  promql: {
+    chart: { node: promqlChartNode },
+    list: { node: listNode },
+    labels: { node: labelsNode },
+    values: { node: valuesNode },
+  },
+  telemetry: {
+    dashboard: { node: dashboardNode },
+  },
 }
