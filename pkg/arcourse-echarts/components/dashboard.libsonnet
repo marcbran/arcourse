@@ -1,50 +1,80 @@
 local chart = import 'chart.libsonnet';
 
-local flexStyle(node) =
-  'flex: %s 1 0%%; min-width: 0; min-height: 0; box-sizing: border-box;' % [node.flex];
+local style = |||
+  @scope (.dashboard) {
+    :scope {
+      display: flex;
+      width: 100%;
+      box-sizing: border-box;
+      gap: 1em;
+    }
+    .dashboard-branch {
+      display: flex;
+      box-sizing: border-box;
+      min-width: 0;
+      min-height: 0;
+      gap: 1em;
+    }
+    .dashboard-panel {
+      display: flex;
+      box-sizing: border-box;
+      min-width: 0;
+      min-height: 0;
+    }
+  }
+|||;
 
 local direction(node) = if node.type == 'row' then 'row' else 'column';
 
-local render(node, path) =
-  if node.type == 'panel' then
-    {
-      element: 'div',
-      attributes: { style: flexStyle(node) + ' display: flex;' },
-      children: [
-        chart {
-          option:: node.chart.option,
-          links:: node.chart.links,
-          id:: 'chart-' + std.join('-', [std.toString(p) for p in path]),
-          width:: '100%',
-          height:: '100%',
+local layoutNode = {
+  local c = self,
+  node:: error 'LayoutNode requires node',
+  path:: [],
+  html::
+    if c.node.type == 'panel' then
+      {
+        element: 'div',
+        attributes: { class: 'dashboard-panel', style: 'flex: %s 1 0%%;' % [c.node.flex] },
+        children: [
+          chart {
+            option:: c.node.chart.option,
+            links:: c.node.chart.links,
+            id:: 'chart-' + std.join('-', [std.toString(p) for p in c.path]),
+            width:: '100%',
+            height:: '100%',
+          },
+        ],
+      }
+    else
+      {
+        element: 'div',
+        attributes: {
+          class: 'dashboard-branch',
+          style: 'flex: %s 1 0%%; flex-direction: %s;' % [c.node.flex, direction(c.node)],
         },
-      ],
-    }
-  else
-    {
-      element: 'div',
-      attributes: { style: flexStyle(node) + ' display: flex; flex-direction: %s; gap: 1em;' % [direction(node)] },
-      children: [
-        render(node.children[i], path + [i])
-        for i in std.range(0, std.length(node.children) - 1)
-      ],
-    };
+        children: [
+          (layoutNode { node:: c.node.children[i], path:: c.path + [i] }).html
+          for i in std.range(0, std.length(c.node.children) - 1)
+        ],
+      },
+};
 
 {
   local c = self,
   layout:: error 'Dashboard requires layout',
   height:: '600px',
-  html: {
-    element: 'div',
-    attributes: {
-      style: 'display: flex; flex-direction: %s; height: %s; width: 100%%; box-sizing: border-box; gap: 1em;' % [
-        direction(c.layout),
-        c.height,
+  html: [
+    { element: 'style', children: [style] },
+    {
+      element: 'div',
+      attributes: {
+        class: 'dashboard',
+        style: 'flex-direction: %s; height: %s;' % [direction(c.layout), c.height],
+      },
+      children: [
+        (layoutNode { node:: c.layout.children[i], path:: [i] }).html
+        for i in std.range(0, std.length(c.layout.children) - 1)
       ],
     },
-    children: [
-      render(c.layout.children[i], [i])
-      for i in std.range(0, std.length(c.layout.children) - 1)
-    ],
-  },
+  ],
 }

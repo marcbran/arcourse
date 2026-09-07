@@ -1,10 +1,23 @@
+local style = |||
+  @scope (.panel) {
+    :scope {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0.25em;
+    }
+  }
+|||;
+
 {
   local c = self,
   child:: error 'Panel requires a child',
-  style:: '',
-  html: {
-    element: 'div',
-    attributes: { style: 'display: inline-block; border: 1px solid var(--border-color); border-radius: 0.5em; padding: 0.75em;' + c.style },
-    children: [c.child],
-  },
+  html: [
+    { element: 'style', children: [style] },
+    {
+      element: 'div',
+      attributes: { class: 'card panel' },
+      children: [c.child],
+    },
+  ],
 }
