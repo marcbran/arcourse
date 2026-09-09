@@ -6,6 +6,7 @@ p.pkg({
   branch: 'arcourse/arcourse-telemetry',
   path: 'arcourse/arcourse-telemetry',
   target: 'arcourse-telemetry',
+  external: ['root'],
   plugins: [
     p.plugin.github('marcbran/jsonnet-plugin-time', 'v0.0.0'),
     p.plugin.github('marcbran/jsonnet-plugin-telemetry', 'v0.0.0'),

@@ -1,23 +1,23 @@
-local chart = import 'nodes/chart.libsonnet';
-local list = import 'nodes/list.libsonnet';
-local dashboard = import 'nodes/dashboard.libsonnet';
-local labels = import 'nodes/labels.libsonnet';
-local values = import 'nodes/values.libsonnet';
-local drilldown = import 'nodeLists/drilldown.libsonnet';
-local entity = import 'nodeLists/entity.libsonnet';
+local time = import 'time/main.libsonnet';
+local telemetry = import 'telemetry/main.libsonnet';
+local chain = import 'chain.libsonnet';
+local timeRange = import 'timeRange.libsonnet';
+
+local query = (import 'query.libsonnet')(time, telemetry);
+local browse = (import 'browse.libsonnet')(query);
 
 {
   promql: {
     chart: {
-      node: chart,
-      drillDown: { nodeList: drilldown },
-      entity: { nodeList: entity },
+      node: (import 'nodes/chart.libsonnet')(query, timeRange),
+      drillDown: { nodeList: (import 'nodeLists/drilldown.libsonnet')(chain, $.promql.chart.node) },
+      entity: { nodeList: (import 'nodeLists/entity.libsonnet')(chain, $.promql.list.node, $.promql.chart.drillDown.nodeList) },
     },
-    list: { node: list },
-    labels: { node: labels },
-    values: { node: values },
+    list: { node: (import 'nodes/list.libsonnet')(browse) },
+    labels: { node: (import 'nodes/labels.libsonnet')(browse) },
+    values: { node: (import 'nodes/values.libsonnet')(browse) },
   },
   telemetry: {
-    dashboard: { node: dashboard },
+    dashboard: { node: (import 'nodes/dashboard.libsonnet')(query, timeRange) },
   },
 }
