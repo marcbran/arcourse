@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.16.0](https://github.com/marcbran/arcourse/compare/v0.15.0...v0.16.0) (2026-09-09)
+
+
+### Features
+
+* chart drilldown ([#104](https://github.com/marcbran/arcourse/issues/104)) ([18b452d](https://github.com/marcbran/arcourse/commit/18b452d04db9b5316f92427fb12cb9ded2e30e3e))
+* support override via DI in telemetry plugin ([#105](https://github.com/marcbran/arcourse/issues/105)) ([a1a679c](https://github.com/marcbran/arcourse/commit/a1a679c1d600af385327dc7dda69eda64e037446))
+* telemetry package ([#102](https://github.com/marcbran/arcourse/issues/102)) ([be97759](https://github.com/marcbran/arcourse/commit/be9775900d43d2e65b8bd2cc4ca70400bb5ecb6f))
+
 ## [0.15.0](https://github.com/marcbran/arcourse/compare/v0.14.0...v0.15.0) (2026-09-05)
 
 
