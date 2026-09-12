@@ -6,79 +6,42 @@ import (
 )
 
 type Evaluator interface {
-	Warm(stringImports map[string]string) error
+	Warm(rootPath string) error
 	Evaluate(snippet string) (string, error)
+	EvaluateOnceRaw(snippet string) (string, error)
 	Watch(key string, snippet string) (string, <-chan string, func(), error)
-	EvaluateOnce(stringImports map[string]string, snippet string) (string, error)
+	WatchFile(key string, snippet string, path string) (func(), error)
 }
 
 type environment struct {
-	cfg       RootConfig
 	root      *root
 	evaluator Evaluator
 }
 
-func newEnvironment(cfg RootConfig, root *root, evaluator Evaluator) *environment {
-	return &environment{cfg: cfg, root: root, evaluator: evaluator}
+func newEnvironment(root *root, evaluator Evaluator) *environment {
+	return &environment{root: root, evaluator: evaluator}
 }
 
 func (e *environment) Warm(ctx context.Context) error {
-	rootSnippet, err := e.root.Snippet(ctx)
-	if err != nil {
-		return err
-	}
-	if e.cfg.Mode != ModeCompiledGraph {
-		return nil
-	}
-	return e.evaluator.Warm(map[string]string{"root": rootSnippet})
+	return e.root.Warm(ctx)
 }
 
 func (e *environment) Evaluate(ctx context.Context, expression string) (string, error) {
-	snippet, stringImports, err := e.buildSnippet(ctx, expression)
+	err := e.root.Warm(ctx)
 	if err != nil {
 		return "", err
 	}
-	if e.cfg.Mode != ModeCompiledGraph {
-		return e.evaluator.EvaluateOnce(stringImports, snippet)
-	}
-	err = e.evaluator.Warm(stringImports)
-	if err != nil {
-		return "", err
-	}
-	return e.evaluator.Evaluate(snippet)
+	return e.evaluator.Evaluate(queryExpression(expression))
 }
 
 func (e *environment) Watch(ctx context.Context, key string, expression string) (string, <-chan string, func(), error) {
-	snippet, stringImports, err := e.buildSnippet(ctx, expression)
+	err := e.root.Warm(ctx)
 	if err != nil {
 		return "", nil, nil, err
 	}
-	if e.cfg.Mode != ModeCompiledGraph {
-		out, err := e.evaluator.EvaluateOnce(stringImports, snippet)
-		if err != nil {
-			return "", nil, nil, err
-		}
-		closed := make(chan string)
-		close(closed)
-		return out, closed, func() {}, nil
-	}
-	err = e.evaluator.Warm(stringImports)
-	if err != nil {
-		return "", nil, nil, err
-	}
-	return e.evaluator.Watch(key, snippet)
+	return e.evaluator.Watch(key, queryExpression(expression))
 }
 
-func (e *environment) buildSnippet(ctx context.Context, expression string) (string, map[string]string, error) {
-	err := ctx.Err()
-	if err != nil {
-		return "", nil, err
-	}
-	rootSnippet, err := e.root.Snippet(ctx)
-	if err != nil {
-		return "", nil, err
-	}
-	stringImports := map[string]string{"root": rootSnippet}
-	snippet := fmt.Sprintf(`local root = import 'root'; %s`, expression)
-	return snippet, stringImports, nil
+func queryExpression(expression string) string {
+	return fmt.Sprintf(`local root = import 'root'; %s`, expression)
 }

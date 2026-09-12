@@ -10,6 +10,7 @@ require (
 
 require (
 	github.com/fatih/color v1.19.0 // indirect
+	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/go-hclog v1.6.3 // indirect
@@ -33,3 +34,5 @@ require (
 )
 
 replace github.com/marcbran/arcourse => ../../
+
+replace github.com/marcbran/jpoet => /Users/marc/git/github.com/marcbran/jpoet
