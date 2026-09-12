@@ -29,8 +29,8 @@ type facade struct {
 
 func NewFacade(cfg Config, evaluator Evaluator, lastQuery LastQuery, auditRepo AuditRepo) pkg.Facade {
 	compile := newCompile(cfg.Root, evaluator)
-	root := newRoot(cfg.Root, compile)
-	environment := newEnvironment(cfg.Root, root, evaluator)
+	root := newRoot(cfg.Root, evaluator)
+	environment := newEnvironment(root, evaluator)
 	evaluate := newEvaluate(environment)
 	appendAudit := newAppendAudit(auditRepo)
 	queryCfg := QueryConfig{AuditFormats: cfg.Audit.Formats}
