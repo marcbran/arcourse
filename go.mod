@@ -3,8 +3,9 @@ module github.com/marcbran/arcourse
 go 1.26.2
 
 require (
+	github.com/google/go-jsonnet v0.22.0
 	github.com/google/uuid v1.6.0
-	github.com/marcbran/jpoet v0.21.1
+	github.com/marcbran/jpoet v0.23.0
 	github.com/marcbran/jsonnet-plugin-html v0.2.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.12.1
@@ -13,8 +14,8 @@ require (
 
 require (
 	github.com/fatih/color v1.19.0 // indirect
+	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
-	github.com/google/go-jsonnet v0.22.0 // indirect
 	github.com/hashicorp/go-hclog v1.6.3 // indirect
 	github.com/hashicorp/go-plugin v1.8.0 // indirect
 	github.com/hashicorp/yamux v0.1.2 // indirect

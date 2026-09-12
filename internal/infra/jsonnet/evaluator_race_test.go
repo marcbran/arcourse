@@ -22,12 +22,12 @@ func TestEvaluatorConcurrentWarmAndEvaluate(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for i := 0; i < iterations; i++ {
-				err := e.Warm(map[string]string{"root": "{ value: 1 }"})
+				err := e.Warm("")
 				if err != nil {
 					errs <- err
 					continue
 				}
-				snippet := fmt.Sprintf(`local root = import 'root'; root.value + %d`, g)
+				snippet := fmt.Sprintf(`local root = { value: 1 }; root.value + %d`, g)
 				out, err := e.Evaluate(snippet)
 				if err != nil {
 					errs <- err
