@@ -20,6 +20,18 @@ local style = |||
       color: var(--primary-color);
       font-weight: bold;
       padding: 0.3em 0.4em;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    th:hover {
+      text-decoration: underline;
+    }
+    th.sort-asc::after {
+      content: ' ↑';
+    }
+    th.sort-desc::after {
+      content: ' ↓';
     }
     td {
       padding: 0;
@@ -97,6 +109,10 @@ local style = |||
     }
   }
 |||;
+
+local sortScript = importstr 'table-sort.js';
+
+local slug(label) = std.asciiLower(std.strReplace(std.toString(label), ' ', '-'));
 
 local cellValue(item, col) =
   if std.objectHas(col, 'value') then col.value(item)
@@ -207,7 +223,7 @@ local paginationNav = {
               children: [{
                 element: 'tr',
                 children: [
-                  { element: 'th', children: [col.label] }
+                  { element: 'th', attributes: { 'data-col': slug(col.label) }, children: [col.label] }
                   for col in c.columns
                 ],
               }],
@@ -232,5 +248,6 @@ local paginationNav = {
         },
       ] + (if nav.visible then [nav.html] else []),
     },
+    { element: 'script', children: [{ html: sortScript }] },
   ],
 }

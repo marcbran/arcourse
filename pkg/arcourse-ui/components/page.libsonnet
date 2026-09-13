@@ -47,6 +47,7 @@ local pageStyle = |||
   }
 |||;
 
+local hashScript = importstr 'hash.js';
 local navScript = importstr 'quick-nav.js';
 
 {
@@ -57,7 +58,13 @@ local navScript = importstr 'quick-nav.js';
     {
       element: 'html',
       children: [
-        { element: 'head', children: [{ element: 'style', children: [pageStyle] }] },
+        {
+          element: 'head',
+          children: [
+            { element: 'style', children: [pageStyle] },
+            { element: 'script', children: [{ html: hashScript }] },
+          ],
+        },
         {
           element: 'body',
           children: [

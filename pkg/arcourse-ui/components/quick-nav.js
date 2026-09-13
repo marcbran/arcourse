@@ -1,18 +1,6 @@
 (function () {
   if (typeof HTMLElement === 'undefined') return;
 
-  var HASH = '#quick-nav';
-
-  function setHash() {
-    if (window.location.hash !== HASH) history.replaceState(null, '', HASH);
-  }
-
-  function clearHash() {
-    if (window.location.hash === HASH) {
-      history.replaceState(null, '', window.location.pathname + window.location.search);
-    }
-  }
-
   function scrapeItems() {
     var items = [];
     document.querySelectorAll('.list a[href]').forEach(function (a) {
@@ -127,7 +115,9 @@
       this.modal.addEventListener('click', function (e) {
         if (e.target === this.modal) this.closeModal();
       }.bind(this));
-      this.modal.addEventListener('close', clearHash);
+      this.modal.addEventListener('close', function () {
+        window.hashParams.remove('quick-nav');
+      });
 
       if (!window.__quickNavBound) {
         window.__quickNavBound = true;
@@ -144,7 +134,7 @@
         }, true);
       }
 
-      if (window.location.hash === HASH) {
+      if (window.hashParams.has('quick-nav')) {
         requestAnimationFrame(function () { this.openModal(); }.bind(this));
       }
     }
@@ -160,7 +150,7 @@
       this.render();
       this.modal.showModal();
       this.input.focus();
-      setHash();
+      window.hashParams.set('quick-nav', '');
     }
 
     closeModal() {
@@ -189,7 +179,7 @@
     choose(keepOpen) {
       var match = this.matches[this.selected];
       if (!match) return;
-      clearHash();
+      window.hashParams.remove('quick-nav');
       var url = new URL(match.link, window.location.href);
       url.hash = keepOpen ? 'quick-nav' : '';
       window.location.href = url.toString();
