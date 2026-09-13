@@ -47,6 +47,8 @@ local pageStyle = |||
   }
 |||;
 
+local navScript = importstr 'quick-nav.js';
+
 {
   local c = self,
   fragment:: error 'HtmlPage requires a fragment',
@@ -58,7 +60,11 @@ local pageStyle = |||
         { element: 'head', children: [{ element: 'style', children: [pageStyle] }] },
         {
           element: 'body',
-          children: [{ element: 'div', attributes: { class: 'deck' }, children: c.fragment }],
+          children: [
+            { element: 'div', attributes: { class: 'deck' }, children: c.fragment },
+            { element: 'quick-nav' },
+            { element: 'script', children: [{ html: navScript }] },
+          ],
         },
       ],
     },

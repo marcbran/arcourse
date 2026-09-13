@@ -8,9 +8,14 @@ local style = |||
     }
     a {
       color: var(--primary-color);
+      border-radius: 0.5em;
     }
     a:hover {
       text-decoration: none;
+    }
+    a:focus {
+      outline: 2px solid var(--primary-color);
+      outline-offset: 2px;
     }
     ul {
       list-style: none;

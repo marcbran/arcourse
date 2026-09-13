@@ -23,6 +23,14 @@ local style = |||
     }
     td {
       padding: 0;
+      border-top: 2px solid transparent;
+      border-bottom: 2px solid transparent;
+    }
+    td:first-child {
+      border-left: 2px solid transparent;
+    }
+    td:last-child {
+      border-right: 2px solid transparent;
     }
     td > * {
       display: block;
@@ -36,6 +44,19 @@ local style = |||
     }
     tbody tr:has(a):hover {
       background-color: var(--container-low-color);
+    }
+    tbody tr:has(a:focus) td {
+      background-color: var(--container-low-color);
+      border-color: var(--primary-color);
+    }
+    tbody tr:has(a:focus) td:first-child {
+      border-radius: 0.8em 0 0 0.8em;
+    }
+    tbody tr:has(a:focus) td:last-child {
+      border-radius: 0 0.8em 0.8em 0;
+    }
+    td > a:focus {
+      outline: none;
     }
     td.empty {
       text-align: center;
@@ -102,12 +123,13 @@ local cell = {
   item:: error 'Cell requires item',
   col:: error 'Cell requires col',
   href:: null,
+  first:: true,
   local text = cellText(c.item, c.col),
   html:
     if c.href == null then
       { element: 'span', children: [text] }
     else
-      { element: 'a', attributes: { href: c.href }, children: [text] },
+      { element: 'a', attributes: { href: c.href } + (if c.first then {} else { tabindex: '-1' }), children: [text] },
 };
 
 local emptyRow = {
@@ -199,8 +221,8 @@ local paginationNav = {
                   {
                     element: 'tr',
                     children: [
-                      { element: 'td', children: [cell { item:: item, col:: col, href:: href }] }
-                      for col in c.columns
+                      { element: 'td', children: [cell { item:: item, col:: c.columns[i], href:: href, first:: i == 0 }] }
+                      for i in std.range(0, std.length(c.columns) - 1)
                     ],
                   }
                   for item in rows
