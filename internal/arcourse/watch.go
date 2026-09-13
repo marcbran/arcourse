@@ -2,6 +2,7 @@ package arcourse
 
 import (
 	"context"
+	"fmt"
 
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
@@ -36,17 +37,16 @@ func (uc *watch) Exec(ctx context.Context, path string, params map[string]any, f
 		return nil, nil, err
 	}
 
-	results := make(chan pkg.Result)
+	value, ok := decodeValue(initial, format)
+	if !ok {
+		unregister()
+		return nil, nil, fmt.Errorf("node has no %s view", format)
+	}
+
+	results := make(chan pkg.Result, 1)
+	results <- pkg.Result{Output: value}
 	go func() {
 		defer close(results)
-
-		if value, ok := decodeValue(initial, format); ok {
-			select {
-			case results <- pkg.Result{Output: value}:
-			case <-ctx.Done():
-				return
-			}
-		}
 
 		for {
 			select {

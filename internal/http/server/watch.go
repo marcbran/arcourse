@@ -11,12 +11,6 @@ import (
 )
 
 func (s *Server) handleWatch(w http.ResponseWriter, r *http.Request) {
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		returnError(w, errors.New("streaming unsupported"))
-		return
-	}
-
 	path := r.URL.Query().Get("path")
 	if path == "" {
 		returnBadRequest(w, errors.New("path is required"))
@@ -43,6 +37,16 @@ func (s *Server) handleWatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer unsubscribe()
+
+	streamWatch(w, r, ch)
+}
+
+func streamWatch(w http.ResponseWriter, r *http.Request, ch <-chan pkg.Result) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		returnError(w, errors.New("streaming unsupported"))
+		return
+	}
 
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")

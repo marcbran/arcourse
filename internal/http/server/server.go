@@ -18,12 +18,13 @@ import (
 )
 
 type Server struct {
-	facade pkg.Facade
-	mux    *http.ServeMux
+	facade         pkg.Facade
+	mux            *http.ServeMux
+	pendingWatches *pendingWatches
 }
 
 func NewServer(facade pkg.Facade) *Server {
-	s := &Server{facade: facade, mux: http.NewServeMux()}
+	s := &Server{facade: facade, mux: http.NewServeMux(), pendingWatches: newPendingWatches()}
 	s.mux.HandleFunc("POST /api/evaluate", s.handleEvaluate)
 	s.mux.HandleFunc("POST /api/query", s.handleQuery)
 	s.mux.HandleFunc("GET /api/audit", s.handleListAudit)
@@ -35,6 +36,7 @@ func NewServer(facade pkg.Facade) *Server {
 	s.mux.HandleFunc("GET /audit", s.handleAuditPage)
 	s.mux.HandleFunc("GET /audit/", redirectTo("/audit"))
 	s.mux.HandleFunc("GET /audit/{id}", s.handleAuditEntryPage)
+	s.mux.HandleFunc("GET /watch", s.handleBrowseWatch)
 	s.mux.HandleFunc("GET /{path...}", s.handleBrowse)
 	return s
 }

@@ -5,11 +5,12 @@ go 1.26.2
 require (
 	github.com/google/go-jsonnet v0.22.0
 	github.com/marcbran/arcourse v0.0.0
-	github.com/marcbran/jpoet v0.21.1
+	github.com/marcbran/jpoet v0.23.0
 )
 
 require (
 	github.com/fatih/color v1.19.0 // indirect
+	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/go-hclog v1.6.3 // indirect
