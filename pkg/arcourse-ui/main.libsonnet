@@ -21,16 +21,6 @@ local collectNeighbors(obj, textPrefix='', exclude=[]) =
 local isNode(value) =
   std.type(value) == 'object' && std.objectHas(value, '_node') && std.objectHasAll(value, '_queryPath');
 
-local directNeighbors(obj, exclude=[]) =
-  std.flatMap(
-    function(k)
-      if std.member(exclude, k) || std.substr(k, 0, 1) == '_' then []
-      else
-        local value = obj[k];
-        if isNode(value) then [{ link: value._queryPath, text: k }] else [],
-    std.objectFields(obj)
-  );
-
 local linksItems(obj) =
   local links = std.get(obj, 'links', {});
   if std.type(links) != 'object' then []
@@ -54,7 +44,7 @@ local linksGroups(obj) =
     std.objectFields(links)
   );
 
-local neighborItems(obj) = directNeighbors(obj, exclude=['data', '_view', 'links']) + linksItems(obj);
+local neighborItems(obj) = collectNeighbors(obj, '', ['data', '_view', 'links']) + linksItems(obj);
 
 local safeGet(obj, path) =
   std.foldl(

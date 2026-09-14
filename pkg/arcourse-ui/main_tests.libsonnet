@@ -515,6 +515,20 @@ local pagerduty = { const: 'pagerduty' };
       ],
     },
     {
+      name: 'a non-node child recurses to render each reachable node as a slash-labeled link',
+      input:: function()
+        local node = a.list.node {
+          arcourse: { _node: true, _queryPath: '/root/arcourse' },
+          kubernetes: { contexts: { _node: true, _queryPath: '/root/kubernetes/contexts' } },
+          form3: {},
+        };
+        [{ link: i.link, text: i.text } for i in node._view.fragment.items],
+      expected: [
+        { link: '/root/arcourse', text: 'arcourse' },
+        { link: '/root/kubernetes/contexts', text: 'kubernetes/contexts' },
+      ],
+    },
+    {
       name: 'withLinkSpecs merged standalone defaults to no links without forcing root',
       input:: function()
         local node = linkspecs.withLinkSpecs { data: { id: 'x' } };
