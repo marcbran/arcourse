@@ -17,14 +17,15 @@ type Config struct {
 }
 
 type facade struct {
-	evaluate  *evaluate
-	query     *query
-	observe   *observe
-	watch     *watch
-	listAudit *listAudit
-	getAudit  *getAudit
-	compile   *compile
-	warm      *warm
+	evaluate    *evaluate
+	query       *query
+	observe     *observe
+	watch       *watch
+	listAudit   *listAudit
+	getAudit    *getAudit
+	compile     *compile
+	warm        *warm
+	environment *environment
 }
 
 func NewFacade(cfg Config, evaluator Evaluator, lastQuery LastQuery, auditRepo AuditRepo) pkg.Facade {
@@ -42,14 +43,15 @@ func NewFacade(cfg Config, evaluator Evaluator, lastQuery LastQuery, auditRepo A
 	warm := newWarm(environment)
 
 	return &facade{
-		evaluate:  evaluate,
-		query:     query,
-		observe:   observe,
-		watch:     watch,
-		listAudit: listAudit,
-		getAudit:  getAudit,
-		compile:   compile,
-		warm:      warm,
+		evaluate:    evaluate,
+		query:       query,
+		observe:     observe,
+		watch:       watch,
+		listAudit:   listAudit,
+		getAudit:    getAudit,
+		compile:     compile,
+		warm:        warm,
+		environment: environment,
 	}
 }
 
@@ -83,4 +85,8 @@ func (f *facade) Compile(ctx context.Context) (pkg.Result, error) {
 
 func (f *facade) Warm(ctx context.Context) error {
 	return f.warm.Exec(ctx)
+}
+
+func (f *facade) Close() error {
+	return f.environment.Close()
 }

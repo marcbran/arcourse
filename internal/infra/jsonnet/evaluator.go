@@ -32,6 +32,13 @@ func (e *Evaluator) Warm(rootPath string) error {
 	return err
 }
 
+func (e *Evaluator) Close() error {
+	if e.env == nil {
+		return nil
+	}
+	return e.env.Close()
+}
+
 func (e *Evaluator) Evaluate(snippet string) (string, error) {
 	if e.env == nil {
 		return "", fmt.Errorf("evaluator not warmed")

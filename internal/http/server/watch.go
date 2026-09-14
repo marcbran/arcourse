@@ -38,10 +38,10 @@ func (s *Server) handleWatch(w http.ResponseWriter, r *http.Request) {
 	}
 	defer unsubscribe()
 
-	streamWatch(w, r, ch)
+	s.streamWatch(w, r, ch)
 }
 
-func streamWatch(w http.ResponseWriter, r *http.Request, ch <-chan pkg.Result) {
+func (s *Server) streamWatch(w http.ResponseWriter, r *http.Request, ch <-chan pkg.Result) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		returnError(w, errors.New("streaming unsupported"))
@@ -56,6 +56,8 @@ func streamWatch(w http.ResponseWriter, r *http.Request, ch <-chan pkg.Result) {
 	for {
 		select {
 		case <-r.Context().Done():
+			return
+		case <-s.ctx.Done():
 			return
 		case result, ok := <-ch:
 			if !ok {

@@ -79,7 +79,7 @@ func (s *Server) handleBrowseWatch(w http.ResponseWriter, r *http.Request) {
 	}
 	defer pw.release()
 
-	streamWatch(w, r, pw.ch)
+	s.streamWatch(w, r, pw.ch)
 }
 
 const pendingWatchTTL = 30 * time.Second

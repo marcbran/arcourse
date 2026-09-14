@@ -21,10 +21,13 @@ type Server struct {
 	facade         pkg.Facade
 	mux            *http.ServeMux
 	pendingWatches *pendingWatches
+	ctx            context.Context
+	cancel         context.CancelFunc
 }
 
-func NewServer(facade pkg.Facade) *Server {
-	s := &Server{facade: facade, mux: http.NewServeMux(), pendingWatches: newPendingWatches()}
+func NewServer(ctx context.Context, facade pkg.Facade) *Server {
+	serverCtx, cancel := context.WithCancel(ctx)
+	s := &Server{facade: facade, mux: http.NewServeMux(), pendingWatches: newPendingWatches(), ctx: serverCtx, cancel: cancel}
 	s.mux.HandleFunc("POST /api/evaluate", s.handleEvaluate)
 	s.mux.HandleFunc("POST /api/query", s.handleQuery)
 	s.mux.HandleFunc("GET /api/audit", s.handleListAudit)
@@ -39,6 +42,10 @@ func NewServer(facade pkg.Facade) *Server {
 	s.mux.HandleFunc("GET /watch", s.handleBrowseWatch)
 	s.mux.HandleFunc("GET /{path...}", s.handleBrowse)
 	return s
+}
+
+func (s *Server) Close() {
+	s.cancel()
 }
 
 func Serve(ctx context.Context, facade pkg.Facade, cfg archttp.Config) error {
@@ -60,7 +67,8 @@ func Serve(ctx context.Context, facade pkg.Facade, cfg archttp.Config) error {
 		}
 	}()
 
-	srv := NewServer(facade)
+	srv := NewServer(ctx, facade)
+	defer srv.Close()
 	httpServer := &http.Server{
 		Handler: srv.mux,
 	}
@@ -89,9 +97,14 @@ func Serve(ctx context.Context, facade pkg.Facade, cfg archttp.Config) error {
 		return err
 	}
 
+	srv.Close()
+
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	return httpServer.Shutdown(shutdownCtx)
+
+	shutdownErr := httpServer.Shutdown(shutdownCtx)
+	closeErr := facade.Close()
+	return errors.Join(shutdownErr, closeErr)
 }
 
 func listen(cfg archttp.Config) ([]net.Listener, error) {
