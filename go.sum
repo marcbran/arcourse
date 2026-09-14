@@ -32,8 +32,8 @@ github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
 github.com/jhump/protoreflect v1.17.0 h1:qOEr613fac2lOuTgWN4tPAtLL7fUSbuJL5X5XumQh94=
 github.com/jhump/protoreflect v1.17.0/go.mod h1:h9+vUUL38jiBzck8ck+6G/aeMX8Z4QUY/NiJPwPNi+8=
-github.com/marcbran/jpoet v0.23.0 h1:lB9L+CV3qbyY7dm6dbKMzxaQvK2OomDjlSRD4xpV/wk=
-github.com/marcbran/jpoet v0.23.0/go.mod h1:qK6Ud3UUDdkxivI80bmYJSzeWBtSSyoRDTQDYG3hcvE=
+github.com/marcbran/jpoet v0.23.1 h1:QtzGfR9QLr5nzbSF02D8+AqJlMcUDTrhXmvVqBE0rP0=
+github.com/marcbran/jpoet v0.23.1/go.mod h1:JzRXvWtYdIM2ZBGDLNUTA3l68wMKMKoHvfzaJaSdBU0=
 github.com/marcbran/jsonnet-plugin-html v0.3.0 h1:VZ+QrWJYIWNej5FE1Z8EQFURSVuLQlVqSNuEzTuFq3M=
 github.com/marcbran/jsonnet-plugin-html v0.3.0/go.mod h1:PVdP0RNyhXpZ1Sj/2jWQChhAJRQoqKOMzvWT7bH2qEE=
 github.com/mattn/go-colorable v0.1.9/go.mod h1:u6P/XSegPjTcexA+o6vUJrdnUu04hMope9wVRipJSqc=

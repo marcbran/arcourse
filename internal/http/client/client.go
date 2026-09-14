@@ -15,6 +15,11 @@ type Client struct {
 	client  *http.Client
 }
 
+func (c *Client) Close() error {
+	c.client.CloseIdleConnections()
+	return nil
+}
+
 func New(cfg archttp.Config) pkg.Facade {
 	if cfg.UnixSocket != "" {
 		return &Client{

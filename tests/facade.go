@@ -185,6 +185,10 @@ func (f *ServerBackedCLIFacade) Warm(ctx context.Context) error {
 	return f.client.Warm(ctx)
 }
 
+func (f *ServerBackedCLIFacade) Close() error {
+	return f.client.Close()
+}
+
 func (f *ServerBackedCLIFacade) start() error {
 	f.startOnce.Do(func() {
 		f.startErr = f.startServer()
@@ -506,6 +510,10 @@ func (f *CLIFacade) Compile(ctx context.Context) (pkg.Result, error) {
 }
 
 func (f *CLIFacade) Warm(ctx context.Context) error {
+	return nil
+}
+
+func (f *CLIFacade) Close() error {
 	return nil
 }
 

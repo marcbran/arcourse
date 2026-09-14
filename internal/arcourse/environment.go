@@ -11,6 +11,7 @@ type Evaluator interface {
 	EvaluateOnceRaw(snippet string) (string, error)
 	Watch(key string, snippet string) (string, <-chan string, func(), error)
 	WatchFile(key string, snippet string, path string) (func(), error)
+	Close() error
 }
 
 type environment struct {
@@ -40,6 +41,10 @@ func (e *environment) Watch(ctx context.Context, key string, expression string) 
 		return "", nil, nil, err
 	}
 	return e.evaluator.Watch(key, queryExpression(expression))
+}
+
+func (e *environment) Close() error {
+	return e.evaluator.Close()
 }
 
 func queryExpression(expression string) string {

@@ -53,6 +53,8 @@ func (s *Server) handleObserveStream(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-r.Context().Done():
 			return
+		case <-s.ctx.Done():
+			return
 		case result, ok := <-ch:
 			if !ok {
 				return

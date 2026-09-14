@@ -54,4 +54,5 @@ type Facade interface {
 	GetAudit(ctx context.Context, id string) (AuditEntry, error)
 	Compile(ctx context.Context) (Result, error)
 	Warm(ctx context.Context) error
+	Close() error
 }
