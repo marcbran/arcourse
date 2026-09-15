@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.17.0](https://github.com/marcbran/arcourse/compare/v0.16.0...v0.17.0) (2026-09-15)
+
+
+### Features
+
+* web ui breadcrumbs ([#114](https://github.com/marcbran/arcourse/issues/114)) ([0af57fc](https://github.com/marcbran/arcourse/commit/0af57fc45e654b4447044341f7d9c4db050380ca))
+
+
+### Bug Fixes
+
+* arcourse-telemetry imports ([#109](https://github.com/marcbran/arcourse/issues/109)) ([95919db](https://github.com/marcbran/arcourse/commit/95919dbf7f8adf13ec5acfdf3848ef35dd773402))
+* close facade on shutdown ([#112](https://github.com/marcbran/arcourse/issues/112)) ([5a2946a](https://github.com/marcbran/arcourse/commit/5a2946a81b8980869a5bdcd4343f4c250735a2a8))
+* show nested links in web ui ([#113](https://github.com/marcbran/arcourse/issues/113)) ([cc1e90e](https://github.com/marcbran/arcourse/commit/cc1e90e400dc484f8a39310d1fafa00788170f23))
+
 ## [0.16.0](https://github.com/marcbran/arcourse/compare/v0.15.0...v0.16.0) (2026-09-13)
 
 
