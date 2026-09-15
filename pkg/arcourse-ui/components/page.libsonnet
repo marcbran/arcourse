@@ -37,9 +37,12 @@ local pageStyle = |||
   .deck {
     display: contents;
   }
+  .deck:has(.breadcrumbs),
   .deck:has(.card ~ .card),
   .deck:has(.list):has(.yaml) {
     display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
     gap: 0.25em;
     border: 1px solid var(--border-color);
     border-radius: 0.5em;
@@ -53,6 +56,7 @@ local navScript = importstr 'quick-nav.js';
 {
   local c = self,
   fragment:: error 'HtmlPage requires a fragment',
+  breadcrumbs:: { html: [] },
   html: [
     { doctype: 'html' },
     {
@@ -68,7 +72,7 @@ local navScript = importstr 'quick-nav.js';
         {
           element: 'body',
           children: [
-            { element: 'div', attributes: { class: 'deck' }, children: c.fragment },
+            { element: 'div', attributes: { class: 'deck' }, children: [c.breadcrumbs, c.fragment] },
             { element: 'quick-nav' },
             { element: 'script', children: [{ html: navScript }] },
           ],

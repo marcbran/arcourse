@@ -4,4 +4,5 @@
   yaml: import 'yaml.libsonnet',
   page: import 'page.libsonnet',
   resource: import 'resource.libsonnet',
+  breadcrumbs: import 'breadcrumbs.libsonnet',
 }

@@ -58,7 +58,10 @@ local baseView = {
   local n = self,
   _view:: {
     fragment: error 'view requires a fragment',
-    page: c.page { fragment:: n._view.fragment },
+    page: c.page {
+      fragment:: n._view.fragment,
+      breadcrumbs:: c.breadcrumbs { pathTemplate:: std.get($, '_pathTemplate', []), node:: $ },
+    },
     html: html.manifestHtml(self.page),
   },
 };
