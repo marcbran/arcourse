@@ -529,6 +529,18 @@ local pagerduty = { const: 'pagerduty' };
       ],
     },
     {
+      name: 'scalar param fields on a node do not render as links',
+      input:: function()
+        local node = a.table.node {
+          context: 'my-context',
+          namespace: 'my-namespace',
+          configmap: 'my-configmap',
+          data: { items: [] },
+        };
+        [{ link: i.link, text: i.text } for i in node._view.fragment.items],
+      expected: [],
+    },
+    {
       name: 'withLinkSpecs merged standalone defaults to no links without forcing root',
       input:: function()
         local node = linkspecs.withLinkSpecs { data: { id: 'x' } };

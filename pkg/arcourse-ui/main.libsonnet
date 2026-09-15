@@ -2,24 +2,22 @@ local c = import 'components/main.libsonnet';
 local html = import 'html/main.libsonnet';
 local linkspecs = import 'linkspecs.libsonnet';
 
-local collectNeighbors(obj, textPrefix='', exclude=[]) =
+local isNode(value) =
+  std.type(value) == 'object' && std.objectHas(value, '_node') && std.objectHasAll(value, '_queryPath');
+
+local collectNeighbors(obj, textPrefix='', exclude=[], linkStrings=false) =
   std.flatMap(
     function(k)
       if std.member(exclude, k) || std.substr(k, 0, 1) == '_' then []
       else
         local value = obj[k];
         local textPath = if textPrefix == '' then k else '%s/%s' % [textPrefix, k];
-        if std.type(value) == 'string' then [{ link: value, text: textPath, external: true }]
-        else if std.type(value) != 'object' then []
-        else
-          if std.objectHas(value, '_node') && std.objectHasAll(value, '_queryPath') then
-            [{ link: value._queryPath, text: textPath }]
-          else collectNeighbors(value, textPath, exclude),
+        if isNode(value) then [{ link: value._queryPath, text: textPath }]
+        else if std.type(value) == 'object' then collectNeighbors(value, textPath, exclude, linkStrings)
+        else if linkStrings && std.type(value) == 'string' then [{ link: value, text: textPath, external: true }]
+        else [],
     std.objectFields(obj)
   );
-
-local isNode(value) =
-  std.type(value) == 'object' && std.objectHas(value, '_node') && std.objectHasAll(value, '_queryPath');
 
 local linksItems(obj) =
   local links = std.get(obj, 'links', {});
@@ -39,7 +37,7 @@ local linksGroups(obj) =
   else std.flatMap(
     function(k)
       local value = links[k];
-      if std.type(value) == 'object' && !isNode(value) then [{ title: k, items: collectNeighbors(value) }]
+      if std.type(value) == 'object' && !isNode(value) then [{ title: k, items: collectNeighbors(value, linkStrings=true) }]
       else [],
     std.objectFields(links)
   );
