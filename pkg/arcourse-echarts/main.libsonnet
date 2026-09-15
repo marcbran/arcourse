@@ -4,12 +4,13 @@ local html = import 'html/main.libsonnet';
 
 local echartsSrc = 'https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js';
 local echartsScript = { element: 'script', attributes: { src: echartsSrc } };
+local componentScript = { element: 'script', children: [{ html: importstr 'components/chart.js' }] };
 
 local baseView = {
   local n = self,
   _view:: {
     fragment: error 'view requires a fragment',
-    page: ui.page { fragment:: [echartsScript, n._view.fragment] },
+    page: ui.page { fragment:: [echartsScript, componentScript, n._view.fragment] },
     html: html.manifestHtml(self.page),
   },
 };
@@ -21,7 +22,6 @@ local chartView = baseView {
         child:: c.chart {
           option:: $.option,
           links:: std.get($, 'links', {}),
-          id:: std.get($, 'chartId', 'chart'),
           width:: std.get($, 'width', '100%'),
           height:: std.get($, 'height', '400px'),
         },

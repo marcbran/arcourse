@@ -29,7 +29,6 @@ local direction(node) = if node.type == 'row' then 'row' else 'column';
 local layoutNode = {
   local c = self,
   node:: error 'LayoutNode requires node',
-  path:: [],
   html::
     if c.node.type == 'panel' then
       {
@@ -39,7 +38,6 @@ local layoutNode = {
           chart {
             option:: c.node.chart.option,
             links:: c.node.chart.links,
-            id:: 'chart-' + std.join('-', [std.toString(p) for p in c.path]),
             width:: '100%',
             height:: '100%',
           },
@@ -53,7 +51,7 @@ local layoutNode = {
           style: 'flex: %s 1 0%%; flex-direction: %s;' % [c.node.flex, direction(c.node)],
         },
         children: [
-          (layoutNode { node:: c.node.children[i], path:: c.path + [i] }).html
+          (layoutNode { node:: c.node.children[i] }).html
           for i in std.range(0, std.length(c.node.children) - 1)
         ],
       },
@@ -72,7 +70,7 @@ local layoutNode = {
         style: 'flex-direction: %s; height: %s;' % [direction(c.layout), c.height],
       },
       children: [
-        (layoutNode { node:: c.layout.children[i], path:: [i] }).html
+        (layoutNode { node:: c.layout.children[i] }).html
         for i in std.range(0, std.length(c.layout.children) - 1)
       ],
     },
