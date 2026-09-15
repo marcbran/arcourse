@@ -1,11 +1,21 @@
 (function () {
   if (typeof HTMLElement === 'undefined') return;
 
+  var GROUPS = [
+    { key: 'breadcrumbs', title: 'breadcrumbs' },
+    { key: 'links', title: 'links' },
+    { key: 'table', title: 'table' },
+  ];
+
   function scrapeItems() {
     var items = [];
+    document.querySelectorAll('.breadcrumbs a[href]').forEach(function (a) {
+      var text = a.textContent.trim();
+      if (text) items.push({ text: text, link: a.href, group: 'breadcrumbs' });
+    });
     document.querySelectorAll('.list a[href]').forEach(function (a) {
       var text = a.textContent.trim();
-      if (text) items.push({ text: text, link: a.href });
+      if (text) items.push({ text: text, link: a.href, group: 'links' });
     });
     document.querySelectorAll('.table tbody tr').forEach(function (tr) {
       var a = tr.querySelector('a[href]');
@@ -14,7 +24,7 @@
         .call(tr.querySelectorAll('td'), function (td) { return td.textContent.trim(); })
         .filter(Boolean)
         .join('  ');
-      if (text) items.push({ text: text, link: a.href });
+      if (text) items.push({ text: text, link: a.href, group: 'table' });
     });
     return items;
   }
@@ -88,6 +98,15 @@
       }
       li.selected { background: var(--container-low-color); }
       li.empty { opacity: 0.6; cursor: default; }
+      li.group {
+        cursor: default;
+        padding: 0.5em 0.5em 0.15em;
+        opacity: 0.5;
+        font-size: 0.85em;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      li.group:first-child { padding-top: 0.15em; }
     </style>
     <dialog part="modal">
       <input type="text" autocomplete="off" spellcheck="false" placeholder="Jump to…" />
@@ -104,6 +123,7 @@
       this.results = this.shadowRoot.querySelector('ul');
       this.items = [];
       this.matches = [];
+      this.itemEls = [];
       this.selected = 0;
 
       this.input.addEventListener('input', function () {
@@ -186,38 +206,52 @@
     }
 
     highlight() {
-      var lis = this.results.children;
-      for (var i = 0; i < lis.length; i++) {
+      for (var i = 0; i < this.itemEls.length; i++) {
         var on = i === this.selected;
-        lis[i].classList.toggle('selected', on);
-        if (on) lis[i].scrollIntoView({ block: 'nearest' });
+        this.itemEls[i].classList.toggle('selected', on);
+        if (on) this.itemEls[i].scrollIntoView({ block: 'nearest' });
       }
     }
 
     render() {
-      this.matches = rank(this.input.value.trim(), this.items);
+      var self = this;
+      var ranked = rank(this.input.value.trim(), this.items);
       this.results.innerHTML = '';
+      this.matches = [];
+      this.itemEls = [];
+
+      GROUPS.forEach(function (group) {
+        var groupItems = ranked.filter(function (m) { return m.group === group.key; });
+        if (groupItems.length === 0) return;
+        var header = document.createElement('li');
+        header.className = 'group';
+        header.textContent = group.title;
+        self.results.appendChild(header);
+        groupItems.forEach(function (match) {
+          var index = self.matches.length;
+          self.matches.push(match);
+          var li = document.createElement('li');
+          li.textContent = match.text;
+          if (index === self.selected) li.classList.add('selected');
+          li.addEventListener('mousemove', function () {
+            self.selected = index;
+            self.highlight();
+          });
+          li.addEventListener('click', function () {
+            self.selected = index;
+            self.choose();
+          });
+          self.results.appendChild(li);
+          self.itemEls.push(li);
+        });
+      });
+
       if (this.matches.length === 0) {
         var empty = document.createElement('li');
         empty.className = 'empty';
         empty.textContent = 'No matches';
         this.results.appendChild(empty);
-        return;
       }
-      this.matches.forEach(function (match, i) {
-        var li = document.createElement('li');
-        li.textContent = match.text;
-        if (i === this.selected) li.classList.add('selected');
-        li.addEventListener('mousemove', function () {
-          this.selected = i;
-          this.highlight();
-        }.bind(this));
-        li.addEventListener('click', function () {
-          this.selected = i;
-          this.choose();
-        }.bind(this));
-        this.results.appendChild(li);
-      }.bind(this));
     }
   }
 
