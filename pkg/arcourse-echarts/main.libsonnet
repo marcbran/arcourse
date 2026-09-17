@@ -48,4 +48,4 @@ local dashboardView = baseView {
   row(flex, children):: { type: 'row', flex: flex, children: children },
   column(flex, children):: { type: 'column', flex: flex, children: children },
   panel(flex, chart):: { type: 'panel', flex: flex, chart: chart },
-}
+} + (import 'charts/main.libsonnet')

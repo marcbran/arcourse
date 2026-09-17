@@ -15,14 +15,15 @@ local nodesDashboardLib = import 'nodes/dashboard.libsonnet';
 
 local query = queryLib(time, telemetry);
 local browse = browseLib(query);
+local chartLib = nodesChartLib(query, timeRange);
 
 {
   promql: {
-    chart: {
-      node: nodesChartLib(query, timeRange),
-      drillDown: { nodeList: nodeListsDrilldownLib(chain, $.promql.chart.node) },
-      entity: { nodeList: nodeListsEntityLib(chain, $.promql.list.node, $.promql.chart.drillDown.nodeList) },
-    },
+    chart: { base: chartLib.base },
+    line: { chart: $.promql.chart.base + chartLib.line },
+    stateTimeline: { chart: $.promql.chart.base + chartLib.stateTimeline },
+    drilldown: { nodeList: nodeListsDrilldownLib(chain) },
+    entity: { nodeList: nodeListsEntityLib(chain, $.promql.list.node, $.promql.drilldown.nodeList) },
     list: { node: nodesListLib(browse) },
     labels: { node: nodesLabelsLib(browse) },
     values: { node: nodesValuesLib(browse) },

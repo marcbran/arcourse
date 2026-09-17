@@ -1,3 +1,22 @@
+function stateTimelineRenderItem(params, api) {
+  var row = api.value(0);
+  var start = api.coord([api.value(1), row]);
+  var end = api.coord([api.value(2), row]);
+  var height = api.size([0, 1])[1] * 0.6;
+  return {
+    type: 'rect',
+    shape: {
+      x: start[0],
+      y: start[1] - height / 2,
+      width: Math.max(end[0] - start[0], 1),
+      height: height,
+    },
+    style: api.style(),
+  };
+}
+
+var RENDERERS = { stateTimeline: stateTimelineRenderItem };
+
 class EchartsChart extends HTMLElement {
   connectedCallback() {
     var self = this;
@@ -32,6 +51,12 @@ class EchartsChart extends HTMLElement {
     };
     option.toolbox = { show: false };
 
+    (option.series || []).forEach(function (s) {
+      if (typeof s.renderItem === 'string' && RENDERERS[s.renderItem]) {
+        s.renderItem = RENDERERS[s.renderItem];
+      }
+    });
+
     chart.setOption(option);
     this._resize = function () { chart.resize(); };
     window.addEventListener('resize', this._resize);
@@ -41,11 +66,6 @@ class EchartsChart extends HTMLElement {
       key: 'brush',
       brushOption: { brushType: 'lineX', brushMode: 'single' },
     });
-    // Drag-select a horizontal range to navigate to it as an
-    // absolute time range, mirroring Grafana's chart-drag zoom.
-    // brushSelected fires continuously while dragging, so it
-    // only tracks the pending range - navigation happens once,
-    // on mouseup, so it doesn't fire mid-drag.
     var pendingRange = null;
     chart.on('brushSelected', function (params) {
       var batch = params.batch && params.batch[0];
@@ -64,16 +84,11 @@ class EchartsChart extends HTMLElement {
       window.location.href = url.toString();
     });
 
-    // Click: toggle. Cmd/ctrl+click: toggle all (isolate this
-    // one / restore all). Shift+click: open link, same tab.
-    // Shift+cmd/ctrl+click: open link, new tab.
     var shiftKey = false;
     var cmdKey = false;
     var prevSelected = {};
     var suppress = false;
-    // Tracked ourselves instead of read from chart.getOption(),
-    // since ECharts only lazily populates legend[0].selected
-    // once the user has interacted with the legend at least once.
+
     var currentSelected = {};
     ((option.legend && option.legend.data) || []).forEach(function (entry) {
       currentSelected[typeof entry === 'string' ? entry : entry.name] = true;
@@ -126,9 +141,6 @@ class EchartsChart extends HTMLElement {
       }
     });
 
-    // Shift/shift+cmd on a data point mirrors the legend's
-    // link-opening behavior (same tab / new tab); plain and
-    // cmd-only clicks on items are left alone.
     chart.on('click', function (params) {
       if (params.componentType !== 'series' || !shiftKey) return;
       var link = links[params.seriesName];

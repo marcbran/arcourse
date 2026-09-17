@@ -1,4 +1,4 @@
-function(c, chartNode)
+function(c)
   function(params)
     local base = params.base;
     local rootNode = c.chainFields(c.root, base);
@@ -6,7 +6,6 @@ function(c, chartNode)
     local vars = std.get(params, 'vars', names);
     local titles = std.get(params, 'titles', [c.capitalize(v) for v in vars]);
     local metric = params.metric;
-    local unit = std.get(params, 'unit', null);
     local n = std.length(names);
 
     local pathSuffixes = [
@@ -37,9 +36,8 @@ function(c, chartNode)
         matchers:: li.matchers,
         titleGroupBy:: if li.isLeaf then '' else 'by %s ' % li.title,
       };
-      [li.path, chartNode {
-        title: ctx.title,
-        unit:: unit,
+      [li.path, ctx {
+        title:: ctx.title,
         queries: [
           {
             expr: ctx.expr % $,
