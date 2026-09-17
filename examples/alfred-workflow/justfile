@@ -1,0 +1,6 @@
+
+build:
+    rm -f arcourse.alfredworkflow && zip -q arcourse.alfredworkflow info.plist filter.py README.md
+
+install: build
+    open arcourse.alfredworkflow
