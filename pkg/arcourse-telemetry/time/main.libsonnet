@@ -1,5 +1,6 @@
 {
   now(): std.native('invoke:time')('now', []),
   addDuration(epochMs, spec): std.native('invoke:time')('addDuration', [epochMs, spec]),
-  parseRFC3339(value): std.native('invoke:time')('parseRFC3339', [value]),
+  parse(value, layout): std.native('invoke:time')('parse', [value, layout]),
+  format(epochMs, layout): std.native('invoke:time')('format', [epochMs, layout]),
 }

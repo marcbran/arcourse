@@ -1,40 +1,7 @@
 local a = import '../../arcourse-echarts/main.libsonnet';
+local time = import '../time/main.libsonnet';
 
 function(query, timeRange)
-  local round(v, decimals) =
-    if v == null || decimals == null then v
-    else
-      local factor = std.pow(10, decimals);
-      std.round(v * factor) / factor;
-
-  local siPrefixes = [
-    { factor: 1e12, suffix: 'TB' },
-    { factor: 1e9, suffix: 'GB' },
-    { factor: 1e6, suffix: 'MB' },
-    { factor: 1e3, suffix: 'KB' },
-    { factor: 1, suffix: 'B' },
-  ];
-
-  local maxAbsValue(series) =
-    std.foldl(
-      function(acc, s) std.foldl(
-        function(acc2, point) if point[1] == null then acc2 else std.max(acc2, std.abs(point[1])),
-        s.data,
-        acc
-      ),
-      series,
-      0
-    );
-
-  local siScale(maxAbs) =
-    local matches = [p for p in siPrefixes if maxAbs >= p.factor];
-    if std.length(matches) > 0 then matches[0] else siPrefixes[std.length(siPrefixes) - 1];
-
-  local scaleSeries(series, factor, decimals) = [
-    s { data: [[point[0], round(if point[1] == null then null else point[1] / factor, decimals)] for point in s.data] }
-    for s in series
-  ];
-
   local defaultSeriesName(labels) =
     local name = std.get(labels, '__name__', null);
     local rest = std.join(', ', ['%s="%s"' % [k, labels[k]] for k in std.objectFields(labels) if k != '__name__']);
@@ -56,90 +23,114 @@ function(query, timeRange)
 
   local hasPoints(series) = std.length(series.points) > 0;
 
-  local seriesFromResult(result, type, decimals, legendFormat) = [
-    {
-      name: seriesName(s.labels, legendFormat),
-      type: type,
-      showSymbol: true,
-      symbolSize: 16,
-      itemStyle: { opacity: 0 },
-      data: [[p[0], round(p[1], decimals)] for p in s.points],
-    }
-    for s in result.series
-    if hasPoints(s)
-  ];
+  local minList(l) = std.foldl(function(a, b) if b < a then b else a, l[1:], l[0]);
+
+  local stepFor(points) =
+    local ts = [p[0] for p in points];
+    local deltas = [ts[j + 1] - ts[j] for j in std.range(0, std.length(ts) - 2) if ts[j + 1] > ts[j]];
+    if std.length(deltas) > 0 then minList(deltas) else 60000;
+
+  local segmentsFor(points, step) =
+    local active = [p for p in points if p[1] != null && p[1] != 0];
+    if std.length(active) == 0 then []
+    else
+      local res = std.foldl(
+        function(acc, p)
+          local ts = p[0];
+          local v = p[1];
+          if acc.cur == null then acc { cur: { start: ts, end: ts + step, value: v } }
+          else if v == acc.cur.value && ts <= acc.cur.end + step * 0.5 then acc { cur: acc.cur { end: ts + step } }
+          else acc { segs: acc.segs + [acc.cur], cur: { start: ts, end: ts + step, value: v } },
+        active,
+        { segs: [], cur: null }
+      );
+      res.segs + (if res.cur != null then [res.cur] else []);
 
   local linksFromResult(result, linkFn, legendFormat) =
     if linkFn == null then {}
     else {
-      [seriesName(s.labels, legendFormat)]: linkFn(s.labels)._queryPath
+      [seriesName(s.labels, legendFormat)]: linkFn(s.labels)
       for s in result.series
       if hasPoints(s) && linkFn(s.labels) != null
     };
 
-  a.chart.view {
-    type:: 'line',
-    decimals:: 2,
-    unit:: null,
-    datasource:: 'default',
-    queries:: error 'Chart requires queries',
-    _paramSpecs: timeRange.paramSpecs,
-    _telemetryItems:: [
-      { type: 'promql', expr: qr.expr, instant: std.get(qr, 'instant', false) }
-      for qr in $.queries
-    ],
-    data: query($.datasource, $._telemetryItems, $._params.from, $._params.to),
-    links::
-      std.foldl(
+  {
+    base: a.chart.view {
+      local n = self,
+      datasource:: 'default',
+      queries:: error 'Chart requires queries',
+      _paramSpecs: timeRange.paramSpecs,
+      _telemetryItems:: [
+        { type: 'promql', expr: qr.expr, instant: std.get(qr, 'instant', false) }
+        for qr in n.queries
+      ],
+      data: query(n.datasource, n._telemetryItems, n._params.from, n._params.to),
+      _view+:: {
+        local baseFragment = super.fragment,
+        fragment: baseFragment { child:: [(timeRange.nav { from:: n._params.from, to:: n._params.to }).html, baseFragment.child] },
+      },
+    },
+
+    line: a.line.chart {
+      local n = self,
+      links: std.foldl(
         function(acc, i) acc + linksFromResult(
-          $.data.results[i],
-          std.get($.queries[i], 'link', null),
-          std.get($.queries[i], 'legendFormat', null)
+          n.data.results[i],
+          std.get(n.queries[i], 'link', null),
+          std.get(n.queries[i], 'legendFormat', null)
         ),
-        std.range(0, std.length($.queries) - 1),
+        std.range(0, std.length(n.queries) - 1),
         {}
       ),
-    option::
+      series:: std.flattenArrays([
+        [
+          { name: seriesName(s.labels, std.get(n.queries[i], 'legendFormat', null)), data: [[p[0], p[1]] for p in s.points] }
+          for s in n.data.results[i].series
+          if hasPoints(s)
+        ]
+        for i in std.range(0, std.length(n.queries) - 1)
+      ]),
+    },
+
+    stateTimeline: a.stateTimeline.chart {
+      local n = self,
+      local render(template, labels, value) =
+        if template != null then applyLegendFormat(template, labels + { value: std.toString(value) }) else null,
+      local linkFor(linkFn, labels) = if linkFn == null then null else linkFn(labels),
       local rawSeries = std.flattenArrays([
-        seriesFromResult($.data.results[i], $.type, null, std.get($.queries[i], 'legendFormat', null))
-        for i in std.range(0, std.length($.queries) - 1)
-      ]);
-      local scale = if $.unit == 'bytes' then siScale(maxAbsValue(rawSeries)) else { factor: 1, suffix: null };
-      local allSeries = scaleSeries(rawSeries, scale.factor, $.decimals);
-      {
-        title: { text: $.title },
-        tooltip: {
-          trigger: 'axis',
-          axisPointer: { type: 'cross', z: 100, lineStyle: { color: '#888', type: 'dashed' } },
-        },
-        legend: {
-          data: [{ name: s.name, itemStyle: { opacity: 1 } } for s in allSeries],
-          type: 'scroll',
-          bottom: 0,
-          icon: 'roundRect',
-        },
-        grid: { top: 40, bottom: 40, containLabel: true },
-        xAxis: {
-          type: 'time',
-          axisLabel: {
-            formatter: {
-              year: '{yyyy}',
-              month: '{MMM}',
-              day: '{MMM} {d}',
-              hour: '{HH}:{mm}',
-              minute: '{HH}:{mm}',
-              second: '{HH}:{mm}:{ss}',
-              none: '{yyyy}-{MM}-{dd}',
-            },
-          },
-        },
-        yAxis: { type: 'value' } + (
-          if scale.suffix != null then { axisLabel: { formatter: '{value} ' + scale.suffix } } else {}
-        ),
-        series: allSeries,
-      },
-    _view+:: {
-      local base = super.fragment,
-      fragment: base { child:: [(timeRange.nav { from:: $._params.from, to:: $._params.to }).html, base.child] },
+        [
+          {
+            row: if n.rowBy != null then applyLegendFormat(n.rowBy, s.labels) else seriesName(s.labels, std.get(n.queries[i], 'legendFormat', null)),
+            color: if n.colorBy != null then std.get(n.colors, applyLegendFormat(n.colorBy, s.labels), null) else null,
+            linkNode: linkFor(std.get(n.queries[i], 'link', null), s.labels),
+            labels: s.labels,
+            segments: segmentsFor(s.points, stepFor(s.points)),
+          }
+          for s in n.data.results[i].series
+          if hasPoints(s)
+        ]
+        for i in std.range(0, std.length(n.queries) - 1)
+      ]),
+      local active = [s for s in rawSeries if std.length(s.segments) > 0],
+      rowBy:: null,
+      colorBy:: null,
+      colors:: {},
+      labelBy:: null,
+      tooltip:: null,
+      timeFormat:: '2006-01-02 15:04',
+      rows:: std.foldl(function(acc, s) if std.member(acc, s.row) then acc else acc + [s.row], active, []),
+      links: std.foldl(function(acc, s) if s.linkNode != null then acc + { [s.row]: s.linkNode } else acc, active, {}),
+      segments:: std.flattenArrays([
+        [{
+          row: s.row,
+          start: seg.start,
+          end: seg.end,
+          color: s.color,
+          label: render(n.labelBy, s.labels, seg.value),
+          tooltip: render(n.tooltip, s.labels + { from: time.format(seg.start, n.timeFormat), to: time.format(seg.end, n.timeFormat) }, seg.value),
+          link: if s.linkNode != null then s.linkNode._queryPath else null,
+        } for seg in s.segments]
+        for s in active
+      ]),
     },
   }

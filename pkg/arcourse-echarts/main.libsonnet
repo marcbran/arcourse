@@ -4,14 +4,21 @@ local html = import 'html/main.libsonnet';
 
 local echartsSrc = 'https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js';
 local echartsScript = { element: 'script', attributes: { src: echartsSrc } };
+local componentScript = { element: 'script', children: [{ html: importstr 'components/chart.js' }] };
 
 local baseView = {
   local n = self,
   _view:: {
     fragment: error 'view requires a fragment',
-    page: ui.page { fragment:: [echartsScript, n._view.fragment] },
+    page: ui.page { fragment:: [echartsScript, componentScript, n._view.fragment] },
     html: html.manifestHtml(self.page),
   },
+};
+
+local linkPaths(links) = {
+  [k]: links[k]._queryPath
+  for k in std.objectFields(links)
+  if std.isObject(links[k]) && std.objectHasAll(links[k], '_queryPath')
 };
 
 local chartView = baseView {
@@ -20,8 +27,7 @@ local chartView = baseView {
       c.panel {
         child:: c.chart {
           option:: $.option,
-          links:: std.get($, 'links', {}),
-          id:: std.get($, 'chartId', 'chart'),
+          links:: linkPaths(std.get($, 'links', {})),
           width:: std.get($, 'width', '100%'),
           height:: std.get($, 'height', '400px'),
         },
@@ -48,4 +54,4 @@ local dashboardView = baseView {
   row(flex, children):: { type: 'row', flex: flex, children: children },
   column(flex, children):: { type: 'column', flex: flex, children: children },
   panel(flex, chart):: { type: 'panel', flex: flex, chart: chart },
-}
+} + (import 'charts/main.libsonnet')
