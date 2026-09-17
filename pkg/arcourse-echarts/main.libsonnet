@@ -1,6 +1,7 @@
 local c = import 'components/main.libsonnet';
 local ui = import '../arcourse-ui/components/main.libsonnet';
 local html = import 'html/main.libsonnet';
+local charts = import 'charts/main.libsonnet';
 
 local echartsSrc = 'https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js';
 local echartsScript = { element: 'script', attributes: { src: echartsSrc } };
@@ -54,4 +55,4 @@ local dashboardView = baseView {
   row(flex, children):: { type: 'row', flex: flex, children: children },
   column(flex, children):: { type: 'column', flex: flex, children: children },
   panel(flex, chart):: { type: 'panel', flex: flex, chart: chart },
-} + (import 'charts/main.libsonnet')
+} + charts
