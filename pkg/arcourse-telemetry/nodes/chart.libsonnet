@@ -1,4 +1,5 @@
 local a = import '../../arcourse-echarts/main.libsonnet';
+local time = import '../time/main.libsonnet';
 
 function(query, timeRange)
   local defaultSeriesName(labels) =
@@ -36,9 +37,10 @@ function(query, timeRange)
       local res = std.foldl(
         function(acc, p)
           local ts = p[0];
-          if acc.cur == null then acc { cur: { start: ts, end: ts + step } }
-          else if ts <= acc.cur.end + step * 0.5 then acc { cur: { start: acc.cur.start, end: ts + step } }
-          else acc { segs: acc.segs + [acc.cur], cur: { start: ts, end: ts + step } },
+          local v = p[1];
+          if acc.cur == null then acc { cur: { start: ts, end: ts + step, value: v } }
+          else if v == acc.cur.value && ts <= acc.cur.end + step * 0.5 then acc { cur: acc.cur { end: ts + step } }
+          else acc { segs: acc.segs + [acc.cur], cur: { start: ts, end: ts + step, value: v } },
         active,
         { segs: [], cur: null }
       );
@@ -47,7 +49,7 @@ function(query, timeRange)
   local linksFromResult(result, linkFn, legendFormat) =
     if linkFn == null then {}
     else {
-      [seriesName(s.labels, legendFormat)]: linkFn(s.labels)._queryPath
+      [seriesName(s.labels, legendFormat)]: linkFn(s.labels)
       for s in result.series
       if hasPoints(s) && linkFn(s.labels) != null
     };
@@ -63,7 +65,6 @@ function(query, timeRange)
         for qr in n.queries
       ],
       data: query(n.datasource, n._telemetryItems, n._params.from, n._params.to),
-      links:: {},
       _view+:: {
         local baseFragment = super.fragment,
         fragment: baseFragment { child:: [(timeRange.nav { from:: n._params.from, to:: n._params.to }).html, baseFragment.child] },
@@ -72,7 +73,7 @@ function(query, timeRange)
 
     line: a.line.chart {
       local n = self,
-      links:: std.foldl(
+      links: std.foldl(
         function(acc, i) acc + linksFromResult(
           n.data.results[i],
           std.get(n.queries[i], 'link', null),
@@ -93,11 +94,16 @@ function(query, timeRange)
 
     stateTimeline: a.stateTimeline.chart {
       local n = self,
+      local render(template, labels, value) =
+        if template != null then applyLegendFormat(template, labels + { value: std.toString(value) }) else null,
+      local linkFor(linkFn, labels) = if linkFn == null then null else linkFn(labels),
       local rawSeries = std.flattenArrays([
         [
           {
             row: if n.rowBy != null then applyLegendFormat(n.rowBy, s.labels) else seriesName(s.labels, std.get(n.queries[i], 'legendFormat', null)),
             color: if n.colorBy != null then std.get(n.colors, applyLegendFormat(n.colorBy, s.labels), null) else null,
+            linkNode: linkFor(std.get(n.queries[i], 'link', null), s.labels),
+            labels: s.labels,
             segments: segmentsFor(s.points, stepFor(s.points)),
           }
           for s in n.data.results[i].series
@@ -109,9 +115,21 @@ function(query, timeRange)
       rowBy:: null,
       colorBy:: null,
       colors:: {},
+      labelBy:: null,
+      tooltip:: null,
+      timeFormat:: '2006-01-02 15:04',
       rows:: std.foldl(function(acc, s) if std.member(acc, s.row) then acc else acc + [s.row], active, []),
+      links: std.foldl(function(acc, s) if s.linkNode != null then acc + { [s.row]: s.linkNode } else acc, active, {}),
       segments:: std.flattenArrays([
-        [{ row: s.row, start: seg.start, end: seg.end, color: s.color } for seg in s.segments]
+        [{
+          row: s.row,
+          start: seg.start,
+          end: seg.end,
+          color: s.color,
+          label: render(n.labelBy, s.labels, seg.value),
+          tooltip: render(n.tooltip, s.labels + { from: time.format(seg.start, n.timeFormat), to: time.format(seg.end, n.timeFormat) }, seg.value),
+          link: if s.linkNode != null then s.linkNode._queryPath else null,
+        } for seg in s.segments]
         for s in active
       ]),
     },

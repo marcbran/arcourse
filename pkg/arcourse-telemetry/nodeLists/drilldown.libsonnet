@@ -36,7 +36,8 @@ function(c)
         matchers:: li.matchers,
         titleGroupBy:: if li.isLeaf then '' else 'by %s ' % li.title,
       };
-      [li.path, ctx {
+      local override = std.get(std.get(ctx, 'levels', {}), ctx.groupBy, {});
+      [li.path, ctx + override {
         title:: ctx.title,
         queries: [
           {

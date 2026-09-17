@@ -3,16 +3,30 @@ function stateTimelineRenderItem(params, api) {
   var start = api.coord([api.value(1), row]);
   var end = api.coord([api.value(2), row]);
   var height = api.size([0, 1])[1] * 0.6;
-  return {
+  var x = start[0];
+  var y = start[1] - height / 2;
+  var width = Math.max(end[0] - start[0], 1);
+  var label = api.value(3);
+  var children = [{
     type: 'rect',
-    shape: {
-      x: start[0],
-      y: start[1] - height / 2,
-      width: Math.max(end[0] - start[0], 1),
-      height: height,
-    },
+    shape: { x: x, y: y, width: width, height: height },
     style: api.style(),
-  };
+  }];
+  if (label != null && label !== '' && width > String(label).length * 7 + 6) {
+    children.push({
+      type: 'text',
+      style: {
+        text: String(label),
+        x: x + width / 2,
+        y: start[1],
+        textAlign: 'center',
+        textVerticalAlign: 'middle',
+        fill: '#fff',
+        fontSize: 11,
+      },
+    });
+  }
+  return { type: 'group', children: children };
 }
 
 var RENDERERS = { stateTimeline: stateTimelineRenderItem };
@@ -143,7 +157,7 @@ class EchartsChart extends HTMLElement {
 
     chart.on('click', function (params) {
       if (params.componentType !== 'series' || !shiftKey) return;
-      var link = links[params.seriesName];
+      var link = (params.data && params.data.link) || links[params.seriesName];
       if (!link) return;
       if (cmdKey) window.open(link, '_blank');
       else window.location.href = link;

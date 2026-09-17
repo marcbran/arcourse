@@ -15,13 +15,19 @@ local baseView = {
   },
 };
 
+local linkPaths(links) = {
+  [k]: links[k]._queryPath
+  for k in std.objectFields(links)
+  if std.isObject(links[k]) && std.objectHasAll(links[k], '_queryPath')
+};
+
 local chartView = baseView {
   _view+:: {
     fragment:
       c.panel {
         child:: c.chart {
           option:: $.option,
-          links:: std.get($, 'links', {}),
+          links:: linkPaths(std.get($, 'links', {})),
           width:: std.get($, 'width', '100%'),
           height:: std.get($, 'height', '400px'),
         },
