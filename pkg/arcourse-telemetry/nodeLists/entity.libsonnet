@@ -2,24 +2,24 @@ function(c, listNode, drilldown)
   function(params)
     local base = params.base;
     local rootNode = c.chainFields(c.root, base);
-    local names = params.names;
-    local vars = std.get(params, 'vars', names);
-    local n = std.length(names);
+    local vars = params.vars;
+    local labels = std.get(params, 'labels', vars);
+    local n = std.length(vars);
     local last = n - 1;
 
-    local accs = c.accs(names, vars);
+    local accs = c.accs(labels, vars);
     local ancestorVars = accs[last].ancestorVars;
     local matchers = c.matcherClause(accs[last].matchers);
 
     local collectionPath = base + ['$' + v for v in ancestorVars] + [vars[last] + 's'];
     local placeholderPath = base + ['$' + v for v in ancestorVars] + ['$' + vars[last]];
 
-    local ctx = params { groupBy:: names[last], matchers:: matchers };
+    local ctx = params { groupBy:: labels[last], matchers:: matchers };
 
     local browseEntries = [
       [collectionPath, listNode {
         expr:: ctx.listExpr % $,
-        label:: names[last],
+        label:: labels[last],
         link:: function(name)
           c.chain(rootNode, [[v, $[v]] for v in ancestorVars] + [[vars[last], name]]),
       }],
