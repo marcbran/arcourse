@@ -9,9 +9,9 @@ local promote(arr, idx, val) = arr[:idx] + [val] + arr[idx + 1:];
 local chain(node, calls) = std.foldl(function(n, call) n[call[0]](call[1]), calls, node);
 local chainFields(node, fields) = std.foldl(function(n, f) n[f], fields, node);
 
-local accs(names, vars) =
-  local n = std.length(names);
-  local initialMatchers = [excludeMatcher(name) for name in names];
+local accs(labels, vars) =
+  local n = std.length(labels);
+  local initialMatchers = [excludeMatcher(label) for label in labels];
   std.foldl(
     function(acc, i)
       acc + [
@@ -19,7 +19,7 @@ local accs(names, vars) =
           local prev = acc[i - 1];
           {
             ancestorVars: prev.ancestorVars + [vars[i - 1]],
-            matchers: promote(prev.matchers, i - 1, eqMatcher(names[i - 1], vars[i - 1])),
+            matchers: promote(prev.matchers, i - 1, eqMatcher(labels[i - 1], vars[i - 1])),
           },
       ],
     std.range(0, n),
