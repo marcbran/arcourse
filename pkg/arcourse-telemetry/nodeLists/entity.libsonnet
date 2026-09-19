@@ -16,6 +16,16 @@ function(c, listNode, drilldown)
 
     local ctx = params { groupBy:: labels[last], matchers:: matchers };
 
+    local entityEntries =
+      if std.objectHasAll(params, 'entityBase') then
+        local entityNode = c.chainFields(c.root, params.entityBase);
+        local entityPath = params.entityBase + ['$' + v for v in vars];
+        [
+          [placeholderPath, { links+: { entity: c.chain(entityNode, [[v, $[v]] for v in vars]) } }],
+          [entityPath, { links+: { telemetry: c.chain(rootNode, [[v, $[v]] for v in vars]) } }],
+        ]
+      else [[placeholderPath]];
+
     local browseEntries = [
       [collectionPath, listNode {
         expr:: ctx.listExpr % $,
@@ -23,8 +33,7 @@ function(c, listNode, drilldown)
         link:: function(name)
           c.chain(rootNode, [[v, $[v]] for v in ancestorVars] + [[vars[last], name]]),
       }],
-      [placeholderPath],
-    ];
+    ] + entityEntries;
 
     local drillDowns = std.get(params, 'drillDowns', {});
     local drillDownEntries = std.flattenArrays([
