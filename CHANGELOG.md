@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.18.0](https://github.com/marcbran/arcourse/compare/v0.17.0...v0.18.0) (2026-09-19)
+
+
+### Features
+
+* example alfred workflow ([#119](https://github.com/marcbran/arcourse/issues/119)) ([eab94df](https://github.com/marcbran/arcourse/commit/eab94df0c547bc0eb85ece429e29be52c25260a0))
+* kubernetes telemetry ([#120](https://github.com/marcbran/arcourse/issues/120)) ([1ff89dd](https://github.com/marcbran/arcourse/commit/1ff89dd8e544dbc1b70b26c3c549807d17edae78))
+* state timeline ([#117](https://github.com/marcbran/arcourse/issues/117)) ([1b7bd00](https://github.com/marcbran/arcourse/commit/1b7bd008061c29a59bbc928730823b06aa3f2d42))
+
+
+### Bug Fixes
+
+* echarts imports ([#118](https://github.com/marcbran/arcourse/issues/118)) ([72c2a35](https://github.com/marcbran/arcourse/commit/72c2a35441a3d5d446a3145e409b9ac9b772a627))
+* remove external string links from links items ([#115](https://github.com/marcbran/arcourse/issues/115)) ([ee94728](https://github.com/marcbran/arcourse/commit/ee9472827cf94cf6fdec9270d6b10b9625f2fe45))
+
 ## [0.17.0](https://github.com/marcbran/arcourse/compare/v0.16.0...v0.17.0) (2026-09-15)
 
 
