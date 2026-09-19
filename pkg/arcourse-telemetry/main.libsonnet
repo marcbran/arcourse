@@ -8,6 +8,7 @@ local browseLib = import 'browse.libsonnet';
 local nodesChartLib = import 'nodes/chart.libsonnet';
 local nodeListsDrilldownLib = import 'nodeLists/drilldown.libsonnet';
 local nodeListsEntityLib = import 'nodeLists/entity.libsonnet';
+local nodeListsEntitiesLib = import 'nodeLists/entities.libsonnet';
 local nodesListLib = import 'nodes/list.libsonnet';
 local nodesLabelsLib = import 'nodes/labels.libsonnet';
 local nodesValuesLib = import 'nodes/values.libsonnet';
@@ -24,6 +25,7 @@ local chartLib = nodesChartLib(query, timeRange);
     stateTimeline: { chart: $.promql.chart.base + chartLib.stateTimeline },
     drilldown: { nodeList: nodeListsDrilldownLib(chain) },
     entity: { nodeList: nodeListsEntityLib(chain, $.promql.list.node, $.promql.drilldown.nodeList) },
+    entities: { nodeList: nodeListsEntitiesLib($.promql.entity.nodeList) },
     list: { node: nodesListLib(browse) },
     labels: { node: nodesLabelsLib(browse) },
     values: { node: nodesValuesLib(browse) },
