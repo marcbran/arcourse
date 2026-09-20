@@ -1,4 +1,4 @@
-function(c, listNode, drilldown)
+function(c, listNode, drilldown, logsNode)
   function(params)
     local base = params.base;
     local rootNode = c.chainFields(c.root, base);
@@ -41,4 +41,17 @@ function(c, listNode, drilldown)
       for metric in std.objectFields(drillDowns)
     ]);
 
-    browseEntries + drillDownEntries
+    local logsEntries =
+      if std.objectHasAll(params, 'logs') then
+        local logsLink = { links+: { logs: c.chain(rootNode, [[v, $[v]] for v in vars]).logs } };
+        [
+          [placeholderPath + ['logs'], logsNode + params.logs],
+          [placeholderPath, logsLink],
+        ] + (
+          if std.objectHasAll(params, 'entityBase')
+          then [[params.entityBase + ['$' + v for v in vars], logsLink]]
+          else []
+        )
+      else [];
+
+    browseEntries + logsEntries + drillDownEntries

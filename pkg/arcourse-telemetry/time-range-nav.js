@@ -71,6 +71,17 @@ function zoomOutRange(fromValue, toValue, nowMs) {
   };
 }
 
+function coverRange(fromValue, toValue, edgeMs, direction, nowMs) {
+  const size = resolve(toValue, nowMs) - resolve(fromValue, nowMs);
+  const rawFrom = direction < 0 ? edgeMs - size : edgeMs;
+  const rawTo = direction < 0 ? edgeMs : edgeMs + size;
+  const clamped = clampToNow(rawFrom, rawTo, nowMs);
+  return {
+    from: new Date(Math.round(clamped.from)).toISOString(),
+    to: new Date(Math.round(clamped.to)).toISOString(),
+  };
+}
+
 function pad2(n) {
   return String(n).padStart(2, '0');
 }
@@ -104,7 +115,7 @@ function combineDatePart(dateOnly, currentValue) {
 if (typeof HTMLElement !== 'undefined') {
   class TimeRangeNav extends HTMLElement {
     static get observedAttributes() {
-      return ['from', 'to'];
+      return ['from', 'to', 'result-from', 'result-to'];
     }
 
     connectedCallback() {
@@ -229,9 +240,11 @@ if (typeof HTMLElement !== 'undefined') {
           }
         </style>
         <div class="chip">
-          <button id="back" type="button" title="Shift back">&laquo;</button>
+          <button id="back" type="button" title="Shift back one window">&laquo;</button>
+          <button id="back-cover" type="button" title="Older (continue from returned range)">&lsaquo;</button>
           <span id="label" title="Edit time range"></span>
-          <button id="forward" type="button" title="Shift forward">&raquo;</button>
+          <button id="forward-cover" type="button" title="Newer (continue from returned range)">&rsaquo;</button>
+          <button id="forward" type="button" title="Shift forward one window">&raquo;</button>
           <button id="zoom-out" type="button" title="Zoom out">&#8854;</button>
         </div>
         <dialog id="modal">
@@ -262,6 +275,8 @@ if (typeof HTMLElement !== 'undefined') {
       `;
       this.shadowRoot.getElementById('back').addEventListener('click', () => this.shift(-1));
       this.shadowRoot.getElementById('forward').addEventListener('click', () => this.shift(1));
+      this.shadowRoot.getElementById('back-cover').addEventListener('click', () => this.cover(-1));
+      this.shadowRoot.getElementById('forward-cover').addEventListener('click', () => this.cover(1));
       this.shadowRoot.getElementById('zoom-out').addEventListener('click', () => this.zoomOut());
       this.shadowRoot.getElementById('label').addEventListener('click', () => this.openModal());
       this.shadowRoot.getElementById('apply').addEventListener('click', () => this.applyModal());
@@ -273,10 +288,20 @@ if (typeof HTMLElement !== 'undefined') {
       this.shadowRoot.getElementById('from-date-btn').addEventListener('click', () => this.shadowRoot.getElementById('from-date').showPicker());
       this.shadowRoot.getElementById('to-date-btn').addEventListener('click', () => this.shadowRoot.getElementById('to-date').showPicker());
       this.updateLabel();
+      this.updateCoverButtons();
     }
 
     attributeChangedCallback() {
       this.updateLabel();
+      this.updateCoverButtons();
+    }
+
+    updateCoverButtons() {
+      if (!this.shadowRoot) return;
+      const back = this.shadowRoot.getElementById('back-cover');
+      const forward = this.shadowRoot.getElementById('forward-cover');
+      if (back) back.style.display = this.hasAttribute('result-from') ? '' : 'none';
+      if (forward) forward.style.display = this.hasAttribute('result-to') ? '' : 'none';
     }
 
     updateLabel() {
@@ -297,6 +322,13 @@ if (typeof HTMLElement !== 'undefined') {
 
     shift(direction) {
       const range = shiftRange(this.getAttribute('from'), this.getAttribute('to'), direction, Date.now());
+      this.navigateTo(range.from, range.to);
+    }
+
+    cover(direction) {
+      const edge = direction < 0 ? this.getAttribute('result-from') : this.getAttribute('result-to');
+      if (edge === null) return;
+      const range = coverRange(this.getAttribute('from'), this.getAttribute('to'), Number(edge), direction, Date.now());
       this.navigateTo(range.from, range.to);
     }
 
@@ -338,9 +370,9 @@ if (typeof HTMLElement !== 'undefined') {
     }
   }
 
-  customElements.define('time-range-nav', TimeRangeNav);
+  if (!customElements.get('time-range-nav')) customElements.define('time-range-nav', TimeRangeNav);
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { parseOffset, resolve, formatOffset, formatValue, shiftRange, zoomOutRange, formatLocal, formatLocalDate, displayValue, dateOnlyValue, combineDatePart };
+  module.exports = { parseOffset, resolve, formatOffset, formatValue, shiftRange, zoomOutRange, coverRange, formatLocal, formatLocalDate, displayValue, dateOnlyValue, combineDatePart };
 }
