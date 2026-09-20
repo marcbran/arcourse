@@ -8,6 +8,12 @@ test-race:
 test-jsonnet:
     jpoet test .
 
+build-all-pkgs:
+    for dir in pkg/*/; do \
+        [ -f "$dir/main.libsonnet" ] || continue; \
+        rm -rf "$dir/build" && jpoet pkg build "$dir" || exit 1; \
+    done
+
 build-push-all-pkgs:
     for dir in pkg/*/; do \
         [ -f "$dir/main.libsonnet" ] || continue; \
@@ -22,8 +28,10 @@ test: test-go test-jsonnet test-node
 lint:
     golangci-lint run ./...
 
-build:
+build-go:
     go build -o arco .
+
+build: build-go build-all-pkgs
 
 install:
     dest=$(go env GOBIN); [ -n "$dest" ] || dest=$(go env GOPATH)/bin; go build -o "$dest/arco" .

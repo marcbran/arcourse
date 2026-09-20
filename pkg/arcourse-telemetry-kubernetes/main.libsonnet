@@ -1,5 +1,7 @@
+local telemetry = import '../arcourse-telemetry/main.libsonnet';
+
 {
-  a:: import '../arcourse-telemetry/main.libsonnet',
+  a:: telemetry,
 
   context:: {
     base:: ['telemetry', 'kubernetes'],
