@@ -3,9 +3,11 @@ local ui = import '../arcourse-ui/components/main.libsonnet';
 local html = import 'html/main.libsonnet';
 local charts = import 'charts/main.libsonnet';
 
+local chartJs = importstr 'components/chart.js';
+
 local echartsSrc = 'https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js';
 local echartsScript = { element: 'script', attributes: { src: echartsSrc } };
-local componentScript = { element: 'script', children: [{ html: importstr 'components/chart.js' }] };
+local componentScript = { element: 'script', children: [{ html: chartJs }] };
 
 local baseView = {
   local n = self,
