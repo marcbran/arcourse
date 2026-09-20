@@ -12,11 +12,13 @@ local nodeListsEntitiesLib = import 'nodeLists/entities.libsonnet';
 local nodesListLib = import 'nodes/list.libsonnet';
 local nodesLabelsLib = import 'nodes/labels.libsonnet';
 local nodesValuesLib = import 'nodes/values.libsonnet';
+local nodesLogsLib = import 'nodes/logs.libsonnet';
 local nodesDashboardLib = import 'nodes/dashboard.libsonnet';
 
 local query = queryLib(time, telemetry);
 local browse = browseLib(query);
 local chartLib = nodesChartLib(query, timeRange);
+local logsLib = nodesLogsLib(query, timeRange);
 
 {
   promql: {
@@ -24,12 +26,13 @@ local chartLib = nodesChartLib(query, timeRange);
     line: { chart: $.promql.chart.base + chartLib.line },
     stateTimeline: { chart: $.promql.chart.base + chartLib.stateTimeline },
     drilldown: { nodeList: nodeListsDrilldownLib(chain) },
-    entity: { nodeList: nodeListsEntityLib(chain, $.promql.list.node, $.promql.drilldown.nodeList) },
+    entity: { nodeList: nodeListsEntityLib(chain, $.promql.list.node, $.promql.drilldown.nodeList, $.logs.node) },
     entities: { nodeList: nodeListsEntitiesLib($.promql.entity.nodeList) },
     list: { node: nodesListLib(browse) },
     labels: { node: nodesLabelsLib(browse) },
     values: { node: nodesValuesLib(browse) },
   },
+  logs: { node: logsLib },
   telemetry: {
     dashboard: { node: nodesDashboardLib(query, timeRange) },
   },

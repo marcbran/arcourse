@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { resolve, formatOffset, shiftRange, zoomOutRange, formatLocal, formatLocalDate, displayValue, dateOnlyValue, combineDatePart } = require('./time-range-nav.js');
+const { resolve, formatOffset, shiftRange, zoomOutRange, coverRange, formatLocal, formatLocalDate, displayValue, dateOnlyValue, combineDatePart } = require('./time-range-nav.js');
 
 const NOW = Date.parse('2026-08-11T12:00:00Z');
 
@@ -102,6 +102,34 @@ test('zoomOutRange', async (t) => {
   for (const c of zoomOutRangeCases) {
     await t.test(c.name, () => {
       assert.deepEqual(zoomOutRange(c.from, c.to, NOW), c.want);
+    });
+  }
+});
+
+const HOUR = 3600e3;
+
+const coverRangeCases = [
+  {
+    name: 'older attaches a same-sized window ending at the returned start',
+    from: 'now-6h', to: 'now', edgeMs: NOW - 3 * HOUR, direction: -1,
+    want: { from: new Date(NOW - 9 * HOUR).toISOString(), to: new Date(NOW - 3 * HOUR).toISOString() },
+  },
+  {
+    name: 'newer attaches a same-sized window starting at the returned end',
+    from: 'now-6h', to: 'now', edgeMs: NOW - 10 * HOUR, direction: 1,
+    want: { from: new Date(NOW - 10 * HOUR).toISOString(), to: new Date(NOW - 4 * HOUR).toISOString() },
+  },
+  {
+    name: 'newer clamps to now when it would overshoot',
+    from: 'now-6h', to: 'now', edgeMs: NOW - 2 * HOUR, direction: 1,
+    want: { from: new Date(NOW - 6 * HOUR).toISOString(), to: new Date(NOW).toISOString() },
+  },
+];
+
+test('coverRange', async (t) => {
+  for (const c of coverRangeCases) {
+    await t.test(c.name, () => {
+      assert.deepEqual(coverRange(c.from, c.to, c.edgeMs, c.direction, NOW), c.want);
     });
   }
 });

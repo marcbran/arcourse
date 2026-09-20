@@ -13,10 +13,11 @@ p.pkg({
     p.plugin.github('marcbran/jsonnet-plugin-html', 'v0.0.0'),
   ],
 }, |||
-  Backend-agnostic `chart`/`dashboard` nodes rendering telemetry queries as
-  arcourse-echarts charts and dashboards. Queries are batched through the
-  host's `telemetry` invocation (see jsonnet-plugin-telemetry), resolving
-  relative time ranges (via jsonnet-plugin-time).
+  Backend-agnostic `chart`/`logs`/`dashboard` nodes rendering telemetry
+  queries as arcourse-echarts charts, log views, and dashboards. Queries are
+  batched through the host's `telemetry` invocation (see
+  jsonnet-plugin-telemetry), resolving relative time ranges (via
+  jsonnet-plugin-time).
 
   Each chart node queries exactly one telemetry type (a chart can't mix
   metric and log series in one rendering), but `dashboard.node` is type-
@@ -27,6 +28,12 @@ p.pkg({
     queries, analogous to arcourse-grafana's nodes but querying the generic
     `telemetry` invocation with `type: 'promql'` items instead of talking to
     Grafana directly.
+  |||),
+  logs: p.desc(|||
+    Backend-generic `logs` node: batches a telemetry item (query language set
+    via `type`, default `logql`) through the `telemetry` invocation and renders
+    the returned records as a time-sorted log view (severity accent,
+    click-to-expand fields).
   |||),
   dashboard: p.desc(|||
     Node rendering a `layout` of panels (see arcourse-echarts) as a
