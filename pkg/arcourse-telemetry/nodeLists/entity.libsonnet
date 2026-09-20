@@ -43,13 +43,10 @@ function(c, listNode, drilldown, logsNode)
 
     local logsEntries =
       if std.objectHasAll(params, 'logs') then
-        local logsLink = { links+: { logs: c.chain(rootNode, [[v, $[v]] for v in vars]).logs } };
-        [
-          [placeholderPath + ['logs'], logsNode + params.logs],
-          [placeholderPath, logsLink],
-        ] + (
-          if std.objectHasAll(params, 'entityBase')
-          then [[params.entityBase + ['$' + v for v in vars], logsLink]]
+        [[placeholderPath + ['logs'], logsNode + params.logs]] + (
+          if std.objectHasAll(params, 'entityBase') then
+            local entityPath = params.entityBase + ['$' + v for v in vars];
+            [[entityPath, { links+: { logs: c.chain(rootNode, [[v, $[v]] for v in vars]).logs } }]]
           else []
         )
       else [];
