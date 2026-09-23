@@ -47,6 +47,12 @@ local style = |||
       white-space: nowrap;
       opacity: 0.8;
     }
+    a.log-time {
+      text-decoration: none;
+    }
+    a.log-time:hover {
+      text-decoration: underline;
+    }
     .log-body {
       white-space: pre-wrap;
       word-break: break-all;
@@ -65,13 +71,18 @@ local logRow = {
   record:: error 'LogRow requires record',
   colors:: {},
   timeFormat:: error 'LogRow requires timeFormat',
+  link:: null,
   local rec = r.record,
   local fields = std.get(rec, 'fields', {}),
   local expandable = std.length(fields) > 0,
   local color = std.get(r.colors, std.asciiLower(std.get(rec, 'severity', '')), null),
   local entryAttrs = { class: 'log-entry' } + (if color != null then { style: 'border-left-color: %s' % color } else {}),
+  local timeText = time.format(rec.timestamp, r.timeFormat),
+  local timeEl =
+    if r.link != null then { element: 'a', attributes: { class: 'log-time', href: r.link }, children: [timeText] }
+    else { element: 'span', attributes: { class: 'log-time' }, children: [timeText] },
   local rowChildren = [
-    { element: 'span', attributes: { class: 'log-time' }, children: [time.format(rec.timestamp, r.timeFormat)] },
+    timeEl,
     { element: 'span', attributes: { class: 'log-body' }, children: [std.get(rec, 'body', '')] },
   ],
   html:
@@ -96,6 +107,7 @@ local logRow = {
   records:: error 'Logs requires records',
   colors:: defaultColors,
   timeFormat:: '2006-01-02 15:04:05.000',
+  links:: {},
   html: [
     { element: 'style', children: [style] },
     {
@@ -105,7 +117,15 @@ local logRow = {
         if std.length(c.records) == 0 then
           [{ element: 'div', attributes: { class: 'logs-empty' }, children: ['No logs'] }]
         else
-          [(logRow { record:: rec, colors:: c.colors, timeFormat:: c.timeFormat }).html for rec in c.records],
+          [
+            (logRow {
+               record:: rec,
+               colors:: c.colors,
+               timeFormat:: c.timeFormat,
+               link:: std.get(c.links, std.get(rec, 'id', ''), null),
+             }).html
+            for rec in c.records
+          ],
     },
   ],
 }

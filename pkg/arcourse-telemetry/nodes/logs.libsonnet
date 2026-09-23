@@ -8,25 +8,36 @@ function(query, timeRange)
     datasource:: 'default',
     type:: 'logql',
     expr:: error 'Logs requires expr',
+    record:: null,
     _paramSpecs: timeRange.paramSpecs,
     _telemetryItems:: [{ type: n.type, expr: n.expr }],
     data: query(n.datasource, n._telemetryItems, n._params.from, n._params.to),
-    records: std.reverse(std.sort(
+    local records = std.reverse(std.sort(
       std.get(n.data.results[0], 'records', []),
       function(rec) rec.timestamp
     )),
+    links:
+      if n.record == null then {}
+      else {
+        [rec.id]: n.record.graphNode { type: n.type, datasource: n.datasource, id: rec.id }
+        for rec in records
+        if std.get(rec, 'id', '') != ''
+      },
     _view:: {
-      local hasRecords = std.length(n.records) > 0,
+      local hasRecords = std.length(records) > 0,
       local nav = timeRange.element {
         from:: n._params.from,
         to:: n._params.to,
-        resultTo:: if hasRecords then n.records[0].timestamp else null,
-        resultFrom:: if hasRecords then n.records[std.length(n.records) - 1].timestamp else null,
+        resultTo:: if hasRecords then records[0].timestamp else null,
+        resultFrom:: if hasRecords then records[std.length(records) - 1].timestamp else null,
       },
       fragment: [
         timeRange.script.html,
         nav.html,
-        logs { records:: n.records },
+        logs {
+          records:: records,
+          links:: { [id]: n.links[id]._queryPath for id in std.objectFields(n.links) },
+        },
         nav.html,
       ],
       page: ui.page {
