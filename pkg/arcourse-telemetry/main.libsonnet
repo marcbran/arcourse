@@ -20,7 +20,6 @@ local nodesDashboardLib = import 'nodes/dashboard.libsonnet';
 local query = queryLib(time, telemetry);
 local browse = browseLib(query);
 local chartLib = nodesChartLib(query, timeRange);
-local logsLib = nodesLogsLib(query, timeRange);
 local logrecordLib = nodesLogrecordLib(telemetry);
 
 {
@@ -36,7 +35,7 @@ local logrecordLib = nodesLogrecordLib(telemetry);
     values: { node: nodesValuesLib(browse) },
   },
   logs: {
-    node: logsLib { record:: $.logs.record },
+    node: nodesLogsLib(query, timeRange, $.logs.record),
     record: {
       recordPath:: ['telemetry', 'logrecord', '$type', '$datasource', '$id'],
       node:: logrecordLib,
