@@ -2,13 +2,13 @@ local ui = import '../../arcourse-ui/components/main.libsonnet';
 local html = import '../../arcourse-ui/html/main.libsonnet';
 local logs = import '../components/logs.libsonnet';
 
-function(query, timeRange)
+function(query, timeRange, record=null)
   {
     local n = self,
     datasource:: 'default',
     type:: 'logql',
     expr:: error 'Logs requires expr',
-    record:: null,
+    columns:: [],
     _paramSpecs: timeRange.paramSpecs,
     _telemetryItems:: [{ type: n.type, expr: n.expr }],
     data: query(n.datasource, n._telemetryItems, n._params.from, n._params.to),
@@ -17,9 +17,9 @@ function(query, timeRange)
       function(rec) rec.timestamp
     )),
     links:
-      if n.record == null then {}
+      if record == null then {}
       else {
-        [rec.id]: n.record.graphNode { type: n.type, datasource: n.datasource, id: rec.id }
+        [rec.id]: record.graphNode { type: n.type, datasource: n.datasource, id: rec.id }
         for rec in records
         if std.get(rec, 'id', '') != ''
       },
@@ -37,6 +37,7 @@ function(query, timeRange)
         logs {
           records:: records,
           links:: { [id]: n.links[id]._queryPath for id in std.objectFields(n.links) },
+          columns:: n.columns,
         },
         nav.html,
       ],
