@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.19.0](https://github.com/marcbran/arcourse/compare/v0.18.0...v0.19.0) (2026-09-24)
+
+
+### Features
+
+* logs view columns ([#128](https://github.com/marcbran/arcourse/issues/128)) ([4dfe963](https://github.com/marcbran/arcourse/commit/4dfe963e466b341bdca6ee7b9e47e999febf4f97))
+* single log record view ([#127](https://github.com/marcbran/arcourse/issues/127)) ([64f781f](https://github.com/marcbran/arcourse/commit/64f781ff9baaf12ce3e2ed60eebc0dc9beea76bf))
+
+
+### Bug Fixes
+
+* chart.js import ([#125](https://github.com/marcbran/arcourse/issues/125)) ([80746dd](https://github.com/marcbran/arcourse/commit/80746ddd940948d981de1cd1da0aec60c68cf9b8))
+* deduplicate telemetry log link ([#126](https://github.com/marcbran/arcourse/issues/126)) ([3068fc0](https://github.com/marcbran/arcourse/commit/3068fc048f283f9c7c2c5c9ca15d45b4cc066568))
+* import in telemetry-kubernetes ([#124](https://github.com/marcbran/arcourse/issues/124)) ([1dfd000](https://github.com/marcbran/arcourse/commit/1dfd000ae1a254676660d9f3eca4259ebc488a4e))
+* use injection for telemetry-kubernetes ([#122](https://github.com/marcbran/arcourse/issues/122)) ([b54e2cd](https://github.com/marcbran/arcourse/commit/b54e2cdff063cf6307d6aae4d381998af949f370))
+
 ## [0.18.0](https://github.com/marcbran/arcourse/compare/v0.17.0...v0.18.0) (2026-09-20)
 
 
