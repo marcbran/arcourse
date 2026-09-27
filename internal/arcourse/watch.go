@@ -21,12 +21,13 @@ func (uc *watch) Exec(ctx context.Context, path string, params map[string]any, f
 		return nil, nil, err
 	}
 
-	_, segments, paramsJSON, key, err := queryParts(path, params, format)
+	formats := []pkg.Format{format}
+
+	_, segments, paramsJSON, key, err := queryParts(path, params, formats)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	formats := []pkg.Format{format}
 	expression, err := buildExpression(segments, paramsJSON, formats)
 	if err != nil {
 		return nil, nil, err

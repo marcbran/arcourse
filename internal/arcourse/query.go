@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
@@ -34,7 +35,7 @@ func (uc *query) Exec(ctx context.Context, path string, params map[string]any, f
 	observed := uc.lastQuery.ObservedFormats()
 	formats := mergeFormats(format, observed, uc.cfg.AuditFormats)
 
-	queryPath, segments, paramsJSON, key, err := queryParts(path, params, format)
+	queryPath, segments, paramsJSON, key, err := queryParts(path, params, formats)
 	if err != nil {
 		return pkg.Result{}, err
 	}
@@ -90,6 +91,7 @@ func mergeFormats(primary pkg.Format, sets ...[]pkg.Format) []pkg.Format {
 			formats = append(formats, f)
 		}
 	}
+	slices.Sort(formats)
 	return formats
 }
 
@@ -113,7 +115,7 @@ func splitPathAndQuery(path string) (string, map[string]any, error) {
 	return base, params, nil
 }
 
-func queryParts(path string, params map[string]any, format pkg.Format) (queryPath string, segments []string, paramsJSON string, key string, err error) {
+func queryParts(path string, params map[string]any, formats []pkg.Format) (queryPath string, segments []string, paramsJSON string, key string, err error) {
 	queryPath, queryParams, err := splitPathAndQuery(path)
 	if err != nil {
 		return "", nil, "", "", err
@@ -125,8 +127,16 @@ func queryParts(path string, params map[string]any, format pkg.Format) (queryPat
 		return "", nil, "", "", err
 	}
 	paramsJSON = string(paramsBytes)
-	key = queryPath + "|" + paramsJSON + "|" + string(format)
+	key = queryPath + "|" + paramsJSON + "|" + formatsKey(formats)
 	return queryPath, segments, paramsJSON, key, nil
+}
+
+func formatsKey(formats []pkg.Format) string {
+	parts := make([]string, len(formats))
+	for i, f := range formats {
+		parts[i] = string(f)
+	}
+	return strings.Join(parts, ",")
 }
 
 func buildExpression(segments []string, paramsJSON string, formats []pkg.Format) (string, error) {
