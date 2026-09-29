@@ -14,6 +14,8 @@ var (
 	ErrShapeNotSupported  = errors.New("compiling a root shape requires immediateGraph or compiledGraph mode (root.jsonnet must be a node-spec list, not a finished value)")
 )
 
+const QueryIDField = "_queryId"
+
 type Format string
 
 const (

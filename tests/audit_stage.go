@@ -75,6 +75,6 @@ func (s *Stage) the_fetched_audit_entry_html_is(expected string) *Stage {
 }
 
 func (s *Stage) the_fetched_audit_entry_json_is(expected string) *Stage {
-	assert.JSONEq(s.t, expected, s.auditEntry.Results[pkg.FormatJSON].Output)
+	assert.JSONEq(s.t, expected, withoutQueryID(s.auditEntry.Results[pkg.FormatJSON].Output))
 	return s
 }

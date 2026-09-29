@@ -3,6 +3,7 @@
 package tests
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -63,8 +64,25 @@ func (s *Stage) a_node_graph(jsonnet string) *Stage {
 }
 
 func (s *Stage) the_output_is(expected string) *Stage {
-	assert.JSONEq(s.t, expected, s.LastOutput)
+	assert.JSONEq(s.t, expected, withoutQueryID(s.LastOutput))
 	return s
+}
+
+func withoutQueryID(out string) string {
+	var doc map[string]any
+	err := json.Unmarshal([]byte(out), &doc)
+	if err != nil {
+		return out
+	}
+	if _, ok := doc[pkg.QueryIDField]; !ok {
+		return out
+	}
+	delete(doc, pkg.QueryIDField)
+	stripped, err := json.Marshal(doc)
+	if err != nil {
+		return out
+	}
+	return string(stripped)
 }
 
 func (s *Stage) the_raw_output_is(expected string) *Stage {
