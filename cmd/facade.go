@@ -34,7 +34,7 @@ func buildLocalFacade(cfg Config, plugins []*jpoet.Plugin) pkg.Facade {
 	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib, jpaths, plugins)
 	lastQuery := broadcast.NewLastQuery()
 	auditRepo := jsonfileinfra.NewAuditRepo(cfg.Audit.Dir)
-	return arcourse.NewFacade(cfg.Config, evaluator, lastQuery, auditRepo)
+	return arcourse.NewFacade(cfg.Config, evaluator, evaluator, lastQuery, auditRepo)
 }
 
 func closePlugins(plugins []*jpoet.Plugin) {

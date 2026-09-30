@@ -30,6 +30,7 @@ func NewServer(ctx context.Context, facade pkg.Facade) *Server {
 	s := &Server{facade: facade, mux: http.NewServeMux(), pendingWatches: newPendingWatches(), ctx: serverCtx, cancel: cancel}
 	s.mux.HandleFunc("POST /api/evaluate", s.handleEvaluate)
 	s.mux.HandleFunc("POST /api/query", s.handleQuery)
+	s.mux.HandleFunc("POST /api/exec/{id}", s.handleExec)
 	s.mux.HandleFunc("GET /api/audit", s.handleListAudit)
 	s.mux.HandleFunc("GET /api/audit/{id}", s.handleGetAudit)
 	s.mux.HandleFunc("GET /api/watch", s.handleWatch)

@@ -2,6 +2,7 @@ package jsonnet
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -78,6 +79,13 @@ func (e *Evaluator) EvaluateOnceRaw(snippet string) (string, error) {
 		return "", err
 	}
 	return out.String(), nil
+}
+
+func (e *Evaluator) Exec(ctx context.Context, plugin string, action string, data map[string]any) (string, error) {
+	if e.env == nil {
+		return "", fmt.Errorf("evaluator not warmed")
+	}
+	return e.env.Exec(ctx, plugin, action, data)
 }
 
 func (e *Evaluator) Watch(key string, snippet string) (string, <-chan string, func(), error) {

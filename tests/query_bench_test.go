@@ -90,7 +90,7 @@ func newBenchFacade(b *testing.B, evaluateDir string, warm bool) pkg.Facade {
 		Root:  arcourse.RootConfig{Dir: evaluateDir, Mode: arcourse.ModeCompiledGraph},
 		Audit: arcourse.AuditConfig{Formats: nil},
 	}
-	facade := arcourse.NewFacade(cfg, evaluator, lastQuery, auditRepo)
+	facade := arcourse.NewFacade(cfg, evaluator, evaluator, lastQuery, auditRepo)
 	if warm {
 		err := facade.Warm(context.Background())
 		if err != nil {

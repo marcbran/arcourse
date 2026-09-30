@@ -18,6 +18,7 @@ type Config struct {
 
 type facade struct {
 	evaluate    *evaluate
+	exec        *exec
 	query       *query
 	observe     *observe
 	watch       *watch
@@ -28,10 +29,10 @@ type facade struct {
 	environment *environment
 }
 
-func NewFacade(cfg Config, evaluator Evaluator, lastQuery LastQuery, auditRepo AuditRepo) pkg.Facade {
+func NewFacade(cfg Config, evaluator Evaluator, executor Executor, lastQuery LastQuery, auditRepo AuditRepo) pkg.Facade {
 	compile := newCompile(cfg.Root, evaluator)
 	root := newRoot(cfg.Root, evaluator)
-	environment := newEnvironment(root, evaluator)
+	environment := newEnvironment(root, evaluator, executor)
 	evaluate := newEvaluate(environment)
 	appendAudit := newAppendAudit(auditRepo)
 	queryCfg := QueryConfig{AuditFormats: cfg.Audit.Formats}
@@ -41,9 +42,11 @@ func NewFacade(cfg Config, evaluator Evaluator, lastQuery LastQuery, auditRepo A
 	listAudit := newListAudit(auditRepo)
 	getAudit := newGetAudit(auditRepo)
 	warm := newWarm(environment)
+	exec := newExec(auditRepo, environment)
 
 	return &facade{
 		evaluate:    evaluate,
+		exec:        exec,
 		query:       query,
 		observe:     observe,
 		watch:       watch,
@@ -77,6 +80,10 @@ func (f *facade) ListAudit(ctx context.Context) ([]pkg.AuditEntry, error) {
 
 func (f *facade) GetAudit(ctx context.Context, id string) (pkg.AuditEntry, error) {
 	return f.getAudit.Exec(ctx, id)
+}
+
+func (f *facade) Exec(ctx context.Context, id string) (pkg.Result, error) {
+	return f.exec.Exec(ctx, id)
 }
 
 func (f *facade) Compile(ctx context.Context) (pkg.Result, error) {

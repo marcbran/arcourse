@@ -41,7 +41,8 @@ func returnNotFound(w http.ResponseWriter, err error) {
 }
 
 func returnError(w http.ResponseWriter, err error) {
-	if errors.Is(err, pkg.ErrGraphEntryNotFound) || errors.Is(err, pkg.ErrEvaluateDirNotSet) {
+	if errors.Is(err, pkg.ErrGraphEntryNotFound) || errors.Is(err, pkg.ErrEvaluateDirNotSet) ||
+		errors.Is(err, pkg.ErrActionNotFound) || errors.Is(err, pkg.ErrAuditJSONNotRecorded) {
 		returnBadRequest(w, err)
 		return
 	}
