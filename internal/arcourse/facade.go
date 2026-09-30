@@ -37,7 +37,7 @@ func NewFacade(cfg Config, evaluator Evaluator, lastQuery LastQuery, auditRepo A
 	queryCfg := QueryConfig{AuditFormats: cfg.Audit.Formats}
 	query := newQuery(queryCfg, environment, lastQuery, appendAudit)
 	observe := newObserve(lastQuery)
-	watch := newWatch(environment)
+	watch := newWatch(queryCfg, environment, appendAudit)
 	listAudit := newListAudit(auditRepo)
 	getAudit := newGetAudit(auditRepo)
 	warm := newWarm(environment)

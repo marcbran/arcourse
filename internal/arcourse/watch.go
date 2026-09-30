@@ -8,11 +8,13 @@ import (
 )
 
 type watch struct {
+	cfg         QueryConfig
 	environment *environment
+	appendAudit *appendAudit
 }
 
-func newWatch(environment *environment) *watch {
-	return &watch{environment: environment}
+func newWatch(cfg QueryConfig, environment *environment, appendAudit *appendAudit) *watch {
+	return &watch{cfg: cfg, environment: environment, appendAudit: appendAudit}
 }
 
 func (uc *watch) Exec(ctx context.Context, path string, params map[string]any, format pkg.Format) (<-chan pkg.Result, func(), error) {
@@ -21,9 +23,9 @@ func (uc *watch) Exec(ctx context.Context, path string, params map[string]any, f
 		return nil, nil, err
 	}
 
-	formats := []pkg.Format{format}
+	formats := mergeFormats(format, uc.cfg.AuditFormats)
 
-	_, segments, paramsJSON, key, err := queryParts(path, params, formats)
+	queryPath, segments, paramsJSON, key, err := queryParts(path, params, formats)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -38,7 +40,7 @@ func (uc *watch) Exec(ctx context.Context, path string, params map[string]any, f
 		return nil, nil, err
 	}
 
-	value, ok := decodeValue(initial, format)
+	value, ok := uc.decodeAndAudit(ctx, initial, formats, format, queryPath)
 	if !ok {
 		unregister()
 		return nil, nil, fmt.Errorf("node has no %s view", format)
@@ -55,7 +57,7 @@ func (uc *watch) Exec(ctx context.Context, path string, params map[string]any, f
 				if !ok {
 					return
 				}
-				value, ok := decodeValue(out, format)
+				value, ok := uc.decodeAndAudit(ctx, out, formats, format, queryPath)
 				if !ok {
 					continue
 				}
@@ -73,11 +75,17 @@ func (uc *watch) Exec(ctx context.Context, path string, params map[string]any, f
 	return results, unregister, nil
 }
 
-func decodeValue(out string, format pkg.Format) (string, bool) {
-	decoded, _, err := decodeOutput(out, []pkg.Format{format}, format)
+func (uc *watch) decodeAndAudit(ctx context.Context, out string, formats []pkg.Format, format pkg.Format, queryPath string) (string, bool) {
+	decoded, queryID, err := decodeOutput(out, formats, format)
 	if err != nil {
 		return "", false
 	}
 	value, ok := decoded[format]
-	return value, ok
+	if !ok {
+		return "", false
+	}
+	if len(uc.cfg.AuditFormats) > 0 {
+		uc.appendAudit.Exec(ctx, queryID, queryPath, auditResults(decoded, uc.cfg.AuditFormats))
+	}
+	return value, true
 }
