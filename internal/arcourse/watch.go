@@ -74,7 +74,7 @@ func (uc *watch) Exec(ctx context.Context, path string, params map[string]any, f
 }
 
 func decodeValue(out string, format pkg.Format) (string, bool) {
-	decoded, err := decodeOutput(out, []pkg.Format{format}, format)
+	decoded, _, err := decodeOutput(out, []pkg.Format{format}, format)
 	if err != nil {
 		return "", false
 	}

@@ -2,11 +2,16 @@ package jsonnet
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io/fs"
+	"strings"
 	"sync"
 
 	"github.com/google/go-jsonnet"
+	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 	"github.com/marcbran/jpoet/pkg/jpoet"
 	"github.com/marcbran/jpoet/pkg/watch"
 )
@@ -21,7 +26,10 @@ type Evaluator struct {
 }
 
 func NewEvaluator(lib fs.FS, jpaths []string, plugins []*jpoet.Plugin) *Evaluator {
-	return &Evaluator{lib: lib, jpaths: jpaths, plugins: plugins}
+	all := make([]*jpoet.Plugin, 0, len(plugins)+1)
+	all = append(all, plugins...)
+	all = append(all, newPlugin())
+	return &Evaluator{lib: lib, jpaths: jpaths, plugins: all}
 }
 
 func (e *Evaluator) Warm(rootPath string) error {
@@ -81,6 +89,7 @@ func (e *Evaluator) Watch(key string, snippet string) (string, <-chan string, fu
 	unregister, err := e.env.Watch(
 		watch.WatchSnippetInput("arcourse.jsonnet", snippet),
 		watch.WatchWithKey(watch.WatchKey(key)),
+		watch.WatchWithIdentity(contentIdentity),
 		watch.WatchValueOutput(&initial, &updates),
 	)
 	if err != nil {
@@ -112,6 +121,25 @@ func (e *Evaluator) WatchFile(key string, snippet string, path string) (func(), 
 		watch.WatchFileOutput(path),
 		watch.WatchSerialize(false),
 	)
+}
+
+func contentIdentity(output string) (string, bool) {
+	var raw map[string]json.RawMessage
+	err := json.Unmarshal([]byte(output), &raw)
+	if err != nil {
+		return "", false
+	}
+	rawID, ok := raw[pkg.QueryIDField]
+	if !ok {
+		return "", false
+	}
+	var id string
+	err = json.Unmarshal(rawID, &id)
+	if err != nil || id == "" {
+		return "", false
+	}
+	sum := sha256.Sum256([]byte(strings.ReplaceAll(output, id, "")))
+	return hex.EncodeToString(sum[:]), true
 }
 
 func (e *Evaluator) buildWatchedEnv(rootPath string) (*watch.Environment, error) {

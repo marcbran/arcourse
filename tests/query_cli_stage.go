@@ -130,7 +130,7 @@ func (s *CLIStage) a_path_is_queried_to_output_file(path string, format pkg.Form
 }
 
 func (s *CLIStage) the_output_is(expected string) *CLIStage {
-	assert.JSONEq(s.t, expected, s.LastOutput)
+	assert.JSONEq(s.t, expected, withoutQueryID(s.LastOutput))
 	return s
 }
 

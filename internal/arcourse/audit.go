@@ -6,7 +6,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/google/uuid"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 
@@ -24,9 +23,9 @@ func newAppendAudit(auditRepo AuditRepo) *appendAudit {
 	return &appendAudit{auditRepo: auditRepo}
 }
 
-func (uc *appendAudit) Exec(ctx context.Context, path string, results map[pkg.Format]pkg.Result) {
+func (uc *appendAudit) Exec(ctx context.Context, id string, path string, results map[pkg.Format]pkg.Result) {
 	entry := pkg.AuditEntry{
-		ID:        uuid.Must(uuid.NewV7()).String(),
+		ID:        id,
 		Path:      path,
 		Timestamp: time.Now(),
 		Results:   results,

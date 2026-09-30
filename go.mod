@@ -5,7 +5,7 @@ go 1.26.2
 require (
 	github.com/google/go-jsonnet v0.22.0
 	github.com/google/uuid v1.6.0
-	github.com/marcbran/jpoet v0.23.1
+	github.com/marcbran/jpoet v0.24.0
 	github.com/marcbran/jsonnet-plugin-html v0.3.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.12.1
@@ -30,7 +30,7 @@ require (
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260526163538-3dc84a4a5aaa // indirect
-	google.golang.org/grpc v1.83.2 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
+	google.golang.org/grpc v1.84.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 )

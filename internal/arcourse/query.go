@@ -51,7 +51,7 @@ func (uc *query) Exec(ctx context.Context, path string, params map[string]any, f
 	}
 	unregister()
 
-	decoded, err := decodeOutput(out, formats, format)
+	decoded, queryID, err := decodeOutput(out, formats, format)
 	if err != nil {
 		return pkg.Result{}, err
 	}
@@ -73,7 +73,7 @@ func (uc *query) Exec(ctx context.Context, path string, params map[string]any, f
 			}
 			results[f] = pkg.Result{Output: value}
 		}
-		uc.appendAudit.Exec(ctx, queryPath, results)
+		uc.appendAudit.Exec(ctx, queryID, queryPath, results)
 	}
 
 	return pkg.Result{Output: decoded[format]}, nil
@@ -167,28 +167,40 @@ func mergeParams(base map[string]any, overrides map[string]any) map[string]any {
 	return merged
 }
 
-func decodeOutput(out string, formats []pkg.Format, primary pkg.Format) (map[pkg.Format]string, error) {
+func decodeOutput(out string, formats []pkg.Format, primary pkg.Format) (map[pkg.Format]string, string, error) {
 	var raw map[string]json.RawMessage
 	err := json.Unmarshal([]byte(out), &raw)
 	if err != nil {
-		return nil, err
+		return nil, "", err
+	}
+	rawID, ok := raw[pkg.QueryIDField]
+	if !ok {
+		return nil, "", fmt.Errorf("output has no %s", pkg.QueryIDField)
+	}
+	var queryID string
+	err = json.Unmarshal(rawID, &queryID)
+	if err != nil {
+		return nil, "", err
+	}
+	if queryID == "" {
+		return nil, "", fmt.Errorf("output has an empty %s", pkg.QueryIDField)
 	}
 	decoded := make(map[pkg.Format]string, len(raw))
 	for _, f := range formats {
 		rawValue, ok := raw[string(f)]
 		if !ok {
 			if f == primary {
-				return nil, fmt.Errorf("node has no %s view", f)
+				return nil, "", fmt.Errorf("node has no %s view", f)
 			}
 			continue
 		}
 		value, err := decodeField(f, rawValue)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		decoded[f] = value
 	}
-	return decoded, nil
+	return decoded, queryID, nil
 }
 
 func decodeField(format pkg.Format, raw json.RawMessage) (string, error) {
