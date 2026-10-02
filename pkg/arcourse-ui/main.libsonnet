@@ -104,6 +104,15 @@ local resourceView = baseView {
   },
 };
 
+local actionView = baseView {
+  _view+:: {
+    fragment: c.action {
+      queryId:: std.get($, '_queryId', ''),
+      summary:: std.get($, '_summary', ''),
+    },
+  },
+};
+
 local withNode = { node: self.view + linkspecs.withLinkSpecs };
 
 {
@@ -112,4 +121,5 @@ local withNode = { node: self.view + linkspecs.withLinkSpecs };
   table: { view: tableView } + withNode,
   yaml: { view: yamlView } + withNode,
   resource: { view: resourceView } + withNode,
+  action: { view: actionView } + withNode,
 }

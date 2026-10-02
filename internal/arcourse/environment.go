@@ -17,10 +17,11 @@ type Evaluator interface {
 type environment struct {
 	root      *root
 	evaluator Evaluator
+	executor  Executor
 }
 
-func newEnvironment(root *root, evaluator Evaluator) *environment {
-	return &environment{root: root, evaluator: evaluator}
+func newEnvironment(root *root, evaluator Evaluator, executor Executor) *environment {
+	return &environment{root: root, evaluator: evaluator, executor: executor}
 }
 
 func (e *environment) Warm(ctx context.Context) error {
@@ -41,6 +42,14 @@ func (e *environment) Watch(ctx context.Context, key string, expression string) 
 		return "", nil, nil, err
 	}
 	return e.evaluator.Watch(key, queryExpression(expression))
+}
+
+func (e *environment) Exec(ctx context.Context, plugin string, action string, data map[string]any) (string, error) {
+	err := e.root.Warm(ctx)
+	if err != nil {
+		return "", err
+	}
+	return e.executor.Exec(ctx, plugin, action, data)
 }
 
 func (e *environment) Close() error {

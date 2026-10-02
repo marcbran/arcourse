@@ -4,9 +4,12 @@ package tests
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func (s *Stage) a_path_is_queried(path string) *Stage {
@@ -50,4 +53,22 @@ func (s *Stage) a_path_is_queried_with_format_promptly(path string, format pkg.F
 	s.LastOutput = result.Output
 	s.LastError = ""
 	return s
+}
+
+func (s *Stage) the_queried_output_has_a_query_id() *Stage {
+	s.queryID = queryIDOf(s.t, s.LastOutput)
+	assert.NotEmpty(s.t, s.queryID)
+	return s
+}
+
+func queryIDOf(t require.TestingT, out string) string {
+	var doc map[string]json.RawMessage
+	err := json.Unmarshal([]byte(out), &doc)
+	require.NoError(t, err)
+	raw, ok := doc[pkg.QueryIDField]
+	require.True(t, ok, "output has no %s", pkg.QueryIDField)
+	var id string
+	err = json.Unmarshal(raw, &id)
+	require.NoError(t, err)
+	return id
 }

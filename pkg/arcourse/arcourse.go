@@ -8,10 +8,12 @@ import (
 )
 
 var (
-	ErrGraphEntryNotFound = errors.New("root.jsonnet not found in evaluate dir")
-	ErrEvaluateDirNotSet  = errors.New("evaluate dir not set")
-	ErrAuditEntryNotFound = errors.New("audit entry not found")
-	ErrShapeNotSupported  = errors.New("compiling a root shape requires immediateGraph or compiledGraph mode (root.jsonnet must be a node-spec list, not a finished value)")
+	ErrGraphEntryNotFound   = errors.New("root.jsonnet not found in evaluate dir")
+	ErrEvaluateDirNotSet    = errors.New("evaluate dir not set")
+	ErrAuditEntryNotFound   = errors.New("audit entry not found")
+	ErrAuditJSONNotRecorded = errors.New("audit entry has no json result recorded")
+	ErrActionNotFound       = errors.New("node has no action")
+	ErrShapeNotSupported    = errors.New("compiling a root shape requires immediateGraph or compiledGraph mode (root.jsonnet must be a node-spec list, not a finished value)")
 )
 
 const QueryIDField = "_queryId"
@@ -40,6 +42,11 @@ type Result struct {
 	Output string
 }
 
+type ExecResult struct {
+	Output   string
+	Redirect string
+}
+
 type AuditEntry struct {
 	ID        string
 	Path      string
@@ -54,6 +61,7 @@ type Facade interface {
 	Watch(ctx context.Context, path string, params map[string]any, format Format) (<-chan Result, func(), error)
 	ListAudit(ctx context.Context) ([]AuditEntry, error)
 	GetAudit(ctx context.Context, id string) (AuditEntry, error)
+	Exec(ctx context.Context, id string) (ExecResult, error)
 	Compile(ctx context.Context) (Result, error)
 	Warm(ctx context.Context) error
 	Close() error

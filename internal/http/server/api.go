@@ -23,6 +23,11 @@ type outputResponse struct {
 	Output string `json:"output"`
 }
 
+type execResponse struct {
+	Output   string `json:"output"`
+	Redirect string `json:"redirect"`
+}
+
 func (s *Server) handleEvaluate(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -74,6 +79,20 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	returnSuccess(w, outputResponse{Output: result.Output})
+}
+
+func (s *Server) handleExec(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		returnBadRequest(w, errors.New("id is required"))
+		return
+	}
+	result, err := s.facade.Exec(r.Context(), id)
+	if err != nil {
+		returnError(w, err)
+		return
+	}
+	returnSuccess(w, execResponse{Output: result.Output, Redirect: result.Redirect})
 }
 
 func (s *Server) handleListAudit(w http.ResponseWriter, r *http.Request) {

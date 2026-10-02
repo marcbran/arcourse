@@ -65,15 +65,7 @@ func (uc *query) Exec(ctx context.Context, path string, params map[string]any, f
 	}
 
 	if len(uc.cfg.AuditFormats) > 0 {
-		results := make(map[pkg.Format]pkg.Result, len(uc.cfg.AuditFormats))
-		for _, f := range uc.cfg.AuditFormats {
-			value, ok := decoded[f]
-			if !ok {
-				continue
-			}
-			results[f] = pkg.Result{Output: value}
-		}
-		uc.appendAudit.Exec(ctx, queryID, queryPath, results)
+		uc.appendAudit.Exec(ctx, queryID, queryPath, auditResults(decoded, uc.cfg.AuditFormats))
 	}
 
 	return pkg.Result{Output: decoded[format]}, nil
@@ -213,4 +205,16 @@ func decodeField(format pkg.Format, raw json.RawMessage) (string, error) {
 		return "", err
 	}
 	return s, nil
+}
+
+func auditResults(decoded map[pkg.Format]string, auditFormats []pkg.Format) map[pkg.Format]pkg.Result {
+	results := make(map[pkg.Format]pkg.Result, len(auditFormats))
+	for _, f := range auditFormats {
+		value, ok := decoded[f]
+		if !ok {
+			continue
+		}
+		results[f] = pkg.Result{Output: value}
+	}
+	return results
 }

@@ -29,6 +29,8 @@ type Stage struct {
 	auditEntries []pkg.AuditEntry
 	auditEntry   pkg.AuditEntry
 
+	queryID string
+
 	LastOutput string
 	LastError  string
 }
