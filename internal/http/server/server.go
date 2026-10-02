@@ -41,6 +41,7 @@ func NewServer(ctx context.Context, facade pkg.Facade) *Server {
 	s.mux.HandleFunc("GET /audit/", redirectTo("/audit"))
 	s.mux.HandleFunc("GET /audit/{id}", s.handleAuditEntryPage)
 	s.mux.HandleFunc("GET /watch", s.handleBrowseWatch)
+	s.mux.HandleFunc("POST /exec", s.handleBrowseExec)
 	s.mux.HandleFunc("GET /{path...}", s.handleBrowse)
 	return s
 }

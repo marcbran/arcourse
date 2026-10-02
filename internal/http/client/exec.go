@@ -11,15 +11,20 @@ import (
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 
-func (c *Client) Exec(ctx context.Context, id string) (pkg.Result, error) {
+type execResponse struct {
+	Output   string `json:"output"`
+	Redirect string `json:"redirect"`
+}
+
+func (c *Client) Exec(ctx context.Context, id string) (pkg.ExecResult, error) {
 	reqURL := c.baseURL + "/api/exec/" + url.PathEscape(id)
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, nil)
 	if err != nil {
-		return pkg.Result{}, err
+		return pkg.ExecResult{}, err
 	}
 	resp, err := c.client.Do(httpReq)
 	if err != nil {
-		return pkg.Result{}, err
+		return pkg.ExecResult{}, err
 	}
 	defer func() {
 		_ = resp.Body.Close()
@@ -28,14 +33,14 @@ func (c *Client) Exec(ctx context.Context, id string) (pkg.Result, error) {
 		var errorResp http2.ErrorResponse
 		err = json.NewDecoder(resp.Body).Decode(&errorResp)
 		if err != nil {
-			return pkg.Result{}, fmt.Errorf("http %d", resp.StatusCode)
+			return pkg.ExecResult{}, fmt.Errorf("http %d", resp.StatusCode)
 		}
-		return pkg.Result{}, fmt.Errorf("%s", errorResp.Message)
+		return pkg.ExecResult{}, fmt.Errorf("%s", errorResp.Message)
 	}
-	var out outputResponse
+	var out execResponse
 	err = json.NewDecoder(resp.Body).Decode(&out)
 	if err != nil {
-		return pkg.Result{}, err
+		return pkg.ExecResult{}, err
 	}
-	return pkg.Result{Output: out.Output}, nil
+	return pkg.ExecResult{Output: out.Output, Redirect: out.Redirect}, nil
 }

@@ -169,10 +169,10 @@ func (f *ServerBackedCLIFacade) GetAudit(ctx context.Context, id string) (pkg.Au
 	return f.client.GetAudit(ctx, id)
 }
 
-func (f *ServerBackedCLIFacade) Exec(ctx context.Context, id string) (pkg.Result, error) {
+func (f *ServerBackedCLIFacade) Exec(ctx context.Context, id string) (pkg.ExecResult, error) {
 	err := f.start()
 	if err != nil {
-		return pkg.Result{}, err
+		return pkg.ExecResult{}, err
 	}
 	return f.client.Exec(ctx, id)
 }
@@ -497,7 +497,7 @@ func (f *CLIFacade) GetAudit(ctx context.Context, id string) (pkg.AuditEntry, er
 	return entry, nil
 }
 
-func (f *CLIFacade) Exec(ctx context.Context, id string) (pkg.Result, error) {
+func (f *CLIFacade) Exec(ctx context.Context, id string) (pkg.ExecResult, error) {
 	cmd := exec.CommandContext(ctx, f.binaryPath, "exec", id)
 	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
 
@@ -509,11 +509,11 @@ func (f *CLIFacade) Exec(ctx context.Context, id string) (pkg.Result, error) {
 	err := cmd.Run()
 	if err != nil {
 		if stderr.String() != "" {
-			return pkg.Result{}, errors.New(stderr.String())
+			return pkg.ExecResult{}, errors.New(stderr.String())
 		}
-		return pkg.Result{}, err
+		return pkg.ExecResult{}, err
 	}
-	return pkg.Result{Output: strings.TrimSuffix(stdout.String(), "\n")}, nil
+	return pkg.ExecResult{Output: strings.TrimSuffix(stdout.String(), "\n")}, nil
 }
 
 func (f *CLIFacade) Compile(ctx context.Context) (pkg.Result, error) {

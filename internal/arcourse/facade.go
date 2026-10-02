@@ -82,7 +82,7 @@ func (f *facade) GetAudit(ctx context.Context, id string) (pkg.AuditEntry, error
 	return f.getAudit.Exec(ctx, id)
 }
 
-func (f *facade) Exec(ctx context.Context, id string) (pkg.Result, error) {
+func (f *facade) Exec(ctx context.Context, id string) (pkg.ExecResult, error) {
 	return f.exec.Exec(ctx, id)
 }
 

@@ -60,6 +60,25 @@ func (s *Server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *Server) handleBrowseExec(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+	if err != nil {
+		returnBadRequest(w, err)
+		return
+	}
+	id := r.PostFormValue("queryId")
+	if id == "" {
+		returnBadRequest(w, errors.New("queryId is required"))
+		return
+	}
+	result, err := s.facade.Exec(r.Context(), id)
+	if err != nil {
+		returnError(w, err)
+		return
+	}
+	http.Redirect(w, r, "/"+strings.TrimPrefix(result.Redirect, "/"), http.StatusSeeOther)
+}
+
 func browseWatchURL(token string) []byte {
 	values := url.Values{"token": {token}}
 	out, _ := json.Marshal("/watch?" + values.Encode())

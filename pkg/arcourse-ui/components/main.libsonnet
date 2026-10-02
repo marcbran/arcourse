@@ -5,4 +5,5 @@
   page: import 'page.libsonnet',
   resource: import 'resource.libsonnet',
   breadcrumbs: import 'breadcrumbs.libsonnet',
+  action: import 'action.libsonnet',
 }

@@ -11,9 +11,14 @@ import (
 const actionField = "_action"
 
 type Command struct {
-	Plugin string         `json:"plugin"`
-	Name   string         `json:"name"`
-	Data   map[string]any `json:"data"`
+	Plugin   string         `json:"plugin"`
+	Name     string         `json:"name"`
+	Data     map[string]any `json:"data"`
+	Redirect *nodeRef       `json:"redirect"`
+}
+
+type nodeRef struct {
+	QueryPath string `json:"_queryPath"`
 }
 
 type Executor interface {
@@ -29,27 +34,32 @@ func newExec(auditRepo AuditRepo, environment *environment) *exec {
 	return &exec{auditRepo: auditRepo, environment: environment}
 }
 
-func (uc *exec) Exec(ctx context.Context, id string) (pkg.Result, error) {
+func (uc *exec) Exec(ctx context.Context, id string) (pkg.ExecResult, error) {
 	err := ctx.Err()
 	if err != nil {
-		return pkg.Result{}, err
+		return pkg.ExecResult{}, err
 	}
 
 	entry, err := uc.auditRepo.Get(ctx, id)
 	if err != nil {
-		return pkg.Result{}, err
+		return pkg.ExecResult{}, err
 	}
 
 	command, err := decodeCommand(entry)
 	if err != nil {
-		return pkg.Result{}, err
+		return pkg.ExecResult{}, err
 	}
 
 	output, err := uc.environment.Exec(ctx, command.Plugin, command.Name, command.Data)
 	if err != nil {
-		return pkg.Result{}, err
+		return pkg.ExecResult{}, err
 	}
-	return pkg.Result{Output: output}, nil
+
+	redirect := entry.Path
+	if command.Redirect != nil && command.Redirect.QueryPath != "" {
+		redirect = command.Redirect.QueryPath
+	}
+	return pkg.ExecResult{Output: output, Redirect: redirect}, nil
 }
 
 func decodeCommand(entry pkg.AuditEntry) (Command, error) {
