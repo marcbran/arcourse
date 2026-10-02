@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"errors"
+	"fmt"
 
 	"github.com/google/go-jsonnet"
 	"github.com/google/go-jsonnet/ast"
@@ -22,6 +24,12 @@ func main() {
 					return args[0], nil
 				},
 			},
-		})}
+		}, jpoet.WithAction("echo", func(_ context.Context, data map[string]any) (string, error) {
+			value, ok := data["value"]
+			if !ok {
+				return "", errors.New("value must be provided")
+			}
+			return fmt.Sprintf("echoed %v", value), nil
+		}))}
 	})
 }

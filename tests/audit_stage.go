@@ -78,3 +78,16 @@ func (s *Stage) the_fetched_audit_entry_json_is(expected string) *Stage {
 	assert.JSONEq(s.t, expected, withoutQueryID(s.auditEntry.Results[pkg.FormatJSON].Output))
 	return s
 }
+
+func (s *Stage) the_fetched_audit_entry_id_matches_the_queried_query_id() *Stage {
+	require.NotEmpty(s.t, s.queryID)
+	assert.Equal(s.t, s.queryID, s.auditEntry.ID)
+	return s
+}
+
+func (s *Stage) the_fetched_audit_entry_records_formats(formats ...pkg.Format) *Stage {
+	for _, format := range formats {
+		assert.Contains(s.t, s.auditEntry.Results, format)
+	}
+	return s
+}
