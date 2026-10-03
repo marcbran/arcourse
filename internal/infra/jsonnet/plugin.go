@@ -178,7 +178,6 @@ func (s *CourseSource) course(session pkg.SessionID) (any, error) {
 		vertices = append(vertices, map[string]any{
 			"visitId":    string(event.VisitID),
 			"path":       event.Path.String(),
-			"edgeClass":  string(event.EdgeClass),
 			"timestamp":  event.Timestamp.Format(time.RFC3339),
 			"_queryPath": "/root/arcourse/session/" + string(session) + "/visit/" + string(event.VisitID),
 		})
@@ -186,9 +185,8 @@ func (s *CourseSource) course(session pkg.SessionID) (any, error) {
 			continue
 		}
 		edges = append(edges, map[string]any{
-			"from":      string(event.From),
-			"to":        string(event.VisitID),
-			"edgeClass": string(event.EdgeClass),
+			"from": string(event.From),
+			"to":   string(event.VisitID),
 		})
 	}
 	for _, edge := range edges {
@@ -234,7 +232,6 @@ func (s *CourseSource) visit(visitID arcourse.VisitID) (any, error) {
 		"sessionId":   string(head.SessionID),
 		"path":        head.Path.String(),
 		"from":        string(head.From),
-		"edgeClass":   string(head.EdgeClass),
 		"versions":    len(evaluations),
 		"evaluations": evaluations,
 		"node":        map[string]any{"_node": true, "_queryPath": "/" + head.Path.String()},

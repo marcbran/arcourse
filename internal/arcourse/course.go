@@ -20,17 +20,6 @@ const (
 	defaultSessionIdleGap = 30 * time.Minute
 )
 
-type EdgeClass string
-
-const (
-	EdgeRoot    EdgeClass = "root"
-	EdgeTree    EdgeClass = "tree"
-	EdgeBack    EdgeClass = "back"
-	EdgeForward EdgeClass = "forward"
-	EdgeCross   EdgeClass = "cross"
-	EdgeFork    EdgeClass = "fork"
-)
-
 type VisitID string
 
 type ContentID string
@@ -41,7 +30,6 @@ type Event struct {
 	SessionID     pkg.SessionID `json:"sessionId"`
 	Path          pkg.QueryPath `json:"path"`
 	From          pkg.QueryID   `json:"from,omitempty"`
-	EdgeClass     EdgeClass     `json:"edgeClass,omitempty"`
 	Timestamp     time.Time     `json:"timestamp"`
 	JSONContentID ContentID     `json:"jsonContentId,omitempty"`
 	HTMLContentID ContentID     `json:"htmlContentId,omitempty"`
@@ -89,7 +77,6 @@ func (uc *recordVisit) Exec(ctx context.Context, ref VisitRef, queryID pkg.Query
 		session, from := uc.resolveOrigin(ctx, origin)
 		ref = VisitRef{VisitID: VisitID(uuid.Must(uuid.NewV7()).String()), SessionID: session}
 		event.From = from
-		event.EdgeClass = uc.classify(ctx, session, from, path)
 	}
 	event.VisitID = ref.VisitID
 	event.SessionID = ref.SessionID
@@ -115,94 +102,6 @@ func (uc *recordVisit) Exec(ctx context.Context, ref VisitRef, queryID pkg.Query
 		uc.observer.Appended(event)
 	}
 	return ref
-}
-
-func (uc *recordVisit) classify(ctx context.Context, session pkg.SessionID, from pkg.QueryID, path pkg.QueryPath) EdgeClass {
-	if from == "" {
-		return EdgeRoot
-	}
-	events, err := uc.courseRepo.List(ctx)
-	if err != nil {
-		return EdgeRoot
-	}
-	source, ok := visitOf(events, from)
-	if !ok {
-		return EdgeRoot
-	}
-	if source.SessionID != session {
-		return EdgeFork
-	}
-	visits := visitsOf(events, session)
-	visited := false
-	for _, visit := range visits {
-		if visit.Path == path {
-			visited = true
-			break
-		}
-	}
-	if !visited {
-		return EdgeTree
-	}
-	parents := parentsOf(visits)
-	for id := source.VisitID; id != ""; id = parents[id] {
-		if pathOf(visits, id) == path {
-			return EdgeBack
-		}
-	}
-	for _, visit := range visits {
-		if visit.Path != path {
-			continue
-		}
-		for id := parents[visit.VisitID]; id != ""; id = parents[id] {
-			if id == source.VisitID {
-				return EdgeForward
-			}
-		}
-	}
-	return EdgeCross
-}
-
-func visitOf(events []Event, queryID pkg.QueryID) (Event, bool) {
-	for _, event := range events {
-		if event.QueryID == queryID {
-			return event, true
-		}
-	}
-	return Event{}, false
-}
-
-func visitsOf(events []Event, session pkg.SessionID) []Event {
-	seen := map[VisitID]bool{}
-	var visits []Event
-	for _, event := range events {
-		if event.SessionID != session || seen[event.VisitID] {
-			continue
-		}
-		seen[event.VisitID] = true
-		visits = append(visits, event)
-	}
-	return visits
-}
-
-func parentsOf(visits []Event) map[VisitID]VisitID {
-	byQueryID := map[pkg.QueryID]VisitID{}
-	for _, visit := range visits {
-		byQueryID[visit.QueryID] = visit.VisitID
-	}
-	parents := map[VisitID]VisitID{}
-	for _, visit := range visits {
-		parents[visit.VisitID] = byQueryID[visit.From]
-	}
-	return parents
-}
-
-func pathOf(visits []Event, visitID VisitID) pkg.QueryPath {
-	for _, visit := range visits {
-		if visit.VisitID == visitID {
-			return visit.Path
-		}
-	}
-	return ""
 }
 
 func (uc *recordVisit) put(ctx context.Context, prepare func(string) (string, error), raw string, path pkg.QueryPath, format pkg.Format) ContentID {
