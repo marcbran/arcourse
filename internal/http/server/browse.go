@@ -40,7 +40,7 @@ func (s *Server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	watchCtx, cancel := context.WithCancel(context.Background())
-	ch, unregister, err := s.facade.Watch(watchCtx, path, params, pkg.FormatHTML, browseOrigin(w, r))
+	ch, unregister, err := s.facade.Watch(watchCtx, pkg.NewQueryPath(path), params, pkg.FormatHTML, browseOrigin(w, r))
 	if err != nil {
 		cancel()
 		returnError(w, err)
@@ -71,12 +71,12 @@ func (s *Server) handleBrowseExec(w http.ResponseWriter, r *http.Request) {
 		returnBadRequest(w, errors.New("queryId is required"))
 		return
 	}
-	result, err := s.facade.Exec(r.Context(), id)
+	result, err := s.facade.Exec(r.Context(), pkg.QueryID(id))
 	if err != nil {
 		returnError(w, err)
 		return
 	}
-	http.Redirect(w, r, "/"+strings.TrimPrefix(result.Redirect, "/"), http.StatusSeeOther)
+	http.Redirect(w, r, "/"+strings.TrimPrefix(result.Redirect.String(), "/"), http.StatusSeeOther)
 }
 
 func browseWatchURL(token string) []byte {

@@ -20,7 +20,7 @@ func newQuery(environment *environment, recordVisit *recordVisit) *query {
 	return &query{environment: environment, recordVisit: recordVisit}
 }
 
-func (uc *query) Exec(ctx context.Context, path string, params map[string]any, format pkg.Format, origin pkg.Origin) (pkg.Result, error) {
+func (uc *query) Exec(ctx context.Context, path pkg.QueryPath, params map[string]any, format pkg.Format, origin pkg.Origin) (pkg.Result, error) {
 	err := ctx.Err()
 	if err != nil {
 		return pkg.Result{}, err
@@ -70,27 +70,27 @@ func mergeFormats(primary pkg.Format, sets ...[]pkg.Format) []pkg.Format {
 	return formats
 }
 
-func queryParts(path string, params map[string]any, formats []pkg.Format) (queryPath string, segments []string, paramsJSON string, key string, err error) {
+func queryParts(path pkg.QueryPath, params map[string]any, formats []pkg.Format) (queryPath pkg.QueryPath, segments []string, paramsJSON string, key string, err error) {
 	queryPath, queryParams, err := splitPathAndQuery(path)
 	if err != nil {
 		return "", nil, "", "", err
 	}
-	queryPath = normalizeQueryPath(queryPath)
-	parts := strings.Split(queryPath, "/")
+	queryPath = pkg.NewQueryPath(queryPath.String())
+	parts := strings.Split(queryPath.String(), "/")
 	segments = parts[1:]
 	paramsBytes, err := json.Marshal(mergeParams(queryParams, params))
 	if err != nil {
 		return "", nil, "", "", err
 	}
 	paramsJSON = string(paramsBytes)
-	key = queryPath + "|" + paramsJSON + "|" + formatsKey(formats)
+	key = queryPath.String() + "|" + paramsJSON + "|" + formatsKey(formats)
 	return queryPath, segments, paramsJSON, key, nil
 }
 
-func splitPathAndQuery(path string) (string, map[string]any, error) {
-	base, query, found := strings.Cut(path, "?")
+func splitPathAndQuery(path pkg.QueryPath) (pkg.QueryPath, map[string]any, error) {
+	base, query, found := strings.Cut(path.String(), "?")
 	if !found {
-		return base, map[string]any{}, nil
+		return pkg.QueryPath(base), map[string]any{}, nil
 	}
 	values, err := url.ParseQuery(query)
 	if err != nil {
@@ -104,11 +104,7 @@ func splitPathAndQuery(path string) (string, map[string]any, error) {
 			params[key] = vs
 		}
 	}
-	return base, params, nil
-}
-
-func normalizeQueryPath(path string) string {
-	return strings.Trim(path, "/")
+	return pkg.QueryPath(base), params, nil
 }
 
 func formatsKey(formats []pkg.Format) string {
@@ -147,7 +143,7 @@ func mergeParams(base map[string]any, overrides map[string]any) map[string]any {
 	return merged
 }
 
-func decodeOutput(out string, formats []pkg.Format, primary pkg.Format) (map[pkg.Format]string, string, error) {
+func decodeOutput(out string, formats []pkg.Format, primary pkg.Format) (map[pkg.Format]string, pkg.QueryID, error) {
 	var raw map[string]json.RawMessage
 	err := json.Unmarshal([]byte(out), &raw)
 	if err != nil {
@@ -157,14 +153,15 @@ func decodeOutput(out string, formats []pkg.Format, primary pkg.Format) (map[pkg
 	if !ok {
 		return nil, "", fmt.Errorf("output has no %s", pkg.QueryIDField)
 	}
-	var queryID string
-	err = json.Unmarshal(rawID, &queryID)
+	var rawQueryID string
+	err = json.Unmarshal(rawID, &rawQueryID)
 	if err != nil {
 		return nil, "", err
 	}
-	if queryID == "" {
+	if rawQueryID == "" {
 		return nil, "", fmt.Errorf("output has an empty %s", pkg.QueryIDField)
 	}
+	queryID := pkg.QueryID(rawQueryID)
 	decoded := make(map[pkg.Format]string, len(raw))
 	for _, f := range formats {
 		rawValue, ok := raw[string(f)]

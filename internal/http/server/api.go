@@ -76,8 +76,8 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 		returnBadRequest(w, err)
 		return
 	}
-	origin := pkg.Origin{Session: req.Session, From: req.From, Suppress: req.Suppress}
-	result, err := s.facade.Query(r.Context(), req.Path, req.Params, format, origin)
+	origin := pkg.Origin{Session: pkg.SessionID(req.Session), From: pkg.QueryID(req.From), Suppress: req.Suppress}
+	result, err := s.facade.Query(r.Context(), pkg.NewQueryPath(req.Path), req.Params, format, origin)
 	if err != nil {
 		returnError(w, err)
 		return
@@ -91,10 +91,10 @@ func (s *Server) handleExec(w http.ResponseWriter, r *http.Request) {
 		returnBadRequest(w, errors.New("id is required"))
 		return
 	}
-	result, err := s.facade.Exec(r.Context(), id)
+	result, err := s.facade.Exec(r.Context(), pkg.QueryID(id))
 	if err != nil {
 		returnError(w, err)
 		return
 	}
-	returnSuccess(w, execResponse{Output: result.Output, Redirect: result.Redirect})
+	returnSuccess(w, execResponse{Output: result.Output, Redirect: result.Redirect.String()})
 }

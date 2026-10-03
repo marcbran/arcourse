@@ -23,7 +23,7 @@ type Stage struct {
 	watchCh          <-chan pkg.Result
 	watchUnsubscribe func()
 
-	queryID string
+	queryID pkg.QueryID
 	origin  pkg.Origin
 
 	LastOutput string

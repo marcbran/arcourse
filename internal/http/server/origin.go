@@ -3,7 +3,6 @@ package server
 import (
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/google/uuid"
 
@@ -19,10 +18,10 @@ func browseOrigin(w http.ResponseWriter, r *http.Request) pkg.Origin {
 	}
 }
 
-func sessionFromCookie(w http.ResponseWriter, r *http.Request) string {
+func sessionFromCookie(w http.ResponseWriter, r *http.Request) pkg.SessionID {
 	cookie, err := r.Cookie(sessionCookieName)
 	if err == nil && cookie.Value != "" {
-		return cookie.Value
+		return pkg.SessionID(cookie.Value)
 	}
 	session := "browse-" + uuid.Must(uuid.NewV7()).String()
 	http.SetCookie(w, &http.Cookie{
@@ -32,10 +31,10 @@ func sessionFromCookie(w http.ResponseWriter, r *http.Request) string {
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	})
-	return session
+	return pkg.SessionID(session)
 }
 
-func refererPath(r *http.Request) string {
+func refererPath(r *http.Request) pkg.QueryPath {
 	referer := r.Header.Get("Referer")
 	if referer == "" {
 		return ""
@@ -47,13 +46,13 @@ func refererPath(r *http.Request) string {
 	if parsed.Host != "" && r.Host != "" && parsed.Host != r.Host {
 		return ""
 	}
-	return strings.Trim(parsed.Path, "/")
+	return pkg.NewQueryPath(parsed.Path)
 }
 
 func requestOrigin(r *http.Request) pkg.Origin {
 	query := r.URL.Query()
 	return pkg.Origin{
-		Session: query.Get("session"),
-		From:    query.Get("from"),
+		Session: pkg.SessionID(query.Get("session")),
+		From:    pkg.QueryID(query.Get("from")),
 	}
 }

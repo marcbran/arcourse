@@ -35,7 +35,7 @@ func newExec(courseRepo CourseRepo, getVisitContent *getVisitContent, environmen
 	return &exec{courseRepo: courseRepo, getVisitContent: getVisitContent, environment: environment}
 }
 
-func (uc *exec) Exec(ctx context.Context, id string) (pkg.ExecResult, error) {
+func (uc *exec) Exec(ctx context.Context, id pkg.QueryID) (pkg.ExecResult, error) {
 	err := ctx.Err()
 	if err != nil {
 		return pkg.ExecResult{}, err
@@ -63,12 +63,12 @@ func (uc *exec) Exec(ctx context.Context, id string) (pkg.ExecResult, error) {
 
 	redirect := event.Path
 	if command.Redirect != nil && command.Redirect.QueryPath != "" {
-		redirect = normalizeQueryPath(command.Redirect.QueryPath)
+		redirect = pkg.NewQueryPath(command.Redirect.QueryPath)
 	}
 	return pkg.ExecResult{Output: output, Redirect: redirect}, nil
 }
 
-func decodeCommand(body string, path string) (Command, error) {
+func decodeCommand(body string, path pkg.QueryPath) (Command, error) {
 	var node map[string]json.RawMessage
 	err := json.Unmarshal([]byte(body), &node)
 	if err != nil {

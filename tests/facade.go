@@ -127,7 +127,7 @@ func (f *ServerBackedCLIFacade) Evaluate(ctx context.Context, expression string)
 	return f.client.Evaluate(ctx, expression)
 }
 
-func (f *ServerBackedCLIFacade) Query(ctx context.Context, path string, params map[string]any, format pkg.Format, origin pkg.Origin) (pkg.Result, error) {
+func (f *ServerBackedCLIFacade) Query(ctx context.Context, path pkg.QueryPath, params map[string]any, format pkg.Format, origin pkg.Origin) (pkg.Result, error) {
 	err := f.start()
 	if err != nil {
 		return pkg.Result{}, err
@@ -135,7 +135,7 @@ func (f *ServerBackedCLIFacade) Query(ctx context.Context, path string, params m
 	return f.client.Query(ctx, path, params, format, origin)
 }
 
-func (f *ServerBackedCLIFacade) Watch(ctx context.Context, path string, params map[string]any, format pkg.Format, origin pkg.Origin) (<-chan pkg.Result, func(), error) {
+func (f *ServerBackedCLIFacade) Watch(ctx context.Context, path pkg.QueryPath, params map[string]any, format pkg.Format, origin pkg.Origin) (<-chan pkg.Result, func(), error) {
 	err := f.start()
 	if err != nil {
 		return nil, nil, err
@@ -143,7 +143,7 @@ func (f *ServerBackedCLIFacade) Watch(ctx context.Context, path string, params m
 	return f.client.Watch(ctx, path, params, format, origin)
 }
 
-func (f *ServerBackedCLIFacade) Exec(ctx context.Context, id string) (pkg.ExecResult, error) {
+func (f *ServerBackedCLIFacade) Exec(ctx context.Context, id pkg.QueryID) (pkg.ExecResult, error) {
 	err := f.start()
 	if err != nil {
 		return pkg.ExecResult{}, err
@@ -314,8 +314,8 @@ func (f *CLIFacade) Evaluate(ctx context.Context, expression string) (pkg.Result
 	return pkg.Result{Output: output.Output}, nil
 }
 
-func (f *CLIFacade) Query(ctx context.Context, path string, params map[string]any, format pkg.Format, origin pkg.Origin) (pkg.Result, error) {
-	args := []string{"query", path, "--format", string(format)}
+func (f *CLIFacade) Query(ctx context.Context, path pkg.QueryPath, params map[string]any, format pkg.Format, origin pkg.Origin) (pkg.Result, error) {
+	args := []string{"query", path.String(), "--format", string(format)}
 	args = appendParamArgs(args, params)
 	args = appendOriginArgs(args, origin)
 	cmd := exec.CommandContext(ctx, f.binaryPath, args...)
@@ -337,11 +337,11 @@ func (f *CLIFacade) Query(ctx context.Context, path string, params map[string]an
 	return pkg.Result{Output: strings.TrimSuffix(stdout.String(), "\n")}, nil
 }
 
-func (f *CLIFacade) Watch(ctx context.Context, path string, params map[string]any, format pkg.Format, origin pkg.Origin) (<-chan pkg.Result, func(), error) {
+func (f *CLIFacade) Watch(ctx context.Context, path pkg.QueryPath, params map[string]any, format pkg.Format, origin pkg.Origin) (<-chan pkg.Result, func(), error) {
 	cmdCtx, cancel := context.WithCancel(ctx)
 	ch := make(chan pkg.Result)
 
-	args := append([]string{"watch", path, "--format", string(format)}, appendParamArgs(nil, params)...)
+	args := append([]string{"watch", path.String(), "--format", string(format)}, appendParamArgs(nil, params)...)
 	cmd := exec.CommandContext(cmdCtx, f.binaryPath, args...)
 	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
 	stdout, err := cmd.StdoutPipe()
@@ -379,8 +379,8 @@ func (f *CLIFacade) Watch(ctx context.Context, path string, params map[string]an
 	return ch, cancel, nil
 }
 
-func (f *CLIFacade) Exec(ctx context.Context, id string) (pkg.ExecResult, error) {
-	cmd := exec.CommandContext(ctx, f.binaryPath, "exec", id)
+func (f *CLIFacade) Exec(ctx context.Context, id pkg.QueryID) (pkg.ExecResult, error) {
+	cmd := exec.CommandContext(ctx, f.binaryPath, "exec", string(id))
 	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
 
 	var stdout bytes.Buffer
@@ -446,10 +446,10 @@ func appendParamArgs(args []string, params map[string]any) []string {
 
 func appendOriginArgs(args []string, origin pkg.Origin) []string {
 	if origin.Session != "" {
-		args = append(args, "--session", origin.Session)
+		args = append(args, "--session", string(origin.Session))
 	}
 	if origin.From != "" {
-		args = append(args, "--from", origin.From)
+		args = append(args, "--from", string(origin.From))
 	}
 	return args
 }

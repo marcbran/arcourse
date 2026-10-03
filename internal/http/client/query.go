@@ -20,8 +20,8 @@ type queryRequest struct {
 	Suppress bool           `json:"suppress"`
 }
 
-func (c *Client) Query(ctx context.Context, path string, params map[string]any, format pkg.Format, origin pkg.Origin) (pkg.Result, error) {
-	body, err := json.Marshal(queryRequest{Path: path, Params: params, Format: string(format), Session: origin.Session, From: origin.From, Suppress: origin.Suppress})
+func (c *Client) Query(ctx context.Context, path pkg.QueryPath, params map[string]any, format pkg.Format, origin pkg.Origin) (pkg.Result, error) {
+	body, err := json.Marshal(queryRequest{Path: path.String(), Params: params, Format: string(format), Session: string(origin.Session), From: string(origin.From), Suppress: origin.Suppress})
 	if err != nil {
 		return pkg.Result{}, err
 	}

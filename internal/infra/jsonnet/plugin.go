@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 	jpoetwatch "github.com/marcbran/jpoet/pkg/watch"
 
 	"github.com/marcbran/arcourse/internal/arcourse"
+	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 
 const (
@@ -70,8 +70,8 @@ func (s *CourseSource) Appended(event arcourse.Event) {
 	}
 	changes([]jpoetwatch.InvocationKey{
 		sessionsKey,
-		jpoetwatch.InvocationKey(sessionPrefix + event.SessionID),
-		jpoetwatch.InvocationKey(visitPrefix + event.VisitID),
+		jpoetwatch.InvocationKey(sessionPrefix + string(event.SessionID)),
+		jpoetwatch.InvocationKey(visitPrefix + string(event.VisitID)),
 	})
 }
 
@@ -100,13 +100,13 @@ func newPlugin(source *CourseSource) *jpoet.Plugin {
 		{
 			Name: "course",
 			Func: func(args []any) (any, error) {
-				return source.course(stringArg(args, 0))
+				return source.course(pkg.SessionID(stringArg(args, 0)))
 			},
 		},
 		{
 			Name: "visit",
 			Func: func(args []any) (any, error) {
-				return source.visit(stringArg(args, 0))
+				return source.visit(arcourse.VisitID(stringArg(args, 0)))
 			},
 		},
 	}
@@ -125,18 +125,18 @@ func (s *CourseSource) sessions() (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	order := []string{}
-	byID := map[string]map[string]any{}
-	visits := map[string]map[string]bool{}
+	order := []pkg.SessionID{}
+	byID := map[pkg.SessionID]map[string]any{}
+	visits := map[pkg.SessionID]map[arcourse.VisitID]bool{}
 	for _, event := range events {
 		entry, ok := byID[event.SessionID]
 		if !ok {
 			entry = map[string]any{
-				"id":    event.SessionID,
+				"id":    string(event.SessionID),
 				"first": event.Timestamp.Format(time.RFC3339),
 			}
 			byID[event.SessionID] = entry
-			visits[event.SessionID] = map[string]bool{}
+			visits[event.SessionID] = map[arcourse.VisitID]bool{}
 			order = append(order, event.SessionID)
 		}
 		entry["last"] = event.Timestamp.Format(time.RFC3339)
@@ -146,7 +146,7 @@ func (s *CourseSource) sessions() (any, error) {
 	for _, id := range order {
 		entry := byID[id]
 		entry["visits"] = len(visits[id])
-		entry["_queryPath"] = "/root/arcourse/session/" + id
+		entry["_queryPath"] = "/root/arcourse/session/" + string(id)
 		items = append(items, entry)
 	}
 	sort.Slice(items, func(i, j int) bool {
@@ -157,13 +157,13 @@ func (s *CourseSource) sessions() (any, error) {
 	return items, nil
 }
 
-func (s *CourseSource) course(session string) (any, error) {
+func (s *CourseSource) course(session pkg.SessionID) (any, error) {
 	events, err := s.events()
 	if err != nil {
 		return nil, err
 	}
-	seen := map[string]bool{}
-	visitByQueryID := map[string]string{}
+	seen := map[arcourse.VisitID]bool{}
+	visitByQueryID := map[pkg.QueryID]arcourse.VisitID{}
 	var vertices []any
 	var edges []any
 	for _, event := range events {
@@ -176,25 +176,25 @@ func (s *CourseSource) course(session string) (any, error) {
 		}
 		seen[event.VisitID] = true
 		vertices = append(vertices, map[string]any{
-			"visitId":    event.VisitID,
-			"path":       event.Path,
-			"edgeClass":  event.EdgeClass,
+			"visitId":    string(event.VisitID),
+			"path":       event.Path.String(),
+			"edgeClass":  string(event.EdgeClass),
 			"timestamp":  event.Timestamp.Format(time.RFC3339),
-			"_queryPath": "/root/arcourse/session/" + session + "/visit/" + event.VisitID,
+			"_queryPath": "/root/arcourse/session/" + string(session) + "/visit/" + string(event.VisitID),
 		})
 		if event.From == "" {
 			continue
 		}
 		edges = append(edges, map[string]any{
-			"from":      event.From,
-			"to":        event.VisitID,
-			"edgeClass": event.EdgeClass,
+			"from":      string(event.From),
+			"to":        string(event.VisitID),
+			"edgeClass": string(event.EdgeClass),
 		})
 	}
 	for _, edge := range edges {
 		entry := edge.(map[string]any)
 		from, _ := entry["from"].(string)
-		entry["from"] = visitByQueryID[from]
+		entry["from"] = string(visitByQueryID[pkg.QueryID(from)])
 	}
 	if vertices == nil {
 		vertices = []any{}
@@ -202,10 +202,10 @@ func (s *CourseSource) course(session string) (any, error) {
 	if edges == nil {
 		edges = []any{}
 	}
-	return map[string]any{"session": session, "vertices": vertices, "edges": edges}, nil
+	return map[string]any{"session": string(session), "vertices": vertices, "edges": edges}, nil
 }
 
-func (s *CourseSource) visit(visitID string) (any, error) {
+func (s *CourseSource) visit(visitID arcourse.VisitID) (any, error) {
 	events, err := s.events()
 	if err != nil {
 		return nil, err
@@ -220,23 +220,23 @@ func (s *CourseSource) visit(visitID string) (any, error) {
 			head = &events[i]
 		}
 		evaluations = append(evaluations, map[string]any{
-			"queryId":       events[i].QueryID,
+			"queryId":       string(events[i].QueryID),
 			"timestamp":     events[i].Timestamp.Format(time.RFC3339),
-			"jsonContentId": events[i].JSONContentID,
-			"htmlContentId": events[i].HTMLContentID,
+			"jsonContentId": string(events[i].JSONContentID),
+			"htmlContentId": string(events[i].HTMLContentID),
 		})
 	}
 	if head == nil {
 		return nil, fmt.Errorf("visit not recorded: %s", visitID)
 	}
 	return map[string]any{
-		"visitId":     head.VisitID,
-		"sessionId":   head.SessionID,
-		"path":        head.Path,
-		"from":        head.From,
-		"edgeClass":   head.EdgeClass,
+		"visitId":     string(head.VisitID),
+		"sessionId":   string(head.SessionID),
+		"path":        head.Path.String(),
+		"from":        string(head.From),
+		"edgeClass":   string(head.EdgeClass),
 		"versions":    len(evaluations),
 		"evaluations": evaluations,
-		"node":        map[string]any{"_node": true, "_queryPath": "/" + strings.TrimPrefix(head.Path, "/")},
+		"node":        map[string]any{"_node": true, "_queryPath": "/" + head.Path.String()},
 	}, nil
 }

@@ -8,6 +8,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	"github.com/marcbran/arcourse/internal/arcourse"
 )
 
 type BlobStore struct {
@@ -18,13 +20,13 @@ func NewBlobStore(dir string) *BlobStore {
 	return &BlobStore{dir: dir}
 }
 
-func (s *BlobStore) Put(ctx context.Context, content string) (string, error) {
+func (s *BlobStore) Put(ctx context.Context, content string) (arcourse.ContentID, error) {
 	err := ctx.Err()
 	if err != nil {
 		return "", err
 	}
 	sum := sha256.Sum256([]byte(content))
-	id := hex.EncodeToString(sum[:])
+	id := arcourse.ContentID(hex.EncodeToString(sum[:]))
 	path := s.blobPath(id)
 	_, err = os.Stat(path)
 	if err == nil {
@@ -66,7 +68,7 @@ func (s *BlobStore) Put(ctx context.Context, content string) (string, error) {
 	return id, nil
 }
 
-func (s *BlobStore) Get(ctx context.Context, contentID string) (string, error) {
+func (s *BlobStore) Get(ctx context.Context, contentID arcourse.ContentID) (string, error) {
 	err := ctx.Err()
 	if err != nil {
 		return "", err
@@ -92,9 +94,10 @@ func (s *BlobStore) Get(ctx context.Context, contentID string) (string, error) {
 	return string(content), nil
 }
 
-func (s *BlobStore) blobPath(contentID string) string {
-	if len(contentID) < 2 {
-		return filepath.Join(s.dir, "blobs", contentID+".gz")
+func (s *BlobStore) blobPath(contentID arcourse.ContentID) string {
+	id := string(contentID)
+	if len(id) < 2 {
+		return filepath.Join(s.dir, "blobs", id+".gz")
 	}
-	return filepath.Join(s.dir, "blobs", contentID[:2], contentID+".gz")
+	return filepath.Join(s.dir, "blobs", id[:2], id+".gz")
 }

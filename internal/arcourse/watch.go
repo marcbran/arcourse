@@ -16,7 +16,7 @@ func newWatch(environment *environment, recordVisit *recordVisit) *watch {
 	return &watch{environment: environment, recordVisit: recordVisit}
 }
 
-func (uc *watch) Exec(ctx context.Context, path string, params map[string]any, format pkg.Format, origin pkg.Origin) (<-chan pkg.Result, func(), error) {
+func (uc *watch) Exec(ctx context.Context, path pkg.QueryPath, params map[string]any, format pkg.Format, origin pkg.Origin) (<-chan pkg.Result, func(), error) {
 	err := ctx.Err()
 	if err != nil {
 		return nil, nil, err
@@ -76,7 +76,7 @@ func (uc *watch) Exec(ctx context.Context, path string, params map[string]any, f
 	return results, unregister, nil
 }
 
-func (uc *watch) decodeAndRecord(ctx context.Context, ref *VisitRef, out string, formats []pkg.Format, format pkg.Format, queryPath string, origin pkg.Origin) (string, bool) {
+func (uc *watch) decodeAndRecord(ctx context.Context, ref *VisitRef, out string, formats []pkg.Format, format pkg.Format, queryPath pkg.QueryPath, origin pkg.Origin) (string, bool) {
 	decoded, queryID, err := decodeOutput(out, formats, format)
 	if err != nil {
 		return "", false

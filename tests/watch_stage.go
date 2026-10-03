@@ -22,7 +22,7 @@ func skipIfLocalCLI(t *testing.T) {
 }
 
 func (s *Stage) a_watcher_subscribes_to(path string, format pkg.Format) *Stage {
-	ch, unsubscribe, err := s.facade.Watch(context.Background(), path, nil, format, s.origin)
+	ch, unsubscribe, err := s.facade.Watch(context.Background(), pkg.NewQueryPath(path), nil, format, s.origin)
 	require.NoError(s.t, err)
 	s.watchCh = ch
 	s.watchUnsubscribe = unsubscribe

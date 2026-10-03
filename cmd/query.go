@@ -46,7 +46,7 @@ func newQueryCmd(plugins []*jpoet.Plugin) *cobra.Command {
 				return err
 			}
 
-			result, err := facade.Query(c.Context(), args[0], params, format, origin)
+			result, err := facade.Query(c.Context(), pkg.NewQueryPath(args[0]), params, format, origin)
 			if err != nil {
 				return err
 			}

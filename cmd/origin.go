@@ -34,5 +34,5 @@ func originFrom(cmd *cobra.Command) (pkg.Origin, error) {
 		}
 		suppress = output != ""
 	}
-	return pkg.Origin{Session: session, From: from, Suppress: suppress}, nil
+	return pkg.Origin{Session: pkg.SessionID(session), From: pkg.QueryID(from), Suppress: suppress}, nil
 }

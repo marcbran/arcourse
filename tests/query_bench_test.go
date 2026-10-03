@@ -122,7 +122,7 @@ func BenchmarkQueryPodsTable(b *testing.B) {
 					ctx := context.Background()
 					b.ResetTimer()
 					for i := 0; i < b.N; i++ {
-						_, err := facade.Query(ctx, "root/kubernetes/context/demo/pods", nil, format, pkg.Origin{})
+						_, err := facade.Query(ctx, pkg.NewQueryPath("root/kubernetes/context/demo/pods"), nil, format, pkg.Origin{})
 						if err != nil {
 							b.Fatal(err)
 						}

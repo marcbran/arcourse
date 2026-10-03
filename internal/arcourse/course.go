@@ -20,38 +20,44 @@ const (
 	defaultSessionIdleGap = 30 * time.Minute
 )
 
+type EdgeClass string
+
 const (
-	EdgeRoot    = "root"
-	EdgeTree    = "tree"
-	EdgeBack    = "back"
-	EdgeForward = "forward"
-	EdgeCross   = "cross"
-	EdgeFork    = "fork"
+	EdgeRoot    EdgeClass = "root"
+	EdgeTree    EdgeClass = "tree"
+	EdgeBack    EdgeClass = "back"
+	EdgeForward EdgeClass = "forward"
+	EdgeCross   EdgeClass = "cross"
+	EdgeFork    EdgeClass = "fork"
 )
 
+type VisitID string
+
+type ContentID string
+
 type Event struct {
-	QueryID       string    `json:"queryId"`
-	VisitID       string    `json:"visitId"`
-	SessionID     string    `json:"sessionId"`
-	Path          string    `json:"path"`
-	From          string    `json:"from,omitempty"`
-	EdgeClass     string    `json:"edgeClass,omitempty"`
-	Timestamp     time.Time `json:"timestamp"`
-	JSONContentID string    `json:"jsonContentId,omitempty"`
-	HTMLContentID string    `json:"htmlContentId,omitempty"`
+	QueryID       pkg.QueryID   `json:"queryId"`
+	VisitID       VisitID       `json:"visitId"`
+	SessionID     pkg.SessionID `json:"sessionId"`
+	Path          pkg.QueryPath `json:"path"`
+	From          pkg.QueryID   `json:"from,omitempty"`
+	EdgeClass     EdgeClass     `json:"edgeClass,omitempty"`
+	Timestamp     time.Time     `json:"timestamp"`
+	JSONContentID ContentID     `json:"jsonContentId,omitempty"`
+	HTMLContentID ContentID     `json:"htmlContentId,omitempty"`
 }
 
 type VisitRef struct {
-	VisitID       string
-	SessionID     string
-	JSONContentID string
-	HTMLContentID string
+	VisitID       VisitID
+	SessionID     pkg.SessionID
+	JSONContentID ContentID
+	HTMLContentID ContentID
 }
 
 type CourseRepo interface {
 	Append(ctx context.Context, event Event) error
 	List(ctx context.Context) ([]Event, error)
-	Get(ctx context.Context, queryID string) (Event, error)
+	Get(ctx context.Context, queryID pkg.QueryID) (Event, error)
 }
 
 type CourseObserver interface {
@@ -59,8 +65,8 @@ type CourseObserver interface {
 }
 
 type BlobStore interface {
-	Put(ctx context.Context, content string) (string, error)
-	Get(ctx context.Context, contentID string) (string, error)
+	Put(ctx context.Context, content string) (ContentID, error)
+	Get(ctx context.Context, contentID ContentID) (string, error)
 }
 
 type recordVisit struct {
@@ -73,7 +79,7 @@ func newRecordVisit(courseRepo CourseRepo, blobs BlobStore, observer CourseObser
 	return &recordVisit{courseRepo: courseRepo, blobs: blobs, observer: observer}
 }
 
-func (uc *recordVisit) Exec(ctx context.Context, ref VisitRef, queryID string, path string, decoded map[pkg.Format]string, format pkg.Format, origin pkg.Origin) VisitRef {
+func (uc *recordVisit) Exec(ctx context.Context, ref VisitRef, queryID pkg.QueryID, path pkg.QueryPath, decoded map[pkg.Format]string, format pkg.Format, origin pkg.Origin) VisitRef {
 	if origin.Suppress || format == pkg.FormatJsonnet {
 		return ref
 	}
@@ -81,7 +87,7 @@ func (uc *recordVisit) Exec(ctx context.Context, ref VisitRef, queryID string, p
 	first := ref.VisitID == ""
 	if first {
 		session, from := uc.resolveOrigin(ctx, origin)
-		ref = VisitRef{VisitID: uuid.Must(uuid.NewV7()).String(), SessionID: session}
+		ref = VisitRef{VisitID: VisitID(uuid.Must(uuid.NewV7()).String()), SessionID: session}
 		event.From = from
 		event.EdgeClass = uc.classify(ctx, session, from, path)
 	}
@@ -111,7 +117,7 @@ func (uc *recordVisit) Exec(ctx context.Context, ref VisitRef, queryID string, p
 	return ref
 }
 
-func (uc *recordVisit) classify(ctx context.Context, session string, from string, path string) string {
+func (uc *recordVisit) classify(ctx context.Context, session pkg.SessionID, from pkg.QueryID, path pkg.QueryPath) EdgeClass {
 	if from == "" {
 		return EdgeRoot
 	}
@@ -156,7 +162,7 @@ func (uc *recordVisit) classify(ctx context.Context, session string, from string
 	return EdgeCross
 }
 
-func visitOf(events []Event, queryID string) (Event, bool) {
+func visitOf(events []Event, queryID pkg.QueryID) (Event, bool) {
 	for _, event := range events {
 		if event.QueryID == queryID {
 			return event, true
@@ -165,8 +171,8 @@ func visitOf(events []Event, queryID string) (Event, bool) {
 	return Event{}, false
 }
 
-func visitsOf(events []Event, session string) []Event {
-	seen := map[string]bool{}
+func visitsOf(events []Event, session pkg.SessionID) []Event {
+	seen := map[VisitID]bool{}
 	var visits []Event
 	for _, event := range events {
 		if event.SessionID != session || seen[event.VisitID] {
@@ -178,19 +184,19 @@ func visitsOf(events []Event, session string) []Event {
 	return visits
 }
 
-func parentsOf(visits []Event) map[string]string {
-	byQueryID := map[string]string{}
+func parentsOf(visits []Event) map[VisitID]VisitID {
+	byQueryID := map[pkg.QueryID]VisitID{}
 	for _, visit := range visits {
 		byQueryID[visit.QueryID] = visit.VisitID
 	}
-	parents := map[string]string{}
+	parents := map[VisitID]VisitID{}
 	for _, visit := range visits {
 		parents[visit.VisitID] = byQueryID[visit.From]
 	}
 	return parents
 }
 
-func pathOf(visits []Event, visitID string) string {
+func pathOf(visits []Event, visitID VisitID) pkg.QueryPath {
 	for _, visit := range visits {
 		if visit.VisitID == visitID {
 			return visit.Path
@@ -199,7 +205,7 @@ func pathOf(visits []Event, visitID string) string {
 	return ""
 }
 
-func (uc *recordVisit) put(ctx context.Context, prepare func(string) (string, error), raw string, path string, format pkg.Format) string {
+func (uc *recordVisit) put(ctx context.Context, prepare func(string) (string, error), raw string, path pkg.QueryPath, format pkg.Format) ContentID {
 	body, err := prepare(raw)
 	if err != nil {
 		slog.Warn("prepare content", "err", err, "path", path, "format", format)
@@ -232,9 +238,9 @@ func (uc *getVisitContent) Exec(ctx context.Context, event Event) (string, error
 	return withQueryID(body, event.QueryID)
 }
 
-func (uc *recordVisit) resolveOrigin(ctx context.Context, origin pkg.Origin) (string, string) {
+func (uc *recordVisit) resolveOrigin(ctx context.Context, origin pkg.Origin) (pkg.SessionID, pkg.QueryID) {
 	from := origin.From
-	fromSession := ""
+	fromSession := pkg.SessionID("")
 	if from != "" {
 		event, err := uc.courseRepo.Get(ctx, from)
 		if err != nil {
@@ -252,12 +258,12 @@ func (uc *recordVisit) resolveOrigin(ctx context.Context, origin pkg.Origin) (st
 		session = uc.defaultSession(ctx)
 	}
 	if from == "" && origin.FromPath != "" {
-		from = uc.resolveFromPath(ctx, session, normalizeQueryPath(origin.FromPath))
+		from = uc.resolveFromPath(ctx, session, pkg.NewQueryPath(origin.FromPath.String()))
 	}
 	return session, from
 }
 
-func (uc *recordVisit) resolveFromPath(ctx context.Context, session string, path string) string {
+func (uc *recordVisit) resolveFromPath(ctx context.Context, session pkg.SessionID, path pkg.QueryPath) pkg.QueryID {
 	events, err := uc.courseRepo.List(ctx)
 	if err != nil {
 		return ""
@@ -270,11 +276,11 @@ func (uc *recordVisit) resolveFromPath(ctx context.Context, session string, path
 	return ""
 }
 
-func (uc *recordVisit) defaultSession(ctx context.Context) string {
+func (uc *recordVisit) defaultSession(ctx context.Context) pkg.SessionID {
 	events, err := uc.courseRepo.List(ctx)
 	if err == nil {
 		for i := len(events) - 1; i >= 0; i-- {
-			if !strings.HasPrefix(events[i].SessionID, defaultSessionPrefix) {
+			if !strings.HasPrefix(string(events[i].SessionID), defaultSessionPrefix) {
 				continue
 			}
 			if time.Since(events[i].Timestamp) < defaultSessionIdleGap {
@@ -283,7 +289,7 @@ func (uc *recordVisit) defaultSession(ctx context.Context) string {
 			break
 		}
 	}
-	return defaultSessionPrefix + uuid.Must(uuid.NewV7()).String()
+	return pkg.SessionID(defaultSessionPrefix + uuid.Must(uuid.NewV7()).String())
 }
 
 func verbatim(raw string) (string, error) {
@@ -302,7 +308,7 @@ func canonicalJSON(raw string) (string, error) {
 	return marshalCanonical(value)
 }
 
-func withQueryID(raw string, queryID string) (string, error) {
+func withQueryID(raw string, queryID pkg.QueryID) (string, error) {
 	value, err := decodeJSONValue(raw)
 	if err != nil {
 		return "", err
@@ -311,7 +317,7 @@ func withQueryID(raw string, queryID string) (string, error) {
 	if !ok {
 		return raw, nil
 	}
-	object[pkg.QueryIDField] = queryID
+	object[pkg.QueryIDField] = string(queryID)
 	return marshalCanonical(object)
 }
 

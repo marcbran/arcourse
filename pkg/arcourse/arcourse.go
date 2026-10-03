@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 )
 
 var (
@@ -37,10 +38,24 @@ func ParseFormat(s string) (Format, error) {
 	}
 }
 
+type QueryPath string
+
+func NewQueryPath(raw string) QueryPath {
+	return QueryPath(strings.Trim(raw, "/"))
+}
+
+func (p QueryPath) String() string {
+	return string(p)
+}
+
+type QueryID string
+
+type SessionID string
+
 type Origin struct {
-	Session  string
-	From     string
-	FromPath string
+	Session  SessionID
+	From     QueryID
+	FromPath QueryPath
 	Suppress bool
 }
 
@@ -50,14 +65,14 @@ type Result struct {
 
 type ExecResult struct {
 	Output   string
-	Redirect string
+	Redirect QueryPath
 }
 
 type Facade interface {
 	Evaluate(ctx context.Context, expression string) (Result, error)
-	Query(ctx context.Context, path string, params map[string]any, format Format, origin Origin) (Result, error)
-	Watch(ctx context.Context, path string, params map[string]any, format Format, origin Origin) (<-chan Result, func(), error)
-	Exec(ctx context.Context, id string) (ExecResult, error)
+	Query(ctx context.Context, path QueryPath, params map[string]any, format Format, origin Origin) (Result, error)
+	Watch(ctx context.Context, path QueryPath, params map[string]any, format Format, origin Origin) (<-chan Result, func(), error)
+	Exec(ctx context.Context, id QueryID) (ExecResult, error)
 	Compile(ctx context.Context) (Result, error)
 	Warm(ctx context.Context) error
 	Close() error

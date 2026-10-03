@@ -25,7 +25,7 @@ func (s *Stage) a_path_is_queried_with_format(path string, format pkg.Format) *S
 }
 
 func (s *Stage) a_path_is_queried_with_params_and_format(path string, params map[string]any, format pkg.Format) *Stage {
-	result, err := s.facade.Query(context.Background(), path, params, format, s.origin)
+	result, err := s.facade.Query(context.Background(), pkg.NewQueryPath(path), params, format, s.origin)
 	if err != nil {
 		s.LastOutput = ""
 		s.LastError = err.Error()
@@ -42,7 +42,7 @@ func (s *Stage) a_path_is_queried_with_params_and_format(path string, params map
 func (s *Stage) a_path_is_queried_with_format_promptly(path string, format pkg.Format) *Stage {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	result, err := s.facade.Query(ctx, path, nil, format, s.origin)
+	result, err := s.facade.Query(ctx, pkg.NewQueryPath(path), nil, format, s.origin)
 	if err != nil {
 		s.LastOutput = ""
 		s.LastError = err.Error()
@@ -60,7 +60,7 @@ func (s *Stage) the_queried_output_has_a_query_id() *Stage {
 	return s
 }
 
-func queryIDOf(t require.TestingT, out string) string {
+func queryIDOf(t require.TestingT, out string) pkg.QueryID {
 	var doc map[string]json.RawMessage
 	err := json.Unmarshal([]byte(out), &doc)
 	require.NoError(t, err)
@@ -69,5 +69,5 @@ func queryIDOf(t require.TestingT, out string) string {
 	var id string
 	err = json.Unmarshal(raw, &id)
 	require.NoError(t, err)
-	return id
+	return pkg.QueryID(id)
 }

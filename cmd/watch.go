@@ -45,7 +45,7 @@ func newWatchCmd(plugins []*jpoet.Plugin) *cobra.Command {
 				return err
 			}
 
-			ch, unsubscribe, err := facade.Watch(c.Context(), args[0], params, format, origin)
+			ch, unsubscribe, err := facade.Watch(c.Context(), pkg.NewQueryPath(args[0]), params, format, origin)
 			if err != nil {
 				return err
 			}

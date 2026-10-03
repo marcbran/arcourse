@@ -87,7 +87,7 @@ func (r *CourseRepo) List(ctx context.Context) ([]arcourse.Event, error) {
 	return events, nil
 }
 
-func (r *CourseRepo) Get(ctx context.Context, queryID string) (arcourse.Event, error) {
+func (r *CourseRepo) Get(ctx context.Context, queryID pkg.QueryID) (arcourse.Event, error) {
 	events, err := r.List(ctx)
 	if err != nil {
 		return arcourse.Event{}, err
