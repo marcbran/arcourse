@@ -85,6 +85,6 @@ func (uc *watch) decodeAndRecord(ctx context.Context, ref *VisitRef, out string,
 	if !ok {
 		return "", false
 	}
-	*ref = uc.recordVisit.Exec(ctx, *ref, queryID, queryPath, decoded, format, origin)
+	*ref = uc.recordVisit.Exec(ctx, *ref, queryID, queryPath, decoded, origin)
 	return value, true
 }

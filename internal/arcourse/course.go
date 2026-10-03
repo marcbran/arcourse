@@ -67,10 +67,7 @@ func newRecordVisit(courseRepo CourseRepo, blobs BlobStore, observer CourseObser
 	return &recordVisit{courseRepo: courseRepo, blobs: blobs, observer: observer}
 }
 
-func (uc *recordVisit) Exec(ctx context.Context, ref VisitRef, queryID pkg.QueryID, path pkg.QueryPath, decoded map[pkg.Format]string, format pkg.Format, origin pkg.Origin) VisitRef {
-	if format == pkg.FormatJsonnet {
-		return ref
-	}
+func (uc *recordVisit) Exec(ctx context.Context, ref VisitRef, queryID pkg.QueryID, path pkg.QueryPath, decoded map[pkg.Format]string, origin pkg.Origin) VisitRef {
 	event := Event{QueryID: queryID, Path: path, Timestamp: time.Now()}
 	first := ref.VisitID == ""
 	if first {

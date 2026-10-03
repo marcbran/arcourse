@@ -49,7 +49,7 @@ func (uc *query) Exec(ctx context.Context, path pkg.QueryPath, params map[string
 		return pkg.Result{}, err
 	}
 
-	uc.recordVisit.Exec(ctx, VisitRef{}, queryID, queryPath, decoded, format, origin)
+	uc.recordVisit.Exec(ctx, VisitRef{}, queryID, queryPath, decoded, origin)
 
 	return pkg.Result{Output: decoded[format]}, nil
 }
