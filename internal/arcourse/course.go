@@ -46,6 +46,8 @@ type CourseRepo interface {
 	Append(ctx context.Context, event Event) error
 	List(ctx context.Context) ([]Event, error)
 	Get(ctx context.Context, queryID pkg.QueryID) (Event, error)
+	LatestAtPath(ctx context.Context, session pkg.SessionID, path pkg.QueryPath) (Event, bool, error)
+	LatestWithSessionPrefix(ctx context.Context, prefix string) (Event, bool, error)
 }
 
 type CourseObserver interface {
@@ -160,30 +162,17 @@ func (uc *recordVisit) resolveOrigin(ctx context.Context, origin pkg.Origin) (pk
 }
 
 func (uc *recordVisit) resolveFromPath(ctx context.Context, session pkg.SessionID, path pkg.QueryPath) pkg.QueryID {
-	events, err := uc.courseRepo.List(ctx)
-	if err != nil {
+	event, found, err := uc.courseRepo.LatestAtPath(ctx, session, path)
+	if err != nil || !found {
 		return ""
 	}
-	for i := len(events) - 1; i >= 0; i-- {
-		if events[i].SessionID == session && events[i].Path == path {
-			return events[i].QueryID
-		}
-	}
-	return ""
+	return event.QueryID
 }
 
 func (uc *recordVisit) defaultSession(ctx context.Context) pkg.SessionID {
-	events, err := uc.courseRepo.List(ctx)
-	if err == nil {
-		for i := len(events) - 1; i >= 0; i-- {
-			if !strings.HasPrefix(string(events[i].SessionID), defaultSessionPrefix) {
-				continue
-			}
-			if time.Since(events[i].Timestamp) < defaultSessionIdleGap {
-				return events[i].SessionID
-			}
-			break
-		}
+	event, found, err := uc.courseRepo.LatestWithSessionPrefix(ctx, defaultSessionPrefix)
+	if err == nil && found && time.Since(event.Timestamp) < defaultSessionIdleGap {
+		return event.SessionID
 	}
 	return pkg.SessionID(defaultSessionPrefix + uuid.Must(uuid.NewV7()).String())
 }
