@@ -11,18 +11,13 @@ import (
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 
-type QueryConfig struct {
-	AuditFormats []pkg.Format `json:"auditFormats"`
-}
-
 type query struct {
-	cfg         QueryConfig
 	environment *environment
-	appendAudit *appendAudit
+	recordVisit *recordVisit
 }
 
-func newQuery(cfg QueryConfig, environment *environment, appendAudit *appendAudit) *query {
-	return &query{cfg: cfg, environment: environment, appendAudit: appendAudit}
+func newQuery(environment *environment, recordVisit *recordVisit) *query {
+	return &query{environment: environment, recordVisit: recordVisit}
 }
 
 func (uc *query) Exec(ctx context.Context, path string, params map[string]any, format pkg.Format) (pkg.Result, error) {
@@ -31,7 +26,7 @@ func (uc *query) Exec(ctx context.Context, path string, params map[string]any, f
 		return pkg.Result{}, err
 	}
 
-	formats := mergeFormats(format, uc.cfg.AuditFormats)
+	formats := mergeFormats(format, recordedFormats)
 
 	queryPath, segments, paramsJSON, key, err := queryParts(path, params, formats)
 	if err != nil {
@@ -54,9 +49,7 @@ func (uc *query) Exec(ctx context.Context, path string, params map[string]any, f
 		return pkg.Result{}, err
 	}
 
-	if len(uc.cfg.AuditFormats) > 0 {
-		uc.appendAudit.Exec(ctx, queryID, queryPath, auditResults(decoded, uc.cfg.AuditFormats))
-	}
+	uc.recordVisit.Exec(ctx, queryID, queryPath, decoded)
 
 	return pkg.Result{Output: decoded[format]}, nil
 }
@@ -200,16 +193,4 @@ func decodeField(format pkg.Format, raw json.RawMessage) (string, error) {
 		return "", err
 	}
 	return s, nil
-}
-
-func auditResults(decoded map[pkg.Format]string, auditFormats []pkg.Format) map[pkg.Format]pkg.Result {
-	results := make(map[pkg.Format]pkg.Result, len(auditFormats))
-	for _, f := range auditFormats {
-		value, ok := decoded[f]
-		if !ok {
-			continue
-		}
-		results[f] = pkg.Result{Output: value}
-	}
-	return results
 }

@@ -6,14 +6,13 @@ import (
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 
-type AuditConfig struct {
-	Formats []pkg.Format `json:"formats"`
-	Dir     string       `json:"dir"`
+type CourseConfig struct {
+	Dir string `json:"dir"`
 }
 
 type Config struct {
-	Root  RootConfig  `json:"root"`
-	Audit AuditConfig `json:"audit"`
+	Root   RootConfig   `json:"root"`
+	Course CourseConfig `json:"course"`
 }
 
 type facade struct {
@@ -21,34 +20,28 @@ type facade struct {
 	exec        *exec
 	query       *query
 	watch       *watch
-	listAudit   *listAudit
-	getAudit    *getAudit
 	compile     *compile
 	warm        *warm
 	environment *environment
 }
 
-func NewFacade(cfg Config, evaluator Evaluator, executor Executor, auditRepo AuditRepo) pkg.Facade {
+func NewFacade(cfg Config, evaluator Evaluator, executor Executor, courseRepo CourseRepo, blobs BlobStore) pkg.Facade {
 	compile := newCompile(cfg.Root, evaluator)
 	root := newRoot(cfg.Root, evaluator)
 	environment := newEnvironment(root, evaluator, executor)
 	evaluate := newEvaluate(environment)
-	appendAudit := newAppendAudit(auditRepo)
-	queryCfg := QueryConfig{AuditFormats: cfg.Audit.Formats}
-	query := newQuery(queryCfg, environment, appendAudit)
-	watch := newWatch(queryCfg, environment, appendAudit)
-	listAudit := newListAudit(auditRepo)
-	getAudit := newGetAudit(auditRepo)
+	recordVisit := newRecordVisit(courseRepo, blobs)
+	getVisitContent := newGetVisitContent(blobs)
+	query := newQuery(environment, recordVisit)
+	watch := newWatch(environment, recordVisit)
 	warm := newWarm(environment)
-	exec := newExec(auditRepo, environment)
+	exec := newExec(courseRepo, getVisitContent, environment)
 
 	return &facade{
 		evaluate:    evaluate,
 		exec:        exec,
 		query:       query,
 		watch:       watch,
-		listAudit:   listAudit,
-		getAudit:    getAudit,
 		compile:     compile,
 		warm:        warm,
 		environment: environment,
@@ -63,17 +56,8 @@ func (f *facade) Query(ctx context.Context, path string, params map[string]any, 
 	return f.query.Exec(ctx, path, params, format)
 }
 
-
 func (f *facade) Watch(ctx context.Context, path string, params map[string]any, format pkg.Format) (<-chan pkg.Result, func(), error) {
 	return f.watch.Exec(ctx, path, params, format)
-}
-
-func (f *facade) ListAudit(ctx context.Context) ([]pkg.AuditEntry, error) {
-	return f.listAudit.Exec(ctx)
-}
-
-func (f *facade) GetAudit(ctx context.Context, id string) (pkg.AuditEntry, error) {
-	return f.getAudit.Exec(ctx, id)
 }
 
 func (f *facade) Exec(ctx context.Context, id string) (pkg.ExecResult, error) {

@@ -31,8 +31,9 @@ func buildFacade(cfg Config, plugins []*jpoet.Plugin) pkg.Facade {
 func buildLocalFacade(cfg Config, plugins []*jpoet.Plugin) pkg.Facade {
 	jpaths := []string{filepath.Join(cfg.Root.Dir, "vendor")}
 	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib, jpaths, plugins)
-	auditRepo := jsonfileinfra.NewAuditRepo(cfg.Audit.Dir)
-	return arcourse.NewFacade(cfg.Config, evaluator, evaluator, auditRepo)
+	courseRepo := jsonfileinfra.NewCourseRepo(cfg.Course.Dir)
+	blobs := jsonfileinfra.NewBlobStore(cfg.Course.Dir)
+	return arcourse.NewFacade(cfg.Config, evaluator, evaluator, courseRepo, blobs)
 }
 
 func closePlugins(plugins []*jpoet.Plugin) {
@@ -159,9 +160,8 @@ func defaultConfig() Config {
 			Root: arcourse.RootConfig{
 				Mode: arcourse.ModeCompiledGraph,
 			},
-			Audit: arcourse.AuditConfig{
-				Dir:     "audit",
-				Formats: []pkg.Format{pkg.FormatJSON, pkg.FormatHTML},
+			Course: arcourse.CourseConfig{
+				Dir: "course",
 			},
 		},
 	}
@@ -174,11 +174,11 @@ func resolveConfigValues(cfg Config, home string) (Config, error) {
 		return Config{}, err
 	}
 	cfg.Root.Dir = evaluateDir
-	auditDir, err := resolveRelativeDir(home, cfg.Audit.Dir)
+	courseDir, err := resolveRelativeDir(home, cfg.Course.Dir)
 	if err != nil {
 		return Config{}, err
 	}
-	cfg.Audit.Dir = auditDir
+	cfg.Course.Dir = courseDir
 	return cfg, nil
 }
 
@@ -210,11 +210,8 @@ func mergeConfigDefaults(cfg Config) Config {
 	if cfg.Root.Mode == "" {
 		cfg.Root.Mode = def.Root.Mode
 	}
-	if strings.TrimSpace(cfg.Audit.Dir) == "" {
-		cfg.Audit.Dir = def.Audit.Dir
-	}
-	if cfg.Audit.Formats == nil {
-		cfg.Audit.Formats = def.Audit.Formats
+	if strings.TrimSpace(cfg.Course.Dir) == "" {
+		cfg.Course.Dir = def.Course.Dir
 	}
 	return cfg
 }

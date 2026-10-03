@@ -31,12 +31,7 @@ func NewServer(ctx context.Context, facade pkg.Facade) *Server {
 	s.mux.HandleFunc("POST /api/evaluate", s.handleEvaluate)
 	s.mux.HandleFunc("POST /api/query", s.handleQuery)
 	s.mux.HandleFunc("POST /api/exec/{id}", s.handleExec)
-	s.mux.HandleFunc("GET /api/audit", s.handleListAudit)
-	s.mux.HandleFunc("GET /api/audit/{id}", s.handleGetAudit)
 	s.mux.HandleFunc("GET /api/watch", s.handleWatch)
-	s.mux.HandleFunc("GET /audit", s.handleAuditPage)
-	s.mux.HandleFunc("GET /audit/", redirectTo("/audit"))
-	s.mux.HandleFunc("GET /audit/{id}", s.handleAuditEntryPage)
 	s.mux.HandleFunc("GET /watch", s.handleBrowseWatch)
 	s.mux.HandleFunc("POST /exec", s.handleBrowseExec)
 	s.mux.HandleFunc("GET /{path...}", s.handleBrowse)
@@ -166,10 +161,4 @@ func prepareUnixSocket(path string) error {
 		return fmt.Errorf("unix socket exists but could not be checked: %w", err)
 	}
 	return os.Remove(path)
-}
-
-func redirectTo(path string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, path, http.StatusFound)
-	}
 }

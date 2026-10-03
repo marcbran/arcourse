@@ -83,12 +83,13 @@ func newBenchFacade(b *testing.B, evaluateDir string, warm bool) pkg.Facade {
 		b.Fatal(err)
 	}
 	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib, []string{pkgDir}, []*jpoet.Plugin{htmlplugin.Plugin()})
-	auditRepo := jsonfileinfra.NewAuditRepo(b.TempDir())
+	courseDir := b.TempDir()
+	courseRepo := jsonfileinfra.NewCourseRepo(courseDir)
+	blobs := jsonfileinfra.NewBlobStore(courseDir)
 	cfg := arcourse.Config{
-		Root:  arcourse.RootConfig{Dir: evaluateDir, Mode: arcourse.ModeCompiledGraph},
-		Audit: arcourse.AuditConfig{Formats: nil},
+		Root: arcourse.RootConfig{Dir: evaluateDir, Mode: arcourse.ModeCompiledGraph},
 	}
-	facade := arcourse.NewFacade(cfg, evaluator, evaluator, auditRepo)
+	facade := arcourse.NewFacade(cfg, evaluator, evaluator, courseRepo, blobs)
 	if warm {
 		err := facade.Warm(context.Background())
 		if err != nil {

@@ -388,19 +388,3 @@ func TestQueryPathNotFoundAsHTML(t *testing.T) {
 	then.
 		the_error_contains("nonexistent")
 }
-
-func TestQueryRecordsItsQueryIdAsTheAuditEntryId(t *testing.T) {
-	given, when, then := scenario(t)
-
-	given.
-		a_graph_root(`{ _node: "resource", title: "hello" }`)
-
-	when.
-		a_path_is_queried_with_format("root", pkg.FormatJSON).and().
-		the_audit_is_listed().and().
-		the_audit_entry_at_index_is_fetched(0)
-
-	then.
-		the_queried_output_has_a_query_id().and().
-		the_fetched_audit_entry_id_matches_the_queried_query_id()
-}

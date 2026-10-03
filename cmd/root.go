@@ -23,7 +23,6 @@ func newRootCmd(plugins []*jpoet.Plugin) *cobra.Command {
 	cmd.AddCommand(newServeCmd(plugins))
 	cmd.AddCommand(newWatchCmd(plugins))
 	cmd.AddCommand(newExecCmd(plugins))
-	cmd.AddCommand(newAuditCmd(plugins))
 	return cmd
 }
 

@@ -46,7 +46,7 @@ func returnError(w http.ResponseWriter, err error) {
 		returnBadRequest(w, err)
 		return
 	}
-	if errors.Is(err, pkg.ErrAuditEntryNotFound) {
+	if errors.Is(err, pkg.ErrQueryNotRecorded) {
 		returnNotFound(w, err)
 		return
 	}

@@ -94,26 +94,3 @@ func (s *Server) handleExec(w http.ResponseWriter, r *http.Request) {
 	}
 	returnSuccess(w, execResponse{Output: result.Output, Redirect: result.Redirect})
 }
-
-func (s *Server) handleListAudit(w http.ResponseWriter, r *http.Request) {
-	entries, err := s.facade.ListAudit(r.Context())
-	if err != nil {
-		returnError(w, err)
-		return
-	}
-	returnSuccess(w, entries)
-}
-
-func (s *Server) handleGetAudit(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	if id == "" {
-		returnBadRequest(w, errors.New("id is required"))
-		return
-	}
-	entry, err := s.facade.GetAudit(r.Context(), id)
-	if err != nil {
-		returnError(w, err)
-		return
-	}
-	returnSuccess(w, entry)
-}
