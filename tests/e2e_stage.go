@@ -20,9 +20,6 @@ type Stage struct {
 	facade  pkg.Facade
 	tempDir string
 
-	observeCh          <-chan pkg.Result
-	observeUnsubscribe func()
-
 	watchCh          <-chan pkg.Result
 	watchUnsubscribe func()
 

@@ -38,8 +38,7 @@ func (s *Stage) a_path_is_queried_with_params_and_format(path string, params map
 }
 
 // a_path_is_queried_with_format_promptly queries with a bounded deadline,
-// so a query that hangs (e.g. because publishing to an observer blocked)
-// fails fast with a clear error instead of hanging the whole test run.
+// so a query that hangs fails fast with a clear error instead of hanging the whole test run.
 func (s *Stage) a_path_is_queried_with_format_promptly(path string, format pkg.Format) *Stage {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()

@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/marcbran/arcourse/internal/arcourse"
-	"github.com/marcbran/arcourse/internal/infra/broadcast"
 	jsonfileinfra "github.com/marcbran/arcourse/internal/infra/jsonfile"
 	jsonnetinfra "github.com/marcbran/arcourse/internal/infra/jsonnet"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
@@ -84,13 +83,12 @@ func newBenchFacade(b *testing.B, evaluateDir string, warm bool) pkg.Facade {
 		b.Fatal(err)
 	}
 	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib, []string{pkgDir}, []*jpoet.Plugin{htmlplugin.Plugin()})
-	lastQuery := broadcast.NewLastQuery()
 	auditRepo := jsonfileinfra.NewAuditRepo(b.TempDir())
 	cfg := arcourse.Config{
 		Root:  arcourse.RootConfig{Dir: evaluateDir, Mode: arcourse.ModeCompiledGraph},
 		Audit: arcourse.AuditConfig{Formats: nil},
 	}
-	facade := arcourse.NewFacade(cfg, evaluator, evaluator, lastQuery, auditRepo)
+	facade := arcourse.NewFacade(cfg, evaluator, evaluator, auditRepo)
 	if warm {
 		err := facade.Warm(context.Background())
 		if err != nil {

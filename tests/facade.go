@@ -135,16 +135,6 @@ func (f *ServerBackedCLIFacade) Query(ctx context.Context, path string, params m
 	return f.client.Query(ctx, path, params, format)
 }
 
-func (f *ServerBackedCLIFacade) Observe(ctx context.Context, format pkg.Format) (<-chan pkg.Result, func()) {
-	err := f.start()
-	if err != nil {
-		ch := make(chan pkg.Result)
-		close(ch)
-		return ch, func() {}
-	}
-	return f.client.Observe(ctx, format)
-}
-
 func (f *ServerBackedCLIFacade) Watch(ctx context.Context, path string, params map[string]any, format pkg.Format) (<-chan pkg.Result, func(), error) {
 	err := f.start()
 	if err != nil {
@@ -360,49 +350,6 @@ func (f *CLIFacade) Query(ctx context.Context, path string, params map[string]an
 	}
 
 	return pkg.Result{Output: strings.TrimSuffix(stdout.String(), "\n")}, nil
-}
-
-func (f *CLIFacade) Observe(ctx context.Context, format pkg.Format) (<-chan pkg.Result, func()) {
-	cmdCtx, cancel := context.WithCancel(ctx)
-	ch := make(chan pkg.Result)
-
-	cmd := exec.CommandContext(cmdCtx, f.binaryPath, "observe", "--format", string(format))
-	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		cancel()
-		close(ch)
-		return ch, func() {}
-	}
-	err = cmd.Start()
-	if err != nil {
-		cancel()
-		close(ch)
-		return ch, func() {}
-	}
-
-	go func() {
-		defer close(ch)
-		defer func() {
-			_ = cmd.Wait()
-		}()
-		scanner := bufio.NewScanner(stdout)
-		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-		for scanner.Scan() {
-			var out commandOutput
-			err := json.Unmarshal(scanner.Bytes(), &out)
-			if err != nil {
-				continue
-			}
-			select {
-			case ch <- pkg.Result{Output: out.Output}:
-			case <-cmdCtx.Done():
-				return
-			}
-		}
-	}()
-
-	return ch, cancel
 }
 
 func (f *CLIFacade) Watch(ctx context.Context, path string, params map[string]any, format pkg.Format) (<-chan pkg.Result, func(), error) {

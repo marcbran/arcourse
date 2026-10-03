@@ -57,7 +57,6 @@ type AuditEntry struct {
 type Facade interface {
 	Evaluate(ctx context.Context, expression string) (Result, error)
 	Query(ctx context.Context, path string, params map[string]any, format Format) (Result, error)
-	Observe(ctx context.Context, format Format) (<-chan Result, func())
 	Watch(ctx context.Context, path string, params map[string]any, format Format) (<-chan Result, func(), error)
 	ListAudit(ctx context.Context) ([]AuditEntry, error)
 	GetAudit(ctx context.Context, id string) (AuditEntry, error)

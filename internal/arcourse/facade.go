@@ -20,7 +20,6 @@ type facade struct {
 	evaluate    *evaluate
 	exec        *exec
 	query       *query
-	observe     *observe
 	watch       *watch
 	listAudit   *listAudit
 	getAudit    *getAudit
@@ -29,15 +28,14 @@ type facade struct {
 	environment *environment
 }
 
-func NewFacade(cfg Config, evaluator Evaluator, executor Executor, lastQuery LastQuery, auditRepo AuditRepo) pkg.Facade {
+func NewFacade(cfg Config, evaluator Evaluator, executor Executor, auditRepo AuditRepo) pkg.Facade {
 	compile := newCompile(cfg.Root, evaluator)
 	root := newRoot(cfg.Root, evaluator)
 	environment := newEnvironment(root, evaluator, executor)
 	evaluate := newEvaluate(environment)
 	appendAudit := newAppendAudit(auditRepo)
 	queryCfg := QueryConfig{AuditFormats: cfg.Audit.Formats}
-	query := newQuery(queryCfg, environment, lastQuery, appendAudit)
-	observe := newObserve(lastQuery)
+	query := newQuery(queryCfg, environment, appendAudit)
 	watch := newWatch(queryCfg, environment, appendAudit)
 	listAudit := newListAudit(auditRepo)
 	getAudit := newGetAudit(auditRepo)
@@ -48,7 +46,6 @@ func NewFacade(cfg Config, evaluator Evaluator, executor Executor, lastQuery Las
 		evaluate:    evaluate,
 		exec:        exec,
 		query:       query,
-		observe:     observe,
 		watch:       watch,
 		listAudit:   listAudit,
 		getAudit:    getAudit,
@@ -66,9 +63,6 @@ func (f *facade) Query(ctx context.Context, path string, params map[string]any, 
 	return f.query.Exec(ctx, path, params, format)
 }
 
-func (f *facade) Observe(ctx context.Context, format pkg.Format) (<-chan pkg.Result, func()) {
-	return f.observe.Exec(ctx, format)
-}
 
 func (f *facade) Watch(ctx context.Context, path string, params map[string]any, format pkg.Format) (<-chan pkg.Result, func(), error) {
 	return f.watch.Exec(ctx, path, params, format)

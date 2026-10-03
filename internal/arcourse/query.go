@@ -18,12 +18,11 @@ type QueryConfig struct {
 type query struct {
 	cfg         QueryConfig
 	environment *environment
-	lastQuery   LastQuery
 	appendAudit *appendAudit
 }
 
-func newQuery(cfg QueryConfig, environment *environment, lastQuery LastQuery, appendAudit *appendAudit) *query {
-	return &query{cfg: cfg, environment: environment, lastQuery: lastQuery, appendAudit: appendAudit}
+func newQuery(cfg QueryConfig, environment *environment, appendAudit *appendAudit) *query {
+	return &query{cfg: cfg, environment: environment, appendAudit: appendAudit}
 }
 
 func (uc *query) Exec(ctx context.Context, path string, params map[string]any, format pkg.Format) (pkg.Result, error) {
@@ -32,8 +31,7 @@ func (uc *query) Exec(ctx context.Context, path string, params map[string]any, f
 		return pkg.Result{}, err
 	}
 
-	observed := uc.lastQuery.ObservedFormats()
-	formats := mergeFormats(format, observed, uc.cfg.AuditFormats)
+	formats := mergeFormats(format, uc.cfg.AuditFormats)
 
 	queryPath, segments, paramsJSON, key, err := queryParts(path, params, formats)
 	if err != nil {
@@ -54,14 +52,6 @@ func (uc *query) Exec(ctx context.Context, path string, params map[string]any, f
 	decoded, queryID, err := decodeOutput(out, formats, format)
 	if err != nil {
 		return pkg.Result{}, err
-	}
-
-	for _, f := range observed {
-		value, ok := decoded[f]
-		if !ok {
-			continue
-		}
-		uc.lastQuery.Publish(f, pkg.Result{Output: value})
 	}
 
 	if len(uc.cfg.AuditFormats) > 0 {

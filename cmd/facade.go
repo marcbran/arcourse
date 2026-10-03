@@ -12,7 +12,6 @@ import (
 	"github.com/marcbran/arcourse/internal/arcourse"
 	archttp "github.com/marcbran/arcourse/internal/http"
 	"github.com/marcbran/arcourse/internal/http/client"
-	"github.com/marcbran/arcourse/internal/infra/broadcast"
 	jsonfileinfra "github.com/marcbran/arcourse/internal/infra/jsonfile"
 	jsonnetinfra "github.com/marcbran/arcourse/internal/infra/jsonnet"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
@@ -32,9 +31,8 @@ func buildFacade(cfg Config, plugins []*jpoet.Plugin) pkg.Facade {
 func buildLocalFacade(cfg Config, plugins []*jpoet.Plugin) pkg.Facade {
 	jpaths := []string{filepath.Join(cfg.Root.Dir, "vendor")}
 	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib, jpaths, plugins)
-	lastQuery := broadcast.NewLastQuery()
 	auditRepo := jsonfileinfra.NewAuditRepo(cfg.Audit.Dir)
-	return arcourse.NewFacade(cfg.Config, evaluator, evaluator, lastQuery, auditRepo)
+	return arcourse.NewFacade(cfg.Config, evaluator, evaluator, auditRepo)
 }
 
 func closePlugins(plugins []*jpoet.Plugin) {
