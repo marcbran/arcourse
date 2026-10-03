@@ -25,12 +25,12 @@ type facade struct {
 	environment *environment
 }
 
-func NewFacade(cfg Config, evaluator Evaluator, executor Executor, courseRepo CourseRepo, blobs BlobStore) pkg.Facade {
+func NewFacade(cfg Config, evaluator Evaluator, executor Executor, courseRepo CourseRepo, blobs BlobStore, observer CourseObserver) pkg.Facade {
 	compile := newCompile(cfg.Root, evaluator)
 	root := newRoot(cfg.Root, evaluator)
 	environment := newEnvironment(root, evaluator, executor)
 	evaluate := newEvaluate(environment)
-	recordVisit := newRecordVisit(courseRepo, blobs)
+	recordVisit := newRecordVisit(courseRepo, blobs, observer)
 	getVisitContent := newGetVisitContent(blobs)
 	query := newQuery(environment, recordVisit)
 	watch := newWatch(environment, recordVisit)

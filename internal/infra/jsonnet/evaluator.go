@@ -26,10 +26,10 @@ type Evaluator struct {
 	env      *watch.Environment
 }
 
-func NewEvaluator(lib fs.FS, jpaths []string, plugins []*jpoet.Plugin) *Evaluator {
+func NewEvaluator(lib fs.FS, jpaths []string, plugins []*jpoet.Plugin, source *CourseSource) *Evaluator {
 	all := make([]*jpoet.Plugin, 0, len(plugins)+1)
 	all = append(all, plugins...)
-	all = append(all, newPlugin())
+	all = append(all, newPlugin(source))
 	return &Evaluator{lib: lib, jpaths: jpaths, plugins: all}
 }
 

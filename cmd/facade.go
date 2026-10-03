@@ -30,10 +30,11 @@ func buildFacade(cfg Config, plugins []*jpoet.Plugin) pkg.Facade {
 
 func buildLocalFacade(cfg Config, plugins []*jpoet.Plugin) pkg.Facade {
 	jpaths := []string{filepath.Join(cfg.Root.Dir, "vendor")}
-	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib, jpaths, plugins)
 	courseRepo := jsonfileinfra.NewCourseRepo(cfg.Course.Dir)
 	blobs := jsonfileinfra.NewBlobStore(cfg.Course.Dir)
-	return arcourse.NewFacade(cfg.Config, evaluator, evaluator, courseRepo, blobs)
+	source := jsonnetinfra.NewCourseSource(courseRepo)
+	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib, jpaths, plugins, source)
+	return arcourse.NewFacade(cfg.Config, evaluator, evaluator, courseRepo, blobs, source)
 }
 
 func closePlugins(plugins []*jpoet.Plugin) {

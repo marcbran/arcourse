@@ -54,6 +54,10 @@ type CourseRepo interface {
 	Get(ctx context.Context, queryID string) (Event, error)
 }
 
+type CourseObserver interface {
+	Appended(event Event)
+}
+
 type BlobStore interface {
 	Put(ctx context.Context, content string) (string, error)
 	Get(ctx context.Context, contentID string) (string, error)
@@ -62,10 +66,11 @@ type BlobStore interface {
 type recordVisit struct {
 	courseRepo CourseRepo
 	blobs      BlobStore
+	observer   CourseObserver
 }
 
-func newRecordVisit(courseRepo CourseRepo, blobs BlobStore) *recordVisit {
-	return &recordVisit{courseRepo: courseRepo, blobs: blobs}
+func newRecordVisit(courseRepo CourseRepo, blobs BlobStore, observer CourseObserver) *recordVisit {
+	return &recordVisit{courseRepo: courseRepo, blobs: blobs, observer: observer}
 }
 
 func (uc *recordVisit) Exec(ctx context.Context, ref VisitRef, queryID string, path string, decoded map[pkg.Format]string, format pkg.Format, origin pkg.Origin) VisitRef {
@@ -98,6 +103,10 @@ func (uc *recordVisit) Exec(ctx context.Context, ref VisitRef, queryID string, p
 	err := uc.courseRepo.Append(ctx, event)
 	if err != nil {
 		slog.Warn("append course event", "err", err, "path", path)
+		return ref
+	}
+	if uc.observer != nil {
+		uc.observer.Appended(event)
 	}
 	return ref
 }
