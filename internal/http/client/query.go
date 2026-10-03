@@ -12,13 +12,16 @@ import (
 )
 
 type queryRequest struct {
-	Path   string         `json:"path"`
-	Params map[string]any `json:"params"`
-	Format string         `json:"format"`
+	Path     string         `json:"path"`
+	Params   map[string]any `json:"params"`
+	Format   string         `json:"format"`
+	Session  string         `json:"session"`
+	From     string         `json:"from"`
+	Suppress bool           `json:"suppress"`
 }
 
-func (c *Client) Query(ctx context.Context, path string, params map[string]any, format pkg.Format) (pkg.Result, error) {
-	body, err := json.Marshal(queryRequest{Path: path, Params: params, Format: string(format)})
+func (c *Client) Query(ctx context.Context, path string, params map[string]any, format pkg.Format, origin pkg.Origin) (pkg.Result, error) {
+	body, err := json.Marshal(queryRequest{Path: path, Params: params, Format: string(format), Session: origin.Session, From: origin.From, Suppress: origin.Suppress})
 	if err != nil {
 		return pkg.Result{}, err
 	}

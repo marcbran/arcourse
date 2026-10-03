@@ -31,7 +31,7 @@ func (s *Server) handleWatch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	ch, unsubscribe, err := s.facade.Watch(r.Context(), path, params, format)
+	ch, unsubscribe, err := s.facade.Watch(r.Context(), path, params, format, requestOrigin(r))
 	if err != nil {
 		returnError(w, err)
 		return

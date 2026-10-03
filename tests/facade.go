@@ -127,20 +127,20 @@ func (f *ServerBackedCLIFacade) Evaluate(ctx context.Context, expression string)
 	return f.client.Evaluate(ctx, expression)
 }
 
-func (f *ServerBackedCLIFacade) Query(ctx context.Context, path string, params map[string]any, format pkg.Format) (pkg.Result, error) {
+func (f *ServerBackedCLIFacade) Query(ctx context.Context, path string, params map[string]any, format pkg.Format, origin pkg.Origin) (pkg.Result, error) {
 	err := f.start()
 	if err != nil {
 		return pkg.Result{}, err
 	}
-	return f.client.Query(ctx, path, params, format)
+	return f.client.Query(ctx, path, params, format, origin)
 }
 
-func (f *ServerBackedCLIFacade) Watch(ctx context.Context, path string, params map[string]any, format pkg.Format) (<-chan pkg.Result, func(), error) {
+func (f *ServerBackedCLIFacade) Watch(ctx context.Context, path string, params map[string]any, format pkg.Format, origin pkg.Origin) (<-chan pkg.Result, func(), error) {
 	err := f.start()
 	if err != nil {
 		return nil, nil, err
 	}
-	return f.client.Watch(ctx, path, params, format)
+	return f.client.Watch(ctx, path, params, format, origin)
 }
 
 func (f *ServerBackedCLIFacade) Exec(ctx context.Context, id string) (pkg.ExecResult, error) {
@@ -314,9 +314,10 @@ func (f *CLIFacade) Evaluate(ctx context.Context, expression string) (pkg.Result
 	return pkg.Result{Output: output.Output}, nil
 }
 
-func (f *CLIFacade) Query(ctx context.Context, path string, params map[string]any, format pkg.Format) (pkg.Result, error) {
+func (f *CLIFacade) Query(ctx context.Context, path string, params map[string]any, format pkg.Format, origin pkg.Origin) (pkg.Result, error) {
 	args := []string{"query", path, "--format", string(format)}
 	args = appendParamArgs(args, params)
+	args = appendOriginArgs(args, origin)
 	cmd := exec.CommandContext(ctx, f.binaryPath, args...)
 	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
 
@@ -336,7 +337,7 @@ func (f *CLIFacade) Query(ctx context.Context, path string, params map[string]an
 	return pkg.Result{Output: strings.TrimSuffix(stdout.String(), "\n")}, nil
 }
 
-func (f *CLIFacade) Watch(ctx context.Context, path string, params map[string]any, format pkg.Format) (<-chan pkg.Result, func(), error) {
+func (f *CLIFacade) Watch(ctx context.Context, path string, params map[string]any, format pkg.Format, origin pkg.Origin) (<-chan pkg.Result, func(), error) {
 	cmdCtx, cancel := context.WithCancel(ctx)
 	ch := make(chan pkg.Result)
 
@@ -439,6 +440,16 @@ func appendParamArgs(args []string, params map[string]any) []string {
 		default:
 			args = append(args, "--param", key+"="+fmt.Sprint(value))
 		}
+	}
+	return args
+}
+
+func appendOriginArgs(args []string, origin pkg.Origin) []string {
+	if origin.Session != "" {
+		args = append(args, "--session", origin.Session)
+	}
+	if origin.From != "" {
+		args = append(args, "--from", origin.From)
 	}
 	return args
 }

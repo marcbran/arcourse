@@ -13,10 +13,16 @@ import (
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 
-func (c *Client) Watch(ctx context.Context, path string, params map[string]any, format pkg.Format) (<-chan pkg.Result, func(), error) {
+func (c *Client) Watch(ctx context.Context, path string, params map[string]any, format pkg.Format, origin pkg.Origin) (<-chan pkg.Result, func(), error) {
 	values := url.Values{}
 	values.Set("path", path)
 	values.Set("format", string(format))
+	if origin.Session != "" {
+		values.Set("session", origin.Session)
+	}
+	if origin.From != "" {
+		values.Set("from", origin.From)
+	}
 	if len(params) > 0 {
 		paramsJSON, err := json.Marshal(params)
 		if err != nil {

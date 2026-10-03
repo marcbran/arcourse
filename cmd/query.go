@@ -41,7 +41,12 @@ func newQueryCmd(plugins []*jpoet.Plugin) *cobra.Command {
 			}
 			facade := buildFacade(cfg, plugins)
 
-			result, err := facade.Query(c.Context(), args[0], params, format)
+			origin, err := originFrom(c)
+			if err != nil {
+				return err
+			}
+
+			result, err := facade.Query(c.Context(), args[0], params, format, origin)
 			if err != nil {
 				return err
 			}
@@ -61,6 +66,7 @@ func newQueryCmd(plugins []*jpoet.Plugin) *cobra.Command {
 	cmd.Flags().StringP("format", "f", "json", "Output format: json, html, jsonnet")
 	cmd.Flags().StringP("output", "o", "", "Write output to a file")
 	cmd.Flags().StringArrayVar(&paramFlags, "param", nil, "Parameter as key=value (repeatable)")
+	addOriginFlags(cmd)
 	return cmd
 }
 

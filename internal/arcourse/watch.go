@@ -16,7 +16,7 @@ func newWatch(environment *environment, recordVisit *recordVisit) *watch {
 	return &watch{environment: environment, recordVisit: recordVisit}
 }
 
-func (uc *watch) Exec(ctx context.Context, path string, params map[string]any, format pkg.Format) (<-chan pkg.Result, func(), error) {
+func (uc *watch) Exec(ctx context.Context, path string, params map[string]any, format pkg.Format, origin pkg.Origin) (<-chan pkg.Result, func(), error) {
 	err := ctx.Err()
 	if err != nil {
 		return nil, nil, err
@@ -39,7 +39,7 @@ func (uc *watch) Exec(ctx context.Context, path string, params map[string]any, f
 		return nil, nil, err
 	}
 
-	value, ok := uc.decodeAndRecord(ctx, initial, formats, format, queryPath)
+	value, ok := uc.decodeAndRecord(ctx, initial, formats, format, queryPath, origin)
 	if !ok {
 		unregister()
 		return nil, nil, fmt.Errorf("node has no %s view", format)
@@ -56,7 +56,7 @@ func (uc *watch) Exec(ctx context.Context, path string, params map[string]any, f
 				if !ok {
 					return
 				}
-				value, ok := uc.decodeAndRecord(ctx, out, formats, format, queryPath)
+				value, ok := uc.decodeAndRecord(ctx, out, formats, format, queryPath, origin)
 				if !ok {
 					continue
 				}
@@ -74,7 +74,7 @@ func (uc *watch) Exec(ctx context.Context, path string, params map[string]any, f
 	return results, unregister, nil
 }
 
-func (uc *watch) decodeAndRecord(ctx context.Context, out string, formats []pkg.Format, format pkg.Format, queryPath string) (string, bool) {
+func (uc *watch) decodeAndRecord(ctx context.Context, out string, formats []pkg.Format, format pkg.Format, queryPath string, origin pkg.Origin) (string, bool) {
 	decoded, queryID, err := decodeOutput(out, formats, format)
 	if err != nil {
 		return "", false
@@ -83,6 +83,6 @@ func (uc *watch) decodeAndRecord(ctx context.Context, out string, formats []pkg.
 	if !ok {
 		return "", false
 	}
-	uc.recordVisit.Exec(ctx, queryID, queryPath, decoded)
+	uc.recordVisit.Exec(ctx, queryID, queryPath, decoded, format, origin)
 	return value, true
 }

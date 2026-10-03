@@ -40,7 +40,7 @@ func (s *Server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	watchCtx, cancel := context.WithCancel(context.Background())
-	ch, unregister, err := s.facade.Watch(watchCtx, path, params, pkg.FormatHTML)
+	ch, unregister, err := s.facade.Watch(watchCtx, path, params, pkg.FormatHTML, browseOrigin(w, r))
 	if err != nil {
 		cancel()
 		returnError(w, err)

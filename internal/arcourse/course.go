@@ -9,14 +9,22 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 
 var recordedFormats = []pkg.Format{pkg.FormatHTML, pkg.FormatJSON}
 
+const (
+	defaultSessionPrefix  = "default-"
+	defaultSessionIdleGap = 30 * time.Minute
+)
+
 type Event struct {
 	QueryID       string    `json:"queryId"`
+	SessionID     string    `json:"sessionId"`
 	Path          string    `json:"path"`
+	From          string    `json:"from,omitempty"`
 	Timestamp     time.Time `json:"timestamp"`
 	JSONContentID string    `json:"jsonContentId,omitempty"`
 	HTMLContentID string    `json:"htmlContentId,omitempty"`
@@ -42,8 +50,12 @@ func newRecordVisit(courseRepo CourseRepo, blobs BlobStore) *recordVisit {
 	return &recordVisit{courseRepo: courseRepo, blobs: blobs}
 }
 
-func (uc *recordVisit) Exec(ctx context.Context, queryID string, path string, decoded map[pkg.Format]string) {
-	event := Event{QueryID: queryID, Path: path, Timestamp: time.Now()}
+func (uc *recordVisit) Exec(ctx context.Context, queryID string, path string, decoded map[pkg.Format]string, format pkg.Format, origin pkg.Origin) {
+	if origin.Suppress || format == pkg.FormatJsonnet {
+		return
+	}
+	session, from := uc.resolveOrigin(ctx, origin)
+	event := Event{QueryID: queryID, SessionID: session, Path: path, From: from, Timestamp: time.Now()}
 	raw, ok := decoded[pkg.FormatJSON]
 	if ok {
 		event.JSONContentID = uc.put(ctx, canonicalJSON, raw, path, pkg.FormatJSON)
@@ -89,6 +101,60 @@ func (uc *getVisitContent) Exec(ctx context.Context, event Event) (string, error
 		return "", err
 	}
 	return withQueryID(body, event.QueryID)
+}
+
+func (uc *recordVisit) resolveOrigin(ctx context.Context, origin pkg.Origin) (string, string) {
+	from := origin.From
+	fromSession := ""
+	if from != "" {
+		event, err := uc.courseRepo.Get(ctx, from)
+		if err != nil {
+			slog.Warn("from names no recorded query", "from", from)
+			from = ""
+		} else {
+			fromSession = event.SessionID
+		}
+	}
+	session := origin.Session
+	if session == "" {
+		session = fromSession
+	}
+	if session == "" {
+		session = uc.defaultSession(ctx)
+	}
+	if from == "" && origin.FromPath != "" {
+		from = uc.resolveFromPath(ctx, session, normalizeQueryPath(origin.FromPath))
+	}
+	return session, from
+}
+
+func (uc *recordVisit) resolveFromPath(ctx context.Context, session string, path string) string {
+	events, err := uc.courseRepo.List(ctx)
+	if err != nil {
+		return ""
+	}
+	for i := len(events) - 1; i >= 0; i-- {
+		if events[i].SessionID == session && events[i].Path == path {
+			return events[i].QueryID
+		}
+	}
+	return ""
+}
+
+func (uc *recordVisit) defaultSession(ctx context.Context) string {
+	events, err := uc.courseRepo.List(ctx)
+	if err == nil {
+		for i := len(events) - 1; i >= 0; i-- {
+			if !strings.HasPrefix(events[i].SessionID, defaultSessionPrefix) {
+				continue
+			}
+			if time.Since(events[i].Timestamp) < defaultSessionIdleGap {
+				return events[i].SessionID
+			}
+			break
+		}
+	}
+	return defaultSessionPrefix + uuid.Must(uuid.NewV7()).String()
 }
 
 func verbatim(raw string) (string, error) {

@@ -14,9 +14,12 @@ type evaluateRequest struct {
 }
 
 type queryRequest struct {
-	Path   string         `json:"path"`
-	Params map[string]any `json:"params"`
-	Format string         `json:"format"`
+	Path     string         `json:"path"`
+	Params   map[string]any `json:"params"`
+	Format   string         `json:"format"`
+	Session  string         `json:"session"`
+	From     string         `json:"from"`
+	Suppress bool           `json:"suppress"`
 }
 
 type outputResponse struct {
@@ -73,7 +76,8 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 		returnBadRequest(w, err)
 		return
 	}
-	result, err := s.facade.Query(r.Context(), req.Path, req.Params, format)
+	origin := pkg.Origin{Session: req.Session, From: req.From, Suppress: req.Suppress}
+	result, err := s.facade.Query(r.Context(), req.Path, req.Params, format, origin)
 	if err != nil {
 		returnError(w, err)
 		return

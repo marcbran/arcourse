@@ -20,7 +20,7 @@ func newQuery(environment *environment, recordVisit *recordVisit) *query {
 	return &query{environment: environment, recordVisit: recordVisit}
 }
 
-func (uc *query) Exec(ctx context.Context, path string, params map[string]any, format pkg.Format) (pkg.Result, error) {
+func (uc *query) Exec(ctx context.Context, path string, params map[string]any, format pkg.Format, origin pkg.Origin) (pkg.Result, error) {
 	err := ctx.Err()
 	if err != nil {
 		return pkg.Result{}, err
@@ -49,7 +49,7 @@ func (uc *query) Exec(ctx context.Context, path string, params map[string]any, f
 		return pkg.Result{}, err
 	}
 
-	uc.recordVisit.Exec(ctx, queryID, queryPath, decoded)
+	uc.recordVisit.Exec(ctx, queryID, queryPath, decoded, format, origin)
 
 	return pkg.Result{Output: decoded[format]}, nil
 }

@@ -37,6 +37,13 @@ func ParseFormat(s string) (Format, error) {
 	}
 }
 
+type Origin struct {
+	Session  string
+	From     string
+	FromPath string
+	Suppress bool
+}
+
 type Result struct {
 	Output string
 }
@@ -48,8 +55,8 @@ type ExecResult struct {
 
 type Facade interface {
 	Evaluate(ctx context.Context, expression string) (Result, error)
-	Query(ctx context.Context, path string, params map[string]any, format Format) (Result, error)
-	Watch(ctx context.Context, path string, params map[string]any, format Format) (<-chan Result, func(), error)
+	Query(ctx context.Context, path string, params map[string]any, format Format, origin Origin) (Result, error)
+	Watch(ctx context.Context, path string, params map[string]any, format Format, origin Origin) (<-chan Result, func(), error)
 	Exec(ctx context.Context, id string) (ExecResult, error)
 	Compile(ctx context.Context) (Result, error)
 	Warm(ctx context.Context) error

@@ -24,6 +24,7 @@ type Stage struct {
 	watchUnsubscribe func()
 
 	queryID string
+	origin  pkg.Origin
 
 	LastOutput string
 	LastError  string

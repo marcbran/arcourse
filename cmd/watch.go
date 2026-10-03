@@ -40,7 +40,12 @@ func newWatchCmd(plugins []*jpoet.Plugin) *cobra.Command {
 			}
 			facade := buildFacade(cfg, plugins)
 
-			ch, unsubscribe, err := facade.Watch(c.Context(), args[0], params, format)
+			origin, err := originFrom(c)
+			if err != nil {
+				return err
+			}
+
+			ch, unsubscribe, err := facade.Watch(c.Context(), args[0], params, format, origin)
 			if err != nil {
 				return err
 			}
@@ -60,5 +65,6 @@ func newWatchCmd(plugins []*jpoet.Plugin) *cobra.Command {
 	}
 	cmd.Flags().StringP("format", "f", "json", "Output format: json, html, jsonnet")
 	cmd.Flags().StringArrayVar(&paramFlags, "param", nil, "Parameter as key=value (repeatable)")
+	addOriginFlags(cmd)
 	return cmd
 }

@@ -52,12 +52,12 @@ func (f *facade) Evaluate(ctx context.Context, expression string) (pkg.Result, e
 	return f.evaluate.Exec(ctx, expression)
 }
 
-func (f *facade) Query(ctx context.Context, path string, params map[string]any, format pkg.Format) (pkg.Result, error) {
-	return f.query.Exec(ctx, path, params, format)
+func (f *facade) Query(ctx context.Context, path string, params map[string]any, format pkg.Format, origin pkg.Origin) (pkg.Result, error) {
+	return f.query.Exec(ctx, path, params, format, origin)
 }
 
-func (f *facade) Watch(ctx context.Context, path string, params map[string]any, format pkg.Format) (<-chan pkg.Result, func(), error) {
-	return f.watch.Exec(ctx, path, params, format)
+func (f *facade) Watch(ctx context.Context, path string, params map[string]any, format pkg.Format, origin pkg.Origin) (<-chan pkg.Result, func(), error) {
+	return f.watch.Exec(ctx, path, params, format, origin)
 }
 
 func (f *facade) Exec(ctx context.Context, id string) (pkg.ExecResult, error) {
