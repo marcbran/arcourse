@@ -77,7 +77,7 @@ func (uc *watch) Exec(ctx context.Context, path pkg.QueryPath, params map[string
 }
 
 func (uc *watch) decodeAndRecord(ctx context.Context, ref *VisitRef, out string, formats []pkg.Format, format pkg.Format, queryPath pkg.QueryPath, origin pkg.Origin) (string, bool) {
-	decoded, queryID, err := decodeOutput(out, formats, format)
+	decoded, evaluationID, err := decodeOutput(out, formats, format)
 	if err != nil {
 		return "", false
 	}
@@ -85,6 +85,6 @@ func (uc *watch) decodeAndRecord(ctx context.Context, ref *VisitRef, out string,
 	if !ok {
 		return "", false
 	}
-	*ref = uc.recordVisit.Exec(ctx, *ref, queryID, queryPath, decoded, origin)
+	*ref = uc.recordVisit.Exec(ctx, *ref, evaluationID, queryPath, decoded, origin)
 	return value, true
 }

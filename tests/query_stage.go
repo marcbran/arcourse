@@ -55,19 +55,19 @@ func (s *Stage) a_path_is_queried_with_format_promptly(path string, format pkg.F
 }
 
 func (s *Stage) the_queried_output_has_a_query_id() *Stage {
-	s.queryID = queryIDOf(s.t, s.LastOutput)
-	assert.NotEmpty(s.t, s.queryID)
+	s.evaluationID = evaluationIDOf(s.t, s.LastOutput)
+	assert.NotEmpty(s.t, s.evaluationID)
 	return s
 }
 
-func queryIDOf(t require.TestingT, out string) pkg.QueryID {
+func evaluationIDOf(t require.TestingT, out string) pkg.EvaluationID {
 	var doc map[string]json.RawMessage
 	err := json.Unmarshal([]byte(out), &doc)
 	require.NoError(t, err)
-	raw, ok := doc[pkg.QueryIDField]
-	require.True(t, ok, "output has no %s", pkg.QueryIDField)
+	raw, ok := doc[pkg.EvaluationIDField]
+	require.True(t, ok, "output has no %s", pkg.EvaluationIDField)
 	var id string
 	err = json.Unmarshal(raw, &id)
 	require.NoError(t, err)
-	return pkg.QueryID(id)
+	return pkg.EvaluationID(id)
 }

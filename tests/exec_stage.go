@@ -7,7 +7,7 @@ import (
 )
 
 func (s *Stage) the_action_recorded_for_the_query_is_executed() *Stage {
-	result, err := s.facade.Exec(context.Background(), queryIDOf(s.t, s.LastOutput))
+	result, err := s.facade.Exec(context.Background(), evaluationIDOf(s.t, s.LastOutput))
 	if err != nil {
 		s.LastError = err.Error()
 		s.LastOutput = ""

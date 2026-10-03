@@ -31,5 +31,5 @@ func originFrom(cmd *cobra.Command) (pkg.Origin, error) {
 	if err != nil {
 		return pkg.Origin{}, err
 	}
-	return pkg.Origin{Session: pkg.SessionID(session), From: pkg.QueryID(from), FromPath: pkg.NewQueryPath(fromPath)}, nil
+	return pkg.Origin{Session: pkg.SessionID(session), From: pkg.EvaluationID(from), FromPath: pkg.NewQueryPath(fromPath)}, nil
 }

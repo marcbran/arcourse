@@ -55,7 +55,7 @@ func (f *facade) Watch(ctx context.Context, path pkg.QueryPath, params map[strin
 	return f.watch.Exec(ctx, path, params, format, origin)
 }
 
-func (f *facade) Exec(ctx context.Context, id pkg.QueryID) (pkg.ExecResult, error) {
+func (f *facade) Exec(ctx context.Context, id pkg.EvaluationID) (pkg.ExecResult, error) {
 	return f.exec.Exec(ctx, id)
 }
 

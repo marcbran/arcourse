@@ -25,14 +25,14 @@ type VisitID string
 type ContentID string
 
 type Event struct {
-	QueryID       pkg.QueryID   `json:"queryId"`
-	VisitID       VisitID       `json:"visitId"`
-	SessionID     pkg.SessionID `json:"sessionId"`
-	Path          pkg.QueryPath `json:"path"`
-	From          pkg.QueryID   `json:"from,omitempty"`
-	Timestamp     time.Time     `json:"timestamp"`
-	JSONContentID ContentID     `json:"jsonContentId,omitempty"`
-	HTMLContentID ContentID     `json:"htmlContentId,omitempty"`
+	EvaluationID  pkg.EvaluationID `json:"evaluationId"`
+	VisitID       VisitID          `json:"visitId"`
+	SessionID     pkg.SessionID    `json:"sessionId"`
+	Path          pkg.QueryPath    `json:"path"`
+	From          pkg.EvaluationID `json:"from,omitempty"`
+	Timestamp     time.Time        `json:"timestamp"`
+	JSONContentID ContentID        `json:"jsonContentId,omitempty"`
+	HTMLContentID ContentID        `json:"htmlContentId,omitempty"`
 }
 
 type VisitRef struct {
@@ -45,7 +45,7 @@ type VisitRef struct {
 type CourseRepo interface {
 	Append(ctx context.Context, event Event) error
 	List(ctx context.Context) ([]Event, error)
-	Get(ctx context.Context, queryID pkg.QueryID) (Event, error)
+	Get(ctx context.Context, evaluationID pkg.EvaluationID) (Event, error)
 	LatestAtPath(ctx context.Context, session pkg.SessionID, path pkg.QueryPath) (Event, bool, error)
 	LatestWithSessionPrefix(ctx context.Context, prefix string) (Event, bool, error)
 }
@@ -69,8 +69,8 @@ func newRecordVisit(courseRepo CourseRepo, blobs BlobStore, observer CourseObser
 	return &recordVisit{courseRepo: courseRepo, blobs: blobs, observer: observer}
 }
 
-func (uc *recordVisit) Exec(ctx context.Context, ref VisitRef, queryID pkg.QueryID, path pkg.QueryPath, decoded map[pkg.Format]string, origin pkg.Origin) VisitRef {
-	event := Event{QueryID: queryID, Path: path, Timestamp: time.Now()}
+func (uc *recordVisit) Exec(ctx context.Context, ref VisitRef, evaluationID pkg.EvaluationID, path pkg.QueryPath, decoded map[pkg.Format]string, origin pkg.Origin) VisitRef {
+	event := Event{EvaluationID: evaluationID, Path: path, Timestamp: time.Now()}
 	first := ref.VisitID == ""
 	if first {
 		session, from := uc.resolveOrigin(ctx, origin)
@@ -133,10 +133,10 @@ func (uc *getVisitContent) Exec(ctx context.Context, event Event) (string, error
 	if err != nil {
 		return "", err
 	}
-	return withQueryID(body, event.QueryID)
+	return withEvaluationID(body, event.EvaluationID)
 }
 
-func (uc *recordVisit) resolveOrigin(ctx context.Context, origin pkg.Origin) (pkg.SessionID, pkg.QueryID) {
+func (uc *recordVisit) resolveOrigin(ctx context.Context, origin pkg.Origin) (pkg.SessionID, pkg.EvaluationID) {
 	from := origin.From
 	fromSession := pkg.SessionID("")
 	if from != "" {
@@ -161,12 +161,12 @@ func (uc *recordVisit) resolveOrigin(ctx context.Context, origin pkg.Origin) (pk
 	return session, from
 }
 
-func (uc *recordVisit) resolveFromPath(ctx context.Context, session pkg.SessionID, path pkg.QueryPath) pkg.QueryID {
+func (uc *recordVisit) resolveFromPath(ctx context.Context, session pkg.SessionID, path pkg.QueryPath) pkg.EvaluationID {
 	event, found, err := uc.courseRepo.LatestAtPath(ctx, session, path)
 	if err != nil || !found {
 		return ""
 	}
-	return event.QueryID
+	return event.EvaluationID
 }
 
 func (uc *recordVisit) defaultSession(ctx context.Context) pkg.SessionID {
@@ -188,12 +188,12 @@ func canonicalJSON(raw string) (string, error) {
 	}
 	object, ok := value.(map[string]any)
 	if ok {
-		delete(object, pkg.QueryIDField)
+		delete(object, pkg.EvaluationIDField)
 	}
 	return marshalCanonical(value)
 }
 
-func withQueryID(raw string, queryID pkg.QueryID) (string, error) {
+func withEvaluationID(raw string, evaluationID pkg.EvaluationID) (string, error) {
 	value, err := decodeJSONValue(raw)
 	if err != nil {
 		return "", err
@@ -202,7 +202,7 @@ func withQueryID(raw string, queryID pkg.QueryID) (string, error) {
 	if !ok {
 		return raw, nil
 	}
-	object[pkg.QueryIDField] = string(queryID)
+	object[pkg.EvaluationIDField] = string(evaluationID)
 	return marshalCanonical(object)
 }
 

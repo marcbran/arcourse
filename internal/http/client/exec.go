@@ -16,7 +16,7 @@ type execResponse struct {
 	Redirect string `json:"redirect"`
 }
 
-func (c *Client) Exec(ctx context.Context, id pkg.QueryID) (pkg.ExecResult, error) {
+func (c *Client) Exec(ctx context.Context, id pkg.EvaluationID) (pkg.ExecResult, error) {
 	reqURL := c.baseURL + "/api/exec/" + url.PathEscape(string(id))
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, nil)
 	if err != nil {

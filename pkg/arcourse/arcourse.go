@@ -16,7 +16,7 @@ var (
 	ErrShapeNotSupported  = errors.New("compiling a root shape requires immediateGraph or compiledGraph mode (root.jsonnet must be a node-spec list, not a finished value)")
 )
 
-const QueryIDField = "_queryId"
+const EvaluationIDField = "_evaluationId"
 
 type Format string
 
@@ -48,13 +48,13 @@ func (p QueryPath) String() string {
 	return string(p)
 }
 
-type QueryID string
+type EvaluationID string
 
 type SessionID string
 
 type Origin struct {
 	Session  SessionID
-	From     QueryID
+	From     EvaluationID
 	FromPath QueryPath
 }
 
@@ -71,7 +71,7 @@ type Facade interface {
 	Evaluate(ctx context.Context, expression string) (Result, error)
 	Query(ctx context.Context, path QueryPath, params map[string]any, format Format, origin Origin) (Result, error)
 	Watch(ctx context.Context, path QueryPath, params map[string]any, format Format, origin Origin) (<-chan Result, func(), error)
-	Exec(ctx context.Context, id QueryID) (ExecResult, error)
+	Exec(ctx context.Context, id EvaluationID) (ExecResult, error)
 	Compile(ctx context.Context) (Result, error)
 	Warm(ctx context.Context) error
 	Close() error

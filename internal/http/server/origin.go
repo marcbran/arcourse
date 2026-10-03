@@ -53,7 +53,7 @@ func requestOrigin(r *http.Request) pkg.Origin {
 	query := r.URL.Query()
 	return pkg.Origin{
 		Session:  pkg.SessionID(query.Get("session")),
-		From:     pkg.QueryID(query.Get("from")),
+		From:     pkg.EvaluationID(query.Get("from")),
 		FromPath: pkg.NewQueryPath(query.Get("fromPath")),
 	}
 }

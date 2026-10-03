@@ -107,7 +107,7 @@ local resourceView = baseView {
 local actionView = baseView {
   _view+:: {
     fragment: c.action {
-      queryId:: std.get($, '_queryId', ''),
+      evaluationId:: std.get($, '_evaluationId', ''),
       summary:: std.get($, '_summary', ''),
     },
   },

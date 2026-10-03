@@ -163,14 +163,14 @@ func (s *CourseSource) course(session pkg.SessionID) (any, error) {
 		return nil, err
 	}
 	seen := map[arcourse.VisitID]bool{}
-	visitByQueryID := map[pkg.QueryID]arcourse.VisitID{}
+	visitByEvaluationID := map[pkg.EvaluationID]arcourse.VisitID{}
 	var vertices []any
 	var edges []any
 	for _, event := range events {
 		if event.SessionID != session {
 			continue
 		}
-		visitByQueryID[event.QueryID] = event.VisitID
+		visitByEvaluationID[event.EvaluationID] = event.VisitID
 		if seen[event.VisitID] {
 			continue
 		}
@@ -192,7 +192,7 @@ func (s *CourseSource) course(session pkg.SessionID) (any, error) {
 	for _, edge := range edges {
 		entry := edge.(map[string]any)
 		from, _ := entry["from"].(string)
-		entry["from"] = string(visitByQueryID[pkg.QueryID(from)])
+		entry["from"] = string(visitByEvaluationID[pkg.EvaluationID(from)])
 	}
 	if vertices == nil {
 		vertices = []any{}
@@ -218,7 +218,7 @@ func (s *CourseSource) visit(visitID arcourse.VisitID) (any, error) {
 			head = &events[i]
 		}
 		evaluations = append(evaluations, map[string]any{
-			"queryId":       string(events[i].QueryID),
+			"evaluationId":  string(events[i].EvaluationID),
 			"timestamp":     events[i].Timestamp.Format(time.RFC3339),
 			"jsonContentId": string(events[i].JSONContentID),
 			"htmlContentId": string(events[i].HTMLContentID),

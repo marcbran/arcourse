@@ -140,7 +140,7 @@ func contentIdentity(output string) (string, bool) {
 	if err != nil {
 		return "", false
 	}
-	rawID, ok := raw[pkg.QueryIDField]
+	rawID, ok := raw[pkg.EvaluationIDField]
 	if !ok {
 		return "", false
 	}

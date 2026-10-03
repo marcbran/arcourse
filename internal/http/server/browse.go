@@ -66,12 +66,12 @@ func (s *Server) handleBrowseExec(w http.ResponseWriter, r *http.Request) {
 		returnBadRequest(w, err)
 		return
 	}
-	id := r.PostFormValue("queryId")
+	id := r.PostFormValue("evaluationId")
 	if id == "" {
-		returnBadRequest(w, errors.New("queryId is required"))
+		returnBadRequest(w, errors.New("evaluationId is required"))
 		return
 	}
-	result, err := s.facade.Exec(r.Context(), pkg.QueryID(id))
+	result, err := s.facade.Exec(r.Context(), pkg.EvaluationID(id))
 	if err != nil {
 		returnError(w, err)
 		return

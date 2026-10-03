@@ -35,7 +35,7 @@ func newExec(courseRepo CourseRepo, getVisitContent *getVisitContent, environmen
 	return &exec{courseRepo: courseRepo, getVisitContent: getVisitContent, environment: environment}
 }
 
-func (uc *exec) Exec(ctx context.Context, id pkg.QueryID) (pkg.ExecResult, error) {
+func (uc *exec) Exec(ctx context.Context, id pkg.EvaluationID) (pkg.ExecResult, error) {
 	err := ctx.Err()
 	if err != nil {
 		return pkg.ExecResult{}, err

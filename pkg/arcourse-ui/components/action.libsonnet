@@ -38,7 +38,7 @@ local style = |||
 
 {
   local c = self,
-  queryId:: error 'Action requires a queryId',
+  evaluationId:: error 'Action requires an evaluationId',
   summary:: '',
   label:: 'Apply',
   html: [
@@ -53,7 +53,7 @@ local style = |||
             element: 'form',
             attributes: { method: 'post', action: '/exec' },
             children: [
-              { element: 'input', attributes: { type: 'hidden', name: 'queryId', value: c.queryId } },
+              { element: 'input', attributes: { type: 'hidden', name: 'evaluationId', value: c.evaluationId } },
               { element: 'button', attributes: { type: 'submit' }, children: [c.label] },
             ],
           },

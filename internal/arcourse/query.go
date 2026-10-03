@@ -44,12 +44,12 @@ func (uc *query) Exec(ctx context.Context, path pkg.QueryPath, params map[string
 	}
 	unregister()
 
-	decoded, queryID, err := decodeOutput(out, formats, format)
+	decoded, evaluationID, err := decodeOutput(out, formats, format)
 	if err != nil {
 		return pkg.Result{}, err
 	}
 
-	uc.recordVisit.Exec(ctx, VisitRef{}, queryID, queryPath, decoded, origin)
+	uc.recordVisit.Exec(ctx, VisitRef{}, evaluationID, queryPath, decoded, origin)
 
 	return pkg.Result{Output: decoded[format]}, nil
 }
@@ -143,25 +143,25 @@ func mergeParams(base map[string]any, overrides map[string]any) map[string]any {
 	return merged
 }
 
-func decodeOutput(out string, formats []pkg.Format, primary pkg.Format) (map[pkg.Format]string, pkg.QueryID, error) {
+func decodeOutput(out string, formats []pkg.Format, primary pkg.Format) (map[pkg.Format]string, pkg.EvaluationID, error) {
 	var raw map[string]json.RawMessage
 	err := json.Unmarshal([]byte(out), &raw)
 	if err != nil {
 		return nil, "", err
 	}
-	rawID, ok := raw[pkg.QueryIDField]
+	rawID, ok := raw[pkg.EvaluationIDField]
 	if !ok {
-		return nil, "", fmt.Errorf("output has no %s", pkg.QueryIDField)
+		return nil, "", fmt.Errorf("output has no %s", pkg.EvaluationIDField)
 	}
-	var rawQueryID string
-	err = json.Unmarshal(rawID, &rawQueryID)
+	var rawEvaluationID string
+	err = json.Unmarshal(rawID, &rawEvaluationID)
 	if err != nil {
 		return nil, "", err
 	}
-	if rawQueryID == "" {
-		return nil, "", fmt.Errorf("output has an empty %s", pkg.QueryIDField)
+	if rawEvaluationID == "" {
+		return nil, "", fmt.Errorf("output has an empty %s", pkg.EvaluationIDField)
 	}
-	queryID := pkg.QueryID(rawQueryID)
+	evaluationID := pkg.EvaluationID(rawEvaluationID)
 	decoded := make(map[pkg.Format]string, len(raw))
 	for _, f := range formats {
 		rawValue, ok := raw[string(f)]
@@ -177,7 +177,7 @@ func decodeOutput(out string, formats []pkg.Format, primary pkg.Format) (map[pkg
 		}
 		decoded[f] = value
 	}
-	return decoded, queryID, nil
+	return decoded, evaluationID, nil
 }
 
 func decodeField(format pkg.Format, raw json.RawMessage) (string, error) {

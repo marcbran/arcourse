@@ -143,7 +143,7 @@ func (f *ServerBackedCLIFacade) Watch(ctx context.Context, path pkg.QueryPath, p
 	return f.client.Watch(ctx, path, params, format, origin)
 }
 
-func (f *ServerBackedCLIFacade) Exec(ctx context.Context, id pkg.QueryID) (pkg.ExecResult, error) {
+func (f *ServerBackedCLIFacade) Exec(ctx context.Context, id pkg.EvaluationID) (pkg.ExecResult, error) {
 	err := f.start()
 	if err != nil {
 		return pkg.ExecResult{}, err
@@ -379,7 +379,7 @@ func (f *CLIFacade) Watch(ctx context.Context, path pkg.QueryPath, params map[st
 	return ch, cancel, nil
 }
 
-func (f *CLIFacade) Exec(ctx context.Context, id pkg.QueryID) (pkg.ExecResult, error) {
+func (f *CLIFacade) Exec(ctx context.Context, id pkg.EvaluationID) (pkg.ExecResult, error) {
 	cmd := exec.CommandContext(ctx, f.binaryPath, "exec", string(id))
 	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
 

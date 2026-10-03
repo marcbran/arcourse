@@ -24,7 +24,7 @@ func newExecCmd(plugins []*jpoet.Plugin) *cobra.Command {
 			}
 			facade := buildFacade(cfg, plugins)
 
-			result, err := facade.Exec(c.Context(), pkg.QueryID(args[0]))
+			result, err := facade.Exec(c.Context(), pkg.EvaluationID(args[0]))
 			if err != nil {
 				return err
 			}
