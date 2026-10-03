@@ -56,7 +56,6 @@ type Origin struct {
 	Session  SessionID
 	From     QueryID
 	FromPath QueryPath
-	Suppress bool
 }
 
 type Result struct {

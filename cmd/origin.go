@@ -31,13 +31,5 @@ func originFrom(cmd *cobra.Command) (pkg.Origin, error) {
 	if err != nil {
 		return pkg.Origin{}, err
 	}
-	suppress := false
-	if cmd.Flags().Lookup("output") != nil {
-		output, err := cmd.Flags().GetString("output")
-		if err != nil {
-			return pkg.Origin{}, err
-		}
-		suppress = output != ""
-	}
-	return pkg.Origin{Session: pkg.SessionID(session), From: pkg.QueryID(from), FromPath: pkg.NewQueryPath(fromPath), Suppress: suppress}, nil
+	return pkg.Origin{Session: pkg.SessionID(session), From: pkg.QueryID(from), FromPath: pkg.NewQueryPath(fromPath)}, nil
 }

@@ -68,7 +68,7 @@ func newRecordVisit(courseRepo CourseRepo, blobs BlobStore, observer CourseObser
 }
 
 func (uc *recordVisit) Exec(ctx context.Context, ref VisitRef, queryID pkg.QueryID, path pkg.QueryPath, decoded map[pkg.Format]string, format pkg.Format, origin pkg.Origin) VisitRef {
-	if origin.Suppress || format == pkg.FormatJsonnet {
+	if format == pkg.FormatJsonnet {
 		return ref
 	}
 	event := Event{QueryID: queryID, Path: path, Timestamp: time.Now()}

@@ -20,7 +20,6 @@ type queryRequest struct {
 	Session  string         `json:"session"`
 	From     string         `json:"from"`
 	FromPath string         `json:"fromPath"`
-	Suppress bool           `json:"suppress"`
 }
 
 type outputResponse struct {
@@ -77,7 +76,7 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 		returnBadRequest(w, err)
 		return
 	}
-	origin := pkg.Origin{Session: pkg.SessionID(req.Session), From: pkg.QueryID(req.From), FromPath: pkg.NewQueryPath(req.FromPath), Suppress: req.Suppress}
+	origin := pkg.Origin{Session: pkg.SessionID(req.Session), From: pkg.QueryID(req.From), FromPath: pkg.NewQueryPath(req.FromPath)}
 	result, err := s.facade.Query(r.Context(), pkg.NewQueryPath(req.Path), req.Params, format, origin)
 	if err != nil {
 		returnError(w, err)
