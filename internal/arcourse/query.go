@@ -77,6 +77,23 @@ func mergeFormats(primary pkg.Format, sets ...[]pkg.Format) []pkg.Format {
 	return formats
 }
 
+func queryParts(path string, params map[string]any, formats []pkg.Format) (queryPath string, segments []string, paramsJSON string, key string, err error) {
+	queryPath, queryParams, err := splitPathAndQuery(path)
+	if err != nil {
+		return "", nil, "", "", err
+	}
+	queryPath = normalizeQueryPath(queryPath)
+	parts := strings.Split(queryPath, "/")
+	segments = parts[1:]
+	paramsBytes, err := json.Marshal(mergeParams(queryParams, params))
+	if err != nil {
+		return "", nil, "", "", err
+	}
+	paramsJSON = string(paramsBytes)
+	key = queryPath + "|" + paramsJSON + "|" + formatsKey(formats)
+	return queryPath, segments, paramsJSON, key, nil
+}
+
 func splitPathAndQuery(path string) (string, map[string]any, error) {
 	base, query, found := strings.Cut(path, "?")
 	if !found {
@@ -97,20 +114,8 @@ func splitPathAndQuery(path string) (string, map[string]any, error) {
 	return base, params, nil
 }
 
-func queryParts(path string, params map[string]any, formats []pkg.Format) (queryPath string, segments []string, paramsJSON string, key string, err error) {
-	queryPath, queryParams, err := splitPathAndQuery(path)
-	if err != nil {
-		return "", nil, "", "", err
-	}
-	parts := strings.Split(strings.Trim(queryPath, "/"), "/")
-	segments = parts[1:]
-	paramsBytes, err := json.Marshal(mergeParams(queryParams, params))
-	if err != nil {
-		return "", nil, "", "", err
-	}
-	paramsJSON = string(paramsBytes)
-	key = queryPath + "|" + paramsJSON + "|" + formatsKey(formats)
-	return queryPath, segments, paramsJSON, key, nil
+func normalizeQueryPath(path string) string {
+	return strings.Trim(path, "/")
 }
 
 func formatsKey(formats []pkg.Format) string {

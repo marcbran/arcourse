@@ -57,7 +57,7 @@ func (uc *exec) Exec(ctx context.Context, id string) (pkg.ExecResult, error) {
 
 	redirect := entry.Path
 	if command.Redirect != nil && command.Redirect.QueryPath != "" {
-		redirect = command.Redirect.QueryPath
+		redirect = normalizeQueryPath(command.Redirect.QueryPath)
 	}
 	return pkg.ExecResult{Output: output, Redirect: redirect}, nil
 }
