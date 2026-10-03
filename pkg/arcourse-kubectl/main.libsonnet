@@ -308,8 +308,8 @@ local generate(resources, manifest=true) =
   if manifest then j.manifestJsonnet(generated) else generated;
 
 local graph = {
-  manifest: true,
-  data: {
+  manifest:: true,
+  data:: {
     contexts: configuredContexts($),
     resources: dedupeResources(resourcesForContexts($.data.contexts)),
   },

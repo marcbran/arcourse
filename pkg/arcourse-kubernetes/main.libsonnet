@@ -502,13 +502,13 @@ local groupsFromSpecs(specs, columns, links) =
   ]);
 
 local graph = {
-  manifest: true,
-  contexts: [],
-  specs: {},
-  globalLinkSpecs: [namespaceLinkSpec, ownerReferenceLinkSpec],
-  data:
-    local columns = if std.objectHas(self, 'columns') then self.columns else {};
-    local links = if std.objectHas(self, 'links') then self.links else {};
+  manifest:: true,
+  contexts:: [],
+  specs:: {},
+  globalLinkSpecs:: [namespaceLinkSpec, ownerReferenceLinkSpec],
+  data::
+    local columns = if std.objectHasAll(self, 'columns') then self.columns else {};
+    local links = if std.objectHasAll(self, 'links') then self.links else {};
     {
       groups: mergeGroups(
         std.flattenArrays([groupsFromContext(ctx, columns, links) for ctx in $.contexts]) +
