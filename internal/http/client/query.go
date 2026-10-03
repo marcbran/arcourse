@@ -17,11 +17,12 @@ type queryRequest struct {
 	Format   string         `json:"format"`
 	Session  string         `json:"session"`
 	From     string         `json:"from"`
+	FromPath string         `json:"fromPath"`
 	Suppress bool           `json:"suppress"`
 }
 
 func (c *Client) Query(ctx context.Context, path pkg.QueryPath, params map[string]any, format pkg.Format, origin pkg.Origin) (pkg.Result, error) {
-	body, err := json.Marshal(queryRequest{Path: path.String(), Params: params, Format: string(format), Session: string(origin.Session), From: string(origin.From), Suppress: origin.Suppress})
+	body, err := json.Marshal(queryRequest{Path: path.String(), Params: params, Format: string(format), Session: string(origin.Session), From: string(origin.From), FromPath: origin.FromPath.String(), Suppress: origin.Suppress})
 	if err != nil {
 		return pkg.Result{}, err
 	}

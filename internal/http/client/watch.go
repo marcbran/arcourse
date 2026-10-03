@@ -23,6 +23,9 @@ func (c *Client) Watch(ctx context.Context, path pkg.QueryPath, params map[strin
 	if origin.From != "" {
 		values.Set("from", string(origin.From))
 	}
+	if origin.FromPath != "" {
+		values.Set("fromPath", origin.FromPath.String())
+	}
 	if len(params) > 0 {
 		paramsJSON, err := json.Marshal(params)
 		if err != nil {

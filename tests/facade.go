@@ -451,5 +451,8 @@ func appendOriginArgs(args []string, origin pkg.Origin) []string {
 	if origin.From != "" {
 		args = append(args, "--from", string(origin.From))
 	}
+	if origin.FromPath != "" {
+		args = append(args, "--from-path", origin.FromPath.String())
+	}
 	return args
 }
