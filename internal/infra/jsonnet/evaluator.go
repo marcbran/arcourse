@@ -27,6 +27,9 @@ type Evaluator struct {
 }
 
 func NewEvaluator(lib fs.FS, jpaths []string, plugins []*jpoet.Plugin, source *CourseSource) *Evaluator {
+	if source == nil {
+		source = NewCourseSource(nil)
+	}
 	all := make([]*jpoet.Plugin, 0, len(plugins)+1)
 	all = append(all, plugins...)
 	all = append(all, newPlugin(source))

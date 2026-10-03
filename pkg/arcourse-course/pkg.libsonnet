@@ -6,6 +6,7 @@ p.pkg({
   branch: 'arcourse/arcourse-course',
   path: 'arcourse/arcourse-course',
   target: 'arcourse-course',
+  external: ['root'],
 }, |||
   Node specs exposing an arcourse instance's own course history as part of the graph
   it describes.

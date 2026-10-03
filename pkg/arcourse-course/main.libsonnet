@@ -1,4 +1,5 @@
 local a = import '../arcourse-ui/main.libsonnet';
+local root = import 'root';
 local invoke(name, args=[]) = std.native('invoke:arcourse')(name, args);
 
 local sessionsNode = a.table.node {
@@ -24,7 +25,7 @@ local sessionsNode = a.table.node {
 local courseNode = a.resource.node {
   data: invoke('course', [$.session]),
   links: {
-    [vertex.visitId]: (import 'root').arcourse.session($.session).visit(vertex.visitId)
+    [vertex.visitId]: root.arcourse.session($.session).visit(vertex.visitId)
     for vertex in $.data.vertices
   },
 };
@@ -33,7 +34,7 @@ local visitNode = a.resource.node {
   data: invoke('visit', [$.visit]),
   links: {
     node: { _node: true, _queryPath: $.data.node._queryPath },
-    session: (import 'root').arcourse.session($.session),
+    session: root.arcourse.session($.session),
   },
 };
 

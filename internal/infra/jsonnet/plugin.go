@@ -84,9 +84,6 @@ func stringArg(args []any, index int) string {
 }
 
 func newPlugin(source *CourseSource) *jpoet.Plugin {
-	if source == nil {
-		source = NewCourseSource(nil)
-	}
 	natives := []jsonnet.NativeFunction{
 		{
 			Name: "uuid",
