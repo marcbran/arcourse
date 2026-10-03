@@ -30,8 +30,9 @@ func buildFacade(cfg Config, plugins []*jpoet.Plugin) pkg.Facade {
 
 func buildLocalFacade(cfg Config, plugins []*jpoet.Plugin) pkg.Facade {
 	jpaths := []string{filepath.Join(cfg.Root.Dir, "vendor")}
-	courseRepo := jsonfileinfra.NewCourseRepo(cfg.Course.Dir)
-	blobs := jsonfileinfra.NewBlobStore(cfg.Course.Dir)
+	courseDir := arcourse.CourseDir(cfg.Root.Dir)
+	courseRepo := jsonfileinfra.NewCourseRepo(courseDir)
+	blobs := jsonfileinfra.NewBlobStore(courseDir)
 	source := jsonnetinfra.NewCourseSource(courseRepo)
 	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib, jpaths, plugins, source)
 	return arcourse.NewFacade(cfg.Config, evaluator, evaluator, courseRepo, blobs, source)
@@ -161,9 +162,6 @@ func defaultConfig() Config {
 			Root: arcourse.RootConfig{
 				Mode: arcourse.ModeCompiledGraph,
 			},
-			Course: arcourse.CourseConfig{
-				Dir: "course",
-			},
 		},
 	}
 }
@@ -175,11 +173,6 @@ func resolveConfigValues(cfg Config, home string) (Config, error) {
 		return Config{}, err
 	}
 	cfg.Root.Dir = evaluateDir
-	courseDir, err := resolveRelativeDir(home, cfg.Course.Dir)
-	if err != nil {
-		return Config{}, err
-	}
-	cfg.Course.Dir = courseDir
 	return cfg, nil
 }
 
@@ -210,9 +203,6 @@ func mergeConfigDefaults(cfg Config) Config {
 	}
 	if cfg.Root.Mode == "" {
 		cfg.Root.Mode = def.Root.Mode
-	}
-	if strings.TrimSpace(cfg.Course.Dir) == "" {
-		cfg.Course.Dir = def.Course.Dir
 	}
 	return cfg
 }

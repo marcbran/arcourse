@@ -6,13 +6,8 @@ import (
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 
-type CourseConfig struct {
-	Dir string `json:"dir"`
-}
-
 type Config struct {
-	Root   RootConfig   `json:"root"`
-	Course CourseConfig `json:"course"`
+	Root RootConfig `json:"root"`
 }
 
 type facade struct {
