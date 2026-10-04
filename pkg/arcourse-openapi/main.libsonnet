@@ -329,6 +329,7 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
   if manifest then j.manifestJsonnet(generated) else generated;
 
 local graph = {
+  _record: false,
   manifest:: true,
   contextParams:: [],
   pagination:: null,
