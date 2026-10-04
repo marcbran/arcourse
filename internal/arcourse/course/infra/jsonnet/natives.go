@@ -12,6 +12,7 @@ type Repo interface {
 	Sessions(ctx context.Context) ([]course.SessionSummary, error)
 	Session(ctx context.Context, sessionID course.SessionID) (course.Session, error)
 	Visit(ctx context.Context, visitID course.VisitID) (course.Visit, error)
+	Evaluation(ctx context.Context, evaluationID course.EvaluationID) (course.Event, error)
 }
 
 type natives struct {
@@ -97,6 +98,25 @@ func (n *natives) visit(visitID course.VisitID) (any, error) {
 		"from":        string(visit.From),
 		"versions":    len(visit.Evaluations),
 		"evaluations": evaluations,
+	}, nil
+}
+
+func (n *natives) evaluation(evaluationID course.EvaluationID) (any, error) {
+	if n.repo == nil {
+		return nil, fmt.Errorf("course repo not configured")
+	}
+	event, err := n.repo.Evaluation(context.Background(), evaluationID)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"evaluationId": string(event.EvaluationID),
+		"visitId":      string(event.VisitID),
+		"sessionId":    string(event.SessionID),
+		"address":      event.Address.String(),
+		"from":         string(event.From),
+		"timestamp":    event.Timestamp.Format(time.RFC3339),
+		"contentIds":   contentIDs(event.ContentIDs),
 	}, nil
 }
 

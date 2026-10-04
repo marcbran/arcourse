@@ -29,6 +29,12 @@ func Plugin(repo Repo) (*jpoet.Plugin, *Watch) {
 				return natives.visit(course.VisitID(stringArg(args, 0)))
 			},
 		},
+		{
+			Name: "evaluation",
+			Func: func(args []any) (any, error) {
+				return natives.evaluation(course.EvaluationID(stringArg(args, 0)))
+			},
+		},
 	}
 	return jpoet.NewPlugin("course", functions, jpoet.WithWatchSource(watch)), watch
 }

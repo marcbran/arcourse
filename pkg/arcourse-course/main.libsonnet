@@ -32,7 +32,18 @@ local invoke(name, args=[]) = std.native('invoke:course')(name, args);
   [['arcourse', '$session', '$visit'], a.resource.node {
     data: invoke('visit', [$.visit]),
     links: {
+      [evaluation.evaluationId]: root.arcourse.session($.session).visit($.visit).evaluation(evaluation.evaluationId)
+      for evaluation in $.data.evaluations
+    } + {
       node: { _node: true, _queryPath: '/' + $.data.address },
+      session: root.arcourse.session($.session),
+    },
+  }],
+  [['arcourse', '$session', '$visit', '$evaluation'], a.resource.node {
+    data: invoke('evaluation', [$.evaluation]),
+    links: {
+      node: { _node: true, _queryPath: '/' + $.data.address },
+      visit: root.arcourse.session($.session).visit($.visit),
       session: root.arcourse.session($.session),
     },
   }],
