@@ -12,6 +12,29 @@ import (
 
 var recordedFormats = []pkg.Format{pkg.FormatHTML, pkg.FormatJSON}
 
+const recordField = "_record"
+
+func recordable(decoded map[pkg.Format]string) bool {
+	raw, ok := decoded[pkg.FormatJSON]
+	if !ok {
+		return true
+	}
+	var node map[string]any
+	err := json.Unmarshal([]byte(raw), &node)
+	if err != nil {
+		return true
+	}
+	value, ok := node[recordField]
+	if !ok {
+		return true
+	}
+	record, ok := value.(bool)
+	if !ok {
+		return true
+	}
+	return record
+}
+
 func recordableContents(decoded map[pkg.Format]string) map[course.Projection]string {
 	contents := make(map[course.Projection]string, len(decoded))
 	for _, format := range recordedFormats {

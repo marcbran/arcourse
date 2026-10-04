@@ -86,6 +86,8 @@ func (uc *watch) decodeAndRecord(ctx context.Context, ref *course.VisitRef, out 
 	if !ok {
 		return "", false
 	}
-	*ref = uc.course.Record(ctx, *ref, course.EvaluationID(evaluationID), course.Address(queryPath), recordableContents(decoded), courseOrigin(origin))
+	if recordable(decoded) {
+		*ref = uc.course.Record(ctx, *ref, course.EvaluationID(evaluationID), course.Address(queryPath), recordableContents(decoded), courseOrigin(origin))
+	}
 	return value, true
 }

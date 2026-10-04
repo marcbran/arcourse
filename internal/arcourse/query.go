@@ -50,7 +50,9 @@ func (uc *query) Exec(ctx context.Context, path pkg.QueryPath, params map[string
 		return pkg.Result{}, err
 	}
 
-	uc.course.Record(ctx, course.VisitRef{}, course.EvaluationID(evaluationID), course.Address(queryPath), recordableContents(decoded), courseOrigin(origin))
+	if recordable(decoded) {
+		uc.course.Record(ctx, course.VisitRef{}, course.EvaluationID(evaluationID), course.Address(queryPath), recordableContents(decoded), courseOrigin(origin))
+	}
 
 	return pkg.Result{Output: decoded[format]}, nil
 }

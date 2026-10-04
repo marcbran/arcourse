@@ -1,6 +1,7 @@
 local a = import '../arcourse-ui/main.libsonnet';
 local root = import 'root';
 local invoke(name, args=[]) = std.native('invoke:course')(name, args);
+local unrecorded = { _record: false };
 
 local visitItem = {
   local c = self,
@@ -20,7 +21,7 @@ local visitItem = {
 };
 
 [
-  [['arcourse', 'sessions'], a.table.node {
+  [['arcourse', 'sessions'], a.table.node + unrecorded {
     data: { items: invoke('sessions') },
     table:: {
       at: ['items'],
@@ -39,7 +40,7 @@ local visitItem = {
       },
     ],
   }],
-  [['arcourse', '$session'], a.tree.node {
+  [['arcourse', '$session'], a.tree.node + unrecorded {
     data: invoke('session', [$.session]),
     local visitOf = { [visit.visitId]: visit for visit in $.data.visits },
     local parentOf = { [edge.to]: edge.from for edge in $.data.edges },
@@ -60,7 +61,7 @@ local visitItem = {
       item: visitItem,
     },
   }],
-  [['arcourse', '$session', '$visit'], a.resource.node {
+  [['arcourse', '$session', '$visit'], a.resource.node + unrecorded {
     data: invoke('visit', [$.visit]),
     links: {
       [evaluation.evaluationId]: root.arcourse.session($.session).visit($.visit).evaluation(evaluation.evaluationId)
@@ -70,7 +71,7 @@ local visitItem = {
       session: root.arcourse.session($.session),
     },
   }],
-  [['arcourse', '$session', '$visit', '$evaluation'], a.resource.node {
+  [['arcourse', '$session', '$visit', '$evaluation'], a.resource.node + unrecorded {
     data: invoke('evaluation', [$.evaluation]),
     links: {
       node: { _node: true, _queryPath: '/' + $.data.address },
@@ -78,10 +79,10 @@ local visitItem = {
       session: root.arcourse.session($.session),
     },
   }],
-  [['arcourse', '$session', '$visit', '$evaluation', 'html'], {
+  [['arcourse', '$session', '$visit', '$evaluation', 'html'], unrecorded {
     _view:: { html: invoke('content', [$.evaluation, 'html']) },
   }],
-  [['arcourse', '$session', '$visit', '$evaluation', 'json'], a.yaml.node {
+  [['arcourse', '$session', '$visit', '$evaluation', 'json'], a.yaml.node + unrecorded {
     local content = std.parseJson(invoke('content', [$.evaluation, 'json'])),
     data: {
       [key]: content[key]
