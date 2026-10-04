@@ -72,10 +72,22 @@ local visitItem = {
   }],
   [['arcourse', '$session', '$visit', '$evaluation'], a.resource.node {
     data: invoke('evaluation', [$.evaluation]),
+    preview:: $.html._queryPath,
     links: {
       node: { _node: true, _queryPath: '/' + $.data.address },
       visit: root.arcourse.session($.session).visit($.visit),
       session: root.arcourse.session($.session),
+    },
+  }],
+  [['arcourse', '$session', '$visit', '$evaluation', 'html'], {
+    _view:: { html: invoke('content', [$.evaluation, 'html']) },
+  }],
+  [['arcourse', '$session', '$visit', '$evaluation', 'json'], a.yaml.node {
+    local content = std.parseJson(invoke('content', [$.evaluation, 'json'])),
+    data: {
+      [key]: content[key]
+      for key in std.objectFields(content)
+      if key != '_node'
     },
   }],
 ]
