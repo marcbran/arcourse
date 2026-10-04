@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/marcbran/arcourse/internal/arcourse/course"
+	"github.com/marcbran/arcourse/internal/course"
 )
 
 type Repo interface {

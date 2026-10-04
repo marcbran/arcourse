@@ -7,25 +7,24 @@ import (
 	"fmt"
 	"net/http"
 
-	http2 "github.com/marcbran/arcourse/internal/http/server"
+	http2 "github.com/marcbran/arcourse/internal/arcourse/http/server"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 
-type queryRequest struct {
-	Path     string         `json:"path"`
-	Params   map[string]any `json:"params"`
-	Format   string         `json:"format"`
-	Session  string         `json:"session"`
-	From     string         `json:"from"`
-	FromPath string         `json:"fromPath"`
+type evaluateRequest struct {
+	Expression string `json:"expression"`
 }
 
-func (c *Client) Query(ctx context.Context, path pkg.QueryPath, params map[string]any, format pkg.Format, origin pkg.Origin) (pkg.Result, error) {
-	body, err := json.Marshal(queryRequest{Path: path.String(), Params: params, Format: string(format), Session: string(origin.Session), From: string(origin.From), FromPath: origin.FromPath.String()})
+type outputResponse struct {
+	Output string `json:"output"`
+}
+
+func (c *Client) Evaluate(ctx context.Context, expression string) (pkg.Result, error) {
+	body, err := json.Marshal(evaluateRequest{Expression: expression})
 	if err != nil {
 		return pkg.Result{}, err
 	}
-	url := c.baseURL + "/api/query"
+	url := c.baseURL + "/api/evaluate"
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return pkg.Result{}, err

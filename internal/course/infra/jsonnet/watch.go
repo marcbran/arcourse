@@ -5,7 +5,7 @@ import (
 
 	jpoetwatch "github.com/marcbran/jpoet/pkg/watch"
 
-	"github.com/marcbran/arcourse/internal/arcourse/course"
+	"github.com/marcbran/arcourse/internal/course"
 )
 
 const (

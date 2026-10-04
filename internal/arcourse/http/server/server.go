@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	archttp "github.com/marcbran/arcourse/internal/http"
+	archttp "github.com/marcbran/arcourse/internal/arcourse/http"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 

@@ -4,7 +4,7 @@ import (
 	"github.com/google/go-jsonnet"
 	"github.com/marcbran/jpoet/pkg/jpoet"
 
-	"github.com/marcbran/arcourse/internal/arcourse/course"
+	"github.com/marcbran/arcourse/internal/course"
 )
 
 func Plugin(repo Repo) (*jpoet.Plugin, *Watch) {

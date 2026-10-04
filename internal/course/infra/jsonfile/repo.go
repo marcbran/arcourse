@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/marcbran/arcourse/internal/arcourse/course"
+	"github.com/marcbran/arcourse/internal/course"
 )
 
 type CourseRepo struct {

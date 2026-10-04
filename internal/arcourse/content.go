@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/marcbran/arcourse/internal/arcourse/course"
+	"github.com/marcbran/arcourse/internal/course"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 

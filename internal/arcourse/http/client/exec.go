@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"net/url"
 
-	http2 "github.com/marcbran/arcourse/internal/http/server"
+	http2 "github.com/marcbran/arcourse/internal/arcourse/http/server"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 
