@@ -35,6 +35,12 @@ func Plugin(repo Repo) (*jpoet.Plugin, *Watch) {
 				return natives.evaluation(course.EvaluationID(stringArg(args, 0)))
 			},
 		},
+		{
+			Name: "content",
+			Func: func(args []any) (any, error) {
+				return natives.content(course.EvaluationID(stringArg(args, 0)), course.Projection(stringArg(args, 1)))
+			},
+		},
 	}
 	return jpoet.NewPlugin("course", functions, jpoet.WithWatchSource(watch)), watch
 }

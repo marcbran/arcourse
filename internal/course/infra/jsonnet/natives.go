@@ -13,6 +13,7 @@ type Repo interface {
 	Session(ctx context.Context, sessionID course.SessionID) (course.Session, error)
 	Visit(ctx context.Context, visitID course.VisitID) (course.Visit, error)
 	Evaluation(ctx context.Context, evaluationID course.EvaluationID) (course.Event, error)
+	Content(ctx context.Context, event course.Event, projection course.Projection) (string, error)
 }
 
 type natives struct {
@@ -118,6 +119,17 @@ func (n *natives) evaluation(evaluationID course.EvaluationID) (any, error) {
 		"timestamp":    event.Timestamp.Format(time.RFC3339),
 		"contentIds":   contentIDs(event.ContentIDs),
 	}, nil
+}
+
+func (n *natives) content(evaluationID course.EvaluationID, projection course.Projection) (any, error) {
+	if n.repo == nil {
+		return nil, fmt.Errorf("course repo not configured")
+	}
+	event, err := n.repo.Evaluation(context.Background(), evaluationID)
+	if err != nil {
+		return nil, err
+	}
+	return n.repo.Content(context.Background(), event, projection)
 }
 
 func contentIDs(contentIDs map[course.Projection]course.ContentID) map[string]any {
