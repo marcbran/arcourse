@@ -72,7 +72,6 @@ local visitItem = {
   }],
   [['arcourse', '$session', '$visit', '$evaluation'], a.resource.node {
     data: invoke('evaluation', [$.evaluation]),
-    preview:: $.html._queryPath,
     links: {
       node: { _node: true, _queryPath: '/' + $.data.address },
       visit: root.arcourse.session($.session).visit($.visit),
