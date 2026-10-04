@@ -10,6 +10,15 @@ import (
 
 var version = "dev"
 
+func Execute(plugins []*jpoet.Plugin) {
+	err := newRootCmd(plugins).Execute()
+	if err == nil {
+		return
+	}
+	fmt.Fprintln(os.Stderr, err)
+	os.Exit(1)
+}
+
 func newRootCmd(plugins []*jpoet.Plugin) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "arco",
@@ -24,13 +33,4 @@ func newRootCmd(plugins []*jpoet.Plugin) *cobra.Command {
 	cmd.AddCommand(newWatchCmd(plugins))
 	cmd.AddCommand(newExecCmd(plugins))
 	return cmd
-}
-
-func Execute(plugins []*jpoet.Plugin) {
-	err := newRootCmd(plugins).Execute()
-	if err == nil {
-		return
-	}
-	fmt.Fprintln(os.Stderr, err)
-	os.Exit(1)
 }

@@ -19,27 +19,6 @@ func returnSuccess(w http.ResponseWriter, data any) {
 	returnJSON(w, data)
 }
 
-func returnBadRequest(w http.ResponseWriter, err error) {
-	slog.Warn("bad request", "err", err)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusBadRequest)
-	returnJSON(w, ErrorResponse{Message: err.Error()})
-}
-
-func returnInternalServerError(w http.ResponseWriter, err error) {
-	slog.Error("internal server error", "err", err)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusInternalServerError)
-	returnJSON(w, ErrorResponse{Message: err.Error()})
-}
-
-func returnNotFound(w http.ResponseWriter, err error) {
-	slog.Warn("not found", "err", err)
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusNotFound)
-	returnJSON(w, ErrorResponse{Message: err.Error()})
-}
-
 func returnError(w http.ResponseWriter, err error) {
 	if errors.Is(err, pkg.ErrGraphEntryNotFound) || errors.Is(err, pkg.ErrEvaluateDirNotSet) ||
 		errors.Is(err, pkg.ErrActionNotFound) {
@@ -51,6 +30,27 @@ func returnError(w http.ResponseWriter, err error) {
 		return
 	}
 	returnInternalServerError(w, err)
+}
+
+func returnBadRequest(w http.ResponseWriter, err error) {
+	slog.Warn("bad request", "err", err)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusBadRequest)
+	returnJSON(w, ErrorResponse{Message: err.Error()})
+}
+
+func returnNotFound(w http.ResponseWriter, err error) {
+	slog.Warn("not found", "err", err)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusNotFound)
+	returnJSON(w, ErrorResponse{Message: err.Error()})
+}
+
+func returnInternalServerError(w http.ResponseWriter, err error) {
+	slog.Error("internal server error", "err", err)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusInternalServerError)
+	returnJSON(w, ErrorResponse{Message: err.Error()})
 }
 
 func returnJSON(w http.ResponseWriter, data any) {
