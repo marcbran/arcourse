@@ -3,8 +3,10 @@ package arcourse
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
+	"github.com/marcbran/arcourse/internal/arcourse/course"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 
@@ -26,13 +28,12 @@ type Executor interface {
 }
 
 type exec struct {
-	courseRepo      CourseRepo
-	getVisitContent *getVisitContent
-	environment     *environment
+	course      *course.Facade
+	environment *environment
 }
 
-func newExec(courseRepo CourseRepo, getVisitContent *getVisitContent, environment *environment) *exec {
-	return &exec{courseRepo: courseRepo, getVisitContent: getVisitContent, environment: environment}
+func newExec(courseFacade *course.Facade, environment *environment) *exec {
+	return &exec{course: courseFacade, environment: environment}
 }
 
 func (uc *exec) Exec(ctx context.Context, id pkg.EvaluationID) (pkg.ExecResult, error) {
@@ -41,17 +42,28 @@ func (uc *exec) Exec(ctx context.Context, id pkg.EvaluationID) (pkg.ExecResult, 
 		return pkg.ExecResult{}, err
 	}
 
-	event, err := uc.courseRepo.Get(ctx, id)
+	event, err := uc.course.Evaluation(ctx, course.EvaluationID(id))
+	if err != nil {
+		if errors.Is(err, course.ErrEvaluationNotRecorded) {
+			return pkg.ExecResult{}, fmt.Errorf("%w: %s", pkg.ErrQueryNotRecorded, id)
+		}
+		return pkg.ExecResult{}, err
+	}
+
+	stored, err := uc.course.Content(ctx, event, course.Projection(pkg.FormatJSON))
+	if err != nil {
+		if errors.Is(err, course.ErrContentNotRecorded) {
+			return pkg.ExecResult{}, fmt.Errorf("%w: %s", pkg.ErrContentNotRecorded, event.Address)
+		}
+		return pkg.ExecResult{}, err
+	}
+
+	body, err := withEvaluationID(stored, event.EvaluationID)
 	if err != nil {
 		return pkg.ExecResult{}, err
 	}
 
-	body, err := uc.getVisitContent.Exec(ctx, event)
-	if err != nil {
-		return pkg.ExecResult{}, err
-	}
-
-	command, err := decodeCommand(body, event.Path)
+	command, err := decodeCommand(body, pkg.QueryPath(event.Address))
 	if err != nil {
 		return pkg.ExecResult{}, err
 	}
@@ -61,7 +73,7 @@ func (uc *exec) Exec(ctx context.Context, id pkg.EvaluationID) (pkg.ExecResult, 
 		return pkg.ExecResult{}, err
 	}
 
-	redirect := event.Path
+	redirect := pkg.QueryPath(event.Address)
 	if command.Redirect != nil && command.Redirect.QueryPath != "" {
 		redirect = pkg.NewQueryPath(command.Redirect.QueryPath)
 	}

@@ -10,8 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/marcbran/arcourse/internal/arcourse"
-	pkg "github.com/marcbran/arcourse/pkg/arcourse"
+	"github.com/marcbran/arcourse/internal/arcourse/course"
 )
 
 type CourseRepo struct {
@@ -23,7 +22,7 @@ func NewCourseRepo(dir string) *CourseRepo {
 	return &CourseRepo{dir: dir}
 }
 
-func (r *CourseRepo) Append(ctx context.Context, event arcourse.Event) error {
+func (r *CourseRepo) Append(ctx context.Context, event course.Event) error {
 	err := ctx.Err()
 	if err != nil {
 		return err
@@ -49,14 +48,14 @@ func (r *CourseRepo) Append(ctx context.Context, event arcourse.Event) error {
 	return err
 }
 
-func (r *CourseRepo) List(ctx context.Context) ([]arcourse.Event, error) {
+func (r *CourseRepo) List(ctx context.Context) ([]course.Event, error) {
 	lines, err := r.readLines(ctx)
 	if err != nil {
 		return nil, err
 	}
-	events := make([]arcourse.Event, 0, len(lines))
+	events := make([]course.Event, 0, len(lines))
 	for _, line := range lines {
-		var event arcourse.Event
+		var event course.Event
 		err = json.Unmarshal(line, &event)
 		if err != nil {
 			return nil, err
@@ -66,47 +65,78 @@ func (r *CourseRepo) List(ctx context.Context) ([]arcourse.Event, error) {
 	return events, nil
 }
 
-func (r *CourseRepo) Get(ctx context.Context, evaluationID pkg.EvaluationID) (arcourse.Event, error) {
-	event, found, err := r.findLast(ctx, func(candidate arcourse.Event) bool {
+func (r *CourseRepo) Get(ctx context.Context, evaluationID course.EvaluationID) (course.Event, error) {
+	event, found, err := r.findLast(ctx, func(candidate course.Event) bool {
 		return candidate.EvaluationID == evaluationID
 	})
 	if err != nil {
-		return arcourse.Event{}, err
+		return course.Event{}, err
 	}
 	if !found {
-		return arcourse.Event{}, pkg.ErrQueryNotRecorded
+		return course.Event{}, course.ErrEvaluationNotRecorded
 	}
 	return event, nil
 }
 
-func (r *CourseRepo) LatestAtPath(ctx context.Context, session pkg.SessionID, path pkg.QueryPath) (arcourse.Event, bool, error) {
-	return r.findLast(ctx, func(candidate arcourse.Event) bool {
-		return candidate.SessionID == session && candidate.Path == path
+func (r *CourseRepo) ListSession(ctx context.Context, sessionID course.SessionID) ([]course.Event, error) {
+	return r.filter(ctx, func(candidate course.Event) bool {
+		return candidate.SessionID == sessionID
 	})
 }
 
-func (r *CourseRepo) LatestWithSessionPrefix(ctx context.Context, prefix string) (arcourse.Event, bool, error) {
-	return r.findLast(ctx, func(candidate arcourse.Event) bool {
+func (r *CourseRepo) ListVisit(ctx context.Context, visitID course.VisitID) ([]course.Event, error) {
+	return r.filter(ctx, func(candidate course.Event) bool {
+		return candidate.VisitID == visitID
+	})
+}
+
+func (r *CourseRepo) LatestAtAddress(ctx context.Context, sessionID course.SessionID, address course.Address) (course.Event, bool, error) {
+	return r.findLast(ctx, func(candidate course.Event) bool {
+		return candidate.SessionID == sessionID && candidate.Address == address
+	})
+}
+
+func (r *CourseRepo) LatestWithSessionPrefix(ctx context.Context, prefix string) (course.Event, bool, error) {
+	return r.findLast(ctx, func(candidate course.Event) bool {
 		return strings.HasPrefix(string(candidate.SessionID), prefix)
 	})
 }
 
-func (r *CourseRepo) findLast(ctx context.Context, match func(arcourse.Event) bool) (arcourse.Event, bool, error) {
+func (r *CourseRepo) filter(ctx context.Context, match func(course.Event) bool) ([]course.Event, error) {
 	lines, err := r.readLines(ctx)
 	if err != nil {
-		return arcourse.Event{}, false, err
+		return nil, err
+	}
+	var events []course.Event
+	for _, line := range lines {
+		var event course.Event
+		err = json.Unmarshal(line, &event)
+		if err != nil {
+			return nil, err
+		}
+		if match(event) {
+			events = append(events, event)
+		}
+	}
+	return events, nil
+}
+
+func (r *CourseRepo) findLast(ctx context.Context, match func(course.Event) bool) (course.Event, bool, error) {
+	lines, err := r.readLines(ctx)
+	if err != nil {
+		return course.Event{}, false, err
 	}
 	for i := len(lines) - 1; i >= 0; i-- {
-		var event arcourse.Event
+		var event course.Event
 		err = json.Unmarshal(lines[i], &event)
 		if err != nil {
-			return arcourse.Event{}, false, err
+			return course.Event{}, false, err
 		}
 		if match(event) {
 			return event, true, nil
 		}
 	}
-	return arcourse.Event{}, false, nil
+	return course.Event{}, false, nil
 }
 
 func (r *CourseRepo) readLines(ctx context.Context) ([][]byte, error) {

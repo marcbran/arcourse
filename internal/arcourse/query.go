@@ -8,16 +8,17 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/marcbran/arcourse/internal/arcourse/course"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 
 type query struct {
 	environment *environment
-	recordVisit *recordVisit
+	course      *course.Facade
 }
 
-func newQuery(environment *environment, recordVisit *recordVisit) *query {
-	return &query{environment: environment, recordVisit: recordVisit}
+func newQuery(environment *environment, courseFacade *course.Facade) *query {
+	return &query{environment: environment, course: courseFacade}
 }
 
 func (uc *query) Exec(ctx context.Context, path pkg.QueryPath, params map[string]any, format pkg.Format, origin pkg.Origin) (pkg.Result, error) {
@@ -49,7 +50,7 @@ func (uc *query) Exec(ctx context.Context, path pkg.QueryPath, params map[string
 		return pkg.Result{}, err
 	}
 
-	uc.recordVisit.Exec(ctx, VisitRef{}, evaluationID, queryPath, decoded, origin)
+	uc.course.Record(ctx, course.VisitRef{}, course.EvaluationID(evaluationID), course.Address(queryPath), recordableContents(decoded), courseOrigin(origin))
 
 	return pkg.Result{Output: decoded[format]}, nil
 }
@@ -107,6 +108,17 @@ func splitPathAndQuery(path pkg.QueryPath) (pkg.QueryPath, map[string]any, error
 	return pkg.QueryPath(base), params, nil
 }
 
+func mergeParams(base map[string]any, overrides map[string]any) map[string]any {
+	merged := make(map[string]any, len(base)+len(overrides))
+	for k, v := range base {
+		merged[k] = v
+	}
+	for k, v := range overrides {
+		merged[k] = v
+	}
+	return merged
+}
+
 func formatsKey(formats []pkg.Format) string {
 	parts := make([]string, len(formats))
 	for i, f := range formats {
@@ -130,17 +142,6 @@ func buildExpression(segments []string, paramsJSON string, formats []pkg.Format)
 		paramsJSON,
 		string(formatsJSON),
 	), nil
-}
-
-func mergeParams(base map[string]any, overrides map[string]any) map[string]any {
-	merged := make(map[string]any, len(base)+len(overrides))
-	for k, v := range base {
-		merged[k] = v
-	}
-	for k, v := range overrides {
-		merged[k] = v
-	}
-	return merged
 }
 
 func decodeOutput(out string, formats []pkg.Format, primary pkg.Format) (map[pkg.Format]string, pkg.EvaluationID, error) {

@@ -11,7 +11,9 @@ import (
 	"testing"
 
 	"github.com/marcbran/arcourse/internal/arcourse"
-	jsonfileinfra "github.com/marcbran/arcourse/internal/infra/jsonfile"
+	"github.com/marcbran/arcourse/internal/arcourse/course"
+	coursejsonfile "github.com/marcbran/arcourse/internal/arcourse/course/infra/jsonfile"
+	coursejsonnet "github.com/marcbran/arcourse/internal/arcourse/course/infra/jsonnet"
 	jsonnetinfra "github.com/marcbran/arcourse/internal/infra/jsonnet"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 	"github.com/marcbran/jpoet/pkg/jpoet"
@@ -83,14 +85,16 @@ func newBenchFacade(b *testing.B, evaluateDir string, warm bool) pkg.Facade {
 		b.Fatal(err)
 	}
 	courseDir := b.TempDir()
-	courseRepo := jsonfileinfra.NewCourseRepo(courseDir)
-	blobs := jsonfileinfra.NewBlobStore(courseDir)
-	source := jsonnetinfra.NewCourseSource(courseRepo)
-	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib, []string{pkgDir}, []*jpoet.Plugin{htmlplugin.Plugin()}, source)
+	courseRepo := coursejsonfile.NewCourseRepo(courseDir)
+	blobs := coursejsonfile.NewBlobStore(courseDir)
+	courseFacade := course.NewFacade(courseRepo, blobs)
+	coursePlugin, courseWatch := coursejsonnet.Plugin(courseFacade)
+	courseFacade.Observe(courseWatch)
+	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib, []string{pkgDir}, []*jpoet.Plugin{htmlplugin.Plugin(), coursePlugin})
 	cfg := arcourse.Config{
 		Root: arcourse.RootConfig{Dir: evaluateDir, Mode: arcourse.ModeCompiledGraph},
 	}
-	facade := arcourse.NewFacade(cfg, evaluator, evaluator, courseRepo, blobs, source)
+	facade := arcourse.NewFacade(cfg, evaluator, evaluator, courseFacade)
 	if warm {
 		err := facade.Warm(context.Background())
 		if err != nil {

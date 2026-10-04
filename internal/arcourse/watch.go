@@ -4,16 +4,17 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/marcbran/arcourse/internal/arcourse/course"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 
 type watch struct {
 	environment *environment
-	recordVisit *recordVisit
+	course      *course.Facade
 }
 
-func newWatch(environment *environment, recordVisit *recordVisit) *watch {
-	return &watch{environment: environment, recordVisit: recordVisit}
+func newWatch(environment *environment, courseFacade *course.Facade) *watch {
+	return &watch{environment: environment, course: courseFacade}
 }
 
 func (uc *watch) Exec(ctx context.Context, path pkg.QueryPath, params map[string]any, format pkg.Format, origin pkg.Origin) (<-chan pkg.Result, func(), error) {
@@ -39,7 +40,7 @@ func (uc *watch) Exec(ctx context.Context, path pkg.QueryPath, params map[string
 		return nil, nil, err
 	}
 
-	var ref VisitRef
+	var ref course.VisitRef
 
 	value, ok := uc.decodeAndRecord(ctx, &ref, initial, formats, format, queryPath, origin)
 	if !ok {
@@ -76,7 +77,7 @@ func (uc *watch) Exec(ctx context.Context, path pkg.QueryPath, params map[string
 	return results, unregister, nil
 }
 
-func (uc *watch) decodeAndRecord(ctx context.Context, ref *VisitRef, out string, formats []pkg.Format, format pkg.Format, queryPath pkg.QueryPath, origin pkg.Origin) (string, bool) {
+func (uc *watch) decodeAndRecord(ctx context.Context, ref *course.VisitRef, out string, formats []pkg.Format, format pkg.Format, queryPath pkg.QueryPath, origin pkg.Origin) (string, bool) {
 	decoded, evaluationID, err := decodeOutput(out, formats, format)
 	if err != nil {
 		return "", false
@@ -85,6 +86,6 @@ func (uc *watch) decodeAndRecord(ctx context.Context, ref *VisitRef, out string,
 	if !ok {
 		return "", false
 	}
-	*ref = uc.recordVisit.Exec(ctx, *ref, evaluationID, queryPath, decoded, origin)
+	*ref = uc.course.Record(ctx, *ref, course.EvaluationID(evaluationID), course.Address(queryPath), recordableContents(decoded), courseOrigin(origin))
 	return value, true
 }

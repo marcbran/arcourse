@@ -3,6 +3,7 @@ package arcourse
 import (
 	"context"
 
+	"github.com/marcbran/arcourse/internal/arcourse/course"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 
@@ -20,17 +21,15 @@ type facade struct {
 	environment *environment
 }
 
-func NewFacade(cfg Config, evaluator Evaluator, executor Executor, courseRepo CourseRepo, blobs BlobStore, observer CourseObserver) pkg.Facade {
+func NewFacade(cfg Config, evaluator Evaluator, executor Executor, courseFacade *course.Facade) pkg.Facade {
 	compile := newCompile(cfg.Root, evaluator)
 	root := newRoot(cfg.Root, evaluator)
 	environment := newEnvironment(root, evaluator, executor)
 	evaluate := newEvaluate(environment)
-	recordVisit := newRecordVisit(courseRepo, blobs, observer)
-	getVisitContent := newGetVisitContent(blobs)
-	query := newQuery(environment, recordVisit)
-	watch := newWatch(environment, recordVisit)
+	query := newQuery(environment, courseFacade)
+	watch := newWatch(environment, courseFacade)
 	warm := newWarm(environment)
-	exec := newExec(courseRepo, getVisitContent, environment)
+	exec := newExec(courseFacade, environment)
 
 	return &facade{
 		evaluate:    evaluate,
@@ -69,4 +68,12 @@ func (f *facade) Warm(ctx context.Context) error {
 
 func (f *facade) Close() error {
 	return f.environment.Close()
+}
+
+func courseOrigin(origin pkg.Origin) course.Origin {
+	return course.Origin{
+		SessionID:   course.SessionID(origin.Session),
+		From:        course.EvaluationID(origin.From),
+		FromAddress: course.Address(pkg.NewQueryPath(origin.FromPath.String())),
+	}
 }

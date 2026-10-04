@@ -10,9 +10,11 @@ import (
 	"strings"
 
 	"github.com/marcbran/arcourse/internal/arcourse"
+	"github.com/marcbran/arcourse/internal/arcourse/course"
+	coursejsonfile "github.com/marcbran/arcourse/internal/arcourse/course/infra/jsonfile"
+	coursejsonnet "github.com/marcbran/arcourse/internal/arcourse/course/infra/jsonnet"
 	archttp "github.com/marcbran/arcourse/internal/http"
 	"github.com/marcbran/arcourse/internal/http/client"
-	jsonfileinfra "github.com/marcbran/arcourse/internal/infra/jsonfile"
 	jsonnetinfra "github.com/marcbran/arcourse/internal/infra/jsonnet"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 	"github.com/marcbran/jpoet/pkg/jpoet"
@@ -31,11 +33,13 @@ func buildFacade(cfg Config, plugins []*jpoet.Plugin) pkg.Facade {
 func buildLocalFacade(cfg Config, plugins []*jpoet.Plugin) pkg.Facade {
 	jpaths := []string{filepath.Join(cfg.Root.Dir, "vendor")}
 	courseDir := arcourse.CourseDir(cfg.Root.Dir)
-	courseRepo := jsonfileinfra.NewCourseRepo(courseDir)
-	blobs := jsonfileinfra.NewBlobStore(courseDir)
-	source := jsonnetinfra.NewCourseSource(courseRepo)
-	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib, jpaths, plugins, source)
-	return arcourse.NewFacade(cfg.Config, evaluator, evaluator, courseRepo, blobs, source)
+	courseRepo := coursejsonfile.NewCourseRepo(courseDir)
+	blobs := coursejsonfile.NewBlobStore(courseDir)
+	courseFacade := course.NewFacade(courseRepo, blobs)
+	coursePlugin, courseWatch := coursejsonnet.Plugin(courseFacade)
+	courseFacade.Observe(courseWatch)
+	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib, jpaths, append(plugins, coursePlugin))
+	return arcourse.NewFacade(cfg.Config, evaluator, evaluator, courseFacade)
 }
 
 func closePlugins(plugins []*jpoet.Plugin) {
@@ -151,21 +155,6 @@ func findConfigFile(home string) (string, error) {
 	return "", fmt.Errorf("%w: no config.yaml, config.yml, or config.json in %s", errNoConfigFile, home)
 }
 
-func defaultConfig() Config {
-	return Config{
-		Mode: ModeClient,
-		HTTP: archttp.Config{
-			Hostname: "localhost",
-			Port:     "1183",
-		},
-		Config: arcourse.Config{
-			Root: arcourse.RootConfig{
-				Mode: arcourse.ModeCompiledGraph,
-			},
-		},
-	}
-}
-
 func resolveConfigValues(cfg Config, home string) (Config, error) {
 	cfg = mergeConfigDefaults(cfg)
 	evaluateDir, err := resolveRelativeDir(home, cfg.Root.Dir)
@@ -205,4 +194,19 @@ func mergeConfigDefaults(cfg Config) Config {
 		cfg.Root.Mode = def.Root.Mode
 	}
 	return cfg
+}
+
+func defaultConfig() Config {
+	return Config{
+		Mode: ModeClient,
+		HTTP: archttp.Config{
+			Hostname: "localhost",
+			Port:     "1183",
+		},
+		Config: arcourse.Config{
+			Root: arcourse.RootConfig{
+				Mode: arcourse.ModeCompiledGraph,
+			},
+		},
+	}
 }

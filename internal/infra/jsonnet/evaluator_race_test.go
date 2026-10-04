@@ -9,7 +9,7 @@ import (
 )
 
 func TestEvaluatorConcurrentWarmAndEvaluate(t *testing.T) {
-	e := NewEvaluator(fstest.MapFS{}, nil, nil, nil)
+	e := NewEvaluator(fstest.MapFS{}, nil, nil)
 
 	const goroutines = 100
 	const iterations = 50
