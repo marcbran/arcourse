@@ -101,6 +101,7 @@ local treeView = baseView {
       c.resource {
         items:: neighborItems($),
         groups:: linksGroups($),
+        preview:: std.get($, 'preview', null),
         content:: c.tree {
           nodes:: std.get(tree, 'nodes', []),
           item:: std.get(tree, 'item', super.item),
@@ -115,6 +116,7 @@ local resourceView = baseView {
       data:: $.data,
       items:: neighborItems($),
       groups:: linksGroups($),
+      preview:: std.get($, 'preview', null),
     },
   },
 };

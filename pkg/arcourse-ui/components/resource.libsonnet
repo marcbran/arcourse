@@ -1,4 +1,5 @@
 local list = import 'list.libsonnet';
+local preview = import 'preview.libsonnet';
 local yaml = import 'yaml.libsonnet';
 
 local style = |||
@@ -19,6 +20,7 @@ local style = |||
   local c = self,
   data:: error 'Resource requires data',
   content:: yaml { data:: c.data },
+  preview:: null,
   items:: [],
   groups:: [],
   html: [
@@ -29,7 +31,11 @@ local style = |||
       children:
         (if std.length(c.items) > 0 || std.length(c.groups) > 0 then
            [list { items:: c.items, groups:: c.groups, style:: ' min-width: 8em;' }]
-         else []) + [c.content],
+         else []) + [c.content] + (
+          if c.preview != null
+          then [preview { src:: c.preview }]
+          else []
+        ),
     },
   ],
 }
