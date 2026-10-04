@@ -7,7 +7,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/marcbran/arcourse/internal/course"
@@ -96,9 +95,9 @@ func (r *CourseRepo) LatestAtAddress(ctx context.Context, sessionID course.Sessi
 	})
 }
 
-func (r *CourseRepo) LatestWithSessionPrefix(ctx context.Context, prefix string) (course.Event, bool, error) {
+func (r *CourseRepo) LatestImplicitSession(ctx context.Context) (course.Event, bool, error) {
 	return r.findLast(ctx, func(candidate course.Event) bool {
-		return strings.HasPrefix(string(candidate.SessionID), prefix)
+		return candidate.Implicit
 	})
 }
 

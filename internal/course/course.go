@@ -10,10 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const (
-	defaultSessionPrefix  = "default-"
-	defaultSessionIdleGap = 30 * time.Minute
-)
+const implicitSessionIdleGap = 30 * time.Minute
 
 var (
 	ErrVisitNotRecorded      = errors.New("visit not recorded")
@@ -49,6 +46,7 @@ type Event struct {
 	SessionID    SessionID                `json:"sessionId"`
 	Address      Address                  `json:"address"`
 	From         EvaluationID             `json:"from,omitempty"`
+	Implicit     bool                     `json:"implicit,omitempty"`
 	Timestamp    time.Time                `json:"timestamp"`
 	ContentIDs   map[Projection]ContentID `json:"contentIds,omitempty"`
 }
@@ -56,6 +54,7 @@ type Event struct {
 type VisitRef struct {
 	VisitID    VisitID
 	SessionID  SessionID
+	Implicit   bool
 	ContentIDs map[Projection]ContentID
 }
 
@@ -66,7 +65,7 @@ type Repo interface {
 	ListSession(ctx context.Context, sessionID SessionID) ([]Event, error)
 	ListVisit(ctx context.Context, visitID VisitID) ([]Event, error)
 	LatestAtAddress(ctx context.Context, sessionID SessionID, address Address) (Event, bool, error)
-	LatestWithSessionPrefix(ctx context.Context, prefix string) (Event, bool, error)
+	LatestImplicitSession(ctx context.Context) (Event, bool, error)
 }
 
 type Observer interface {
@@ -92,12 +91,13 @@ func (uc *recordVisit) Exec(ctx context.Context, ref VisitRef, evaluationID Eval
 	event := Event{EvaluationID: evaluationID, Address: address, Timestamp: time.Now()}
 	first := ref.VisitID == ""
 	if first {
-		sessionID, from := uc.resolveOrigin(ctx, origin)
-		ref = VisitRef{VisitID: VisitID(uuid.Must(uuid.NewV7()).String()), SessionID: sessionID}
+		sessionID, from, implicit := uc.resolveOrigin(ctx, origin)
+		ref = VisitRef{VisitID: VisitID(uuid.Must(uuid.NewV7()).String()), SessionID: sessionID, Implicit: implicit}
 		event.From = from
 	}
 	event.VisitID = ref.VisitID
 	event.SessionID = ref.SessionID
+	event.Implicit = ref.Implicit
 	event.ContentIDs = uc.put(ctx, contents, address)
 	if !first && sameContentIDs(event.ContentIDs, ref.ContentIDs) {
 		return ref
@@ -114,9 +114,10 @@ func (uc *recordVisit) Exec(ctx context.Context, ref VisitRef, evaluationID Eval
 	return ref
 }
 
-func (uc *recordVisit) resolveOrigin(ctx context.Context, origin Origin) (SessionID, EvaluationID) {
+func (uc *recordVisit) resolveOrigin(ctx context.Context, origin Origin) (SessionID, EvaluationID, bool) {
 	from := origin.From
 	fromSession := SessionID("")
+	fromImplicit := false
 	if from != "" {
 		event, err := uc.repo.Get(ctx, from)
 		if err != nil {
@@ -124,19 +125,23 @@ func (uc *recordVisit) resolveOrigin(ctx context.Context, origin Origin) (Sessio
 			from = ""
 		} else {
 			fromSession = event.SessionID
+			fromImplicit = event.Implicit
 		}
 	}
 	sessionID := origin.SessionID
+	implicit := false
 	if sessionID == "" {
 		sessionID = fromSession
+		implicit = fromImplicit
 	}
 	if sessionID == "" {
-		sessionID = uc.defaultSession(ctx)
+		sessionID = uc.implicitSession(ctx)
+		implicit = true
 	}
 	if from == "" && origin.FromAddress != "" {
 		from = uc.resolveFromAddress(ctx, sessionID, origin.FromAddress)
 	}
-	return sessionID, from
+	return sessionID, from, implicit
 }
 
 func (uc *recordVisit) resolveFromAddress(ctx context.Context, sessionID SessionID, address Address) EvaluationID {
@@ -147,12 +152,12 @@ func (uc *recordVisit) resolveFromAddress(ctx context.Context, sessionID Session
 	return event.EvaluationID
 }
 
-func (uc *recordVisit) defaultSession(ctx context.Context) SessionID {
-	event, found, err := uc.repo.LatestWithSessionPrefix(ctx, defaultSessionPrefix)
-	if err == nil && found && time.Since(event.Timestamp) < defaultSessionIdleGap {
+func (uc *recordVisit) implicitSession(ctx context.Context) SessionID {
+	event, found, err := uc.repo.LatestImplicitSession(ctx)
+	if err == nil && found && time.Since(event.Timestamp) < implicitSessionIdleGap {
 		return event.SessionID
 	}
-	return SessionID(defaultSessionPrefix + uuid.Must(uuid.NewV7()).String())
+	return SessionID(uuid.Must(uuid.NewV7()).String())
 }
 
 func (uc *recordVisit) put(ctx context.Context, contents map[Projection]string, address Address) map[Projection]ContentID {

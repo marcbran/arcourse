@@ -23,7 +23,7 @@ func sessionFromCookie(w http.ResponseWriter, r *http.Request) pkg.SessionID {
 	if err == nil && cookie.Value != "" {
 		return pkg.SessionID(cookie.Value)
 	}
-	session := "browse-" + uuid.Must(uuid.NewV7()).String()
+	session := uuid.Must(uuid.NewV7()).String()
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,
 		Value:    session,
