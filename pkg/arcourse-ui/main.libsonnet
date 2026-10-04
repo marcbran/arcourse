@@ -94,6 +94,21 @@ local tableView = baseView {
   },
 };
 
+local treeView = baseView {
+  _view+:: {
+    fragment:
+      local tree = std.get($, 'tree', {});
+      c.resource {
+        items:: neighborItems($),
+        groups:: linksGroups($),
+        content:: c.tree {
+          nodes:: std.get(tree, 'nodes', []),
+          item:: std.get(tree, 'item', super.item),
+        },
+      },
+  },
+};
+
 local resourceView = baseView {
   _view+:: {
     fragment: c.resource {
@@ -119,6 +134,7 @@ local withNode = { node: self.view + linkspecs.withLinkSpecs };
   default: { view: listView } + withNode,
   list: { view: listView } + withNode,
   table: { view: tableView } + withNode,
+  tree: { view: treeView } + withNode,
   yaml: { view: yamlView } + withNode,
   resource: { view: resourceView } + withNode,
   action: { view: actionView } + withNode,
