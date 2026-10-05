@@ -11,9 +11,10 @@ import (
 	"testing"
 
 	"github.com/marcbran/arcourse/internal/arcourse"
-	"github.com/marcbran/arcourse/internal/infra/broadcast"
-	jsonfileinfra "github.com/marcbran/arcourse/internal/infra/jsonfile"
-	jsonnetinfra "github.com/marcbran/arcourse/internal/infra/jsonnet"
+	jsonnetinfra "github.com/marcbran/arcourse/internal/arcourse/infra/jsonnet"
+	"github.com/marcbran/arcourse/internal/course"
+	coursejsonfile "github.com/marcbran/arcourse/internal/course/infra/jsonfile"
+	coursejsonnet "github.com/marcbran/arcourse/internal/course/infra/jsonnet"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 	"github.com/marcbran/jpoet/pkg/jpoet"
 	htmlplugin "github.com/marcbran/jsonnet-plugin-html/html"
@@ -83,14 +84,17 @@ func newBenchFacade(b *testing.B, evaluateDir string, warm bool) pkg.Facade {
 	if err != nil {
 		b.Fatal(err)
 	}
-	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib, []string{pkgDir}, []*jpoet.Plugin{htmlplugin.Plugin()})
-	lastQuery := broadcast.NewLastQuery()
-	auditRepo := jsonfileinfra.NewAuditRepo(b.TempDir())
+	courseDir := b.TempDir()
+	courseRepo := coursejsonfile.NewCourseRepo(courseDir)
+	blobs := coursejsonfile.NewBlobStore(courseDir)
+	courseFacade := course.NewFacade(courseRepo, blobs)
+	coursePlugin, courseWatch := coursejsonnet.Plugin(courseFacade)
+	courseFacade.Observe(courseWatch)
+	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib, []string{pkgDir}, []*jpoet.Plugin{htmlplugin.Plugin(), coursePlugin})
 	cfg := arcourse.Config{
-		Root:  arcourse.RootConfig{Dir: evaluateDir, Mode: arcourse.ModeCompiledGraph},
-		Audit: arcourse.AuditConfig{Formats: nil},
+		Root: arcourse.RootConfig{Dir: evaluateDir, Mode: arcourse.ModeCompiledGraph},
 	}
-	facade := arcourse.NewFacade(cfg, evaluator, evaluator, lastQuery, auditRepo)
+	facade := arcourse.NewFacade(cfg, evaluator, evaluator, courseFacade)
 	if warm {
 		err := facade.Warm(context.Background())
 		if err != nil {
@@ -122,7 +126,7 @@ func BenchmarkQueryPodsTable(b *testing.B) {
 					ctx := context.Background()
 					b.ResetTimer()
 					for i := 0; i < b.N; i++ {
-						_, err := facade.Query(ctx, "root/kubernetes/context/demo/pods", nil, format)
+						_, err := facade.Query(ctx, pkg.NewQueryPath("root/kubernetes/context/demo/pods"), nil, format, pkg.Origin{})
 						if err != nil {
 							b.Fatal(err)
 						}

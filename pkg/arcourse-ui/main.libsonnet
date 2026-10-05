@@ -42,7 +42,19 @@ local linksGroups(obj) =
     std.objectFields(links)
   );
 
-local neighborItems(obj) = collectNeighbors(obj, '', ['data', '_view', 'links']) + linksItems(obj);
+local curatedLinks(obj) =
+  std.set([
+    item.link
+    for item in linksItems(obj) + std.flatMap(function(group) group.items, linksGroups(obj))
+  ]);
+
+local neighborItems(obj) =
+  local curated = curatedLinks(obj);
+  [
+    item
+    for item in collectNeighbors(obj, '', ['data', '_view', 'links'])
+    if !std.setMember(item.link, curated)
+  ] + linksItems(obj);
 
 local safeGet(obj, path) =
   std.foldl(
@@ -94,6 +106,21 @@ local tableView = baseView {
   },
 };
 
+local treeView = baseView {
+  _view+:: {
+    fragment:
+      local tree = std.get($, 'tree', {});
+      c.resource {
+        items:: neighborItems($),
+        groups:: linksGroups($),
+        content:: c.tree {
+          nodes:: std.get(tree, 'nodes', []),
+          item:: std.get(tree, 'item', super.item),
+        },
+      },
+  },
+};
+
 local resourceView = baseView {
   _view+:: {
     fragment: c.resource {
@@ -107,7 +134,7 @@ local resourceView = baseView {
 local actionView = baseView {
   _view+:: {
     fragment: c.action {
-      queryId:: std.get($, '_queryId', ''),
+      evaluationId:: std.get($, '_evaluationId', ''),
       summary:: std.get($, '_summary', ''),
     },
   },
@@ -119,6 +146,7 @@ local withNode = { node: self.view + linkspecs.withLinkSpecs };
   default: { view: listView } + withNode,
   list: { view: listView } + withNode,
   table: { view: tableView } + withNode,
+  tree: { view: treeView } + withNode,
   yaml: { view: yamlView } + withNode,
   resource: { view: resourceView } + withNode,
   action: { view: actionView } + withNode,

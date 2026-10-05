@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 	"github.com/marcbran/jpoet/pkg/jpoet"
 	"github.com/spf13/cobra"
 )
@@ -23,7 +24,7 @@ func newExecCmd(plugins []*jpoet.Plugin) *cobra.Command {
 			}
 			facade := buildFacade(cfg, plugins)
 
-			result, err := facade.Exec(c.Context(), args[0])
+			result, err := facade.Exec(c.Context(), pkg.EvaluationID(args[0]))
 			if err != nil {
 				return err
 			}

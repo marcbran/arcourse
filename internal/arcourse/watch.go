@@ -4,26 +4,26 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/marcbran/arcourse/internal/course"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 
 type watch struct {
-	cfg         QueryConfig
 	environment *environment
-	appendAudit *appendAudit
+	course      *course.Facade
 }
 
-func newWatch(cfg QueryConfig, environment *environment, appendAudit *appendAudit) *watch {
-	return &watch{cfg: cfg, environment: environment, appendAudit: appendAudit}
+func newWatch(environment *environment, courseFacade *course.Facade) *watch {
+	return &watch{environment: environment, course: courseFacade}
 }
 
-func (uc *watch) Exec(ctx context.Context, path string, params map[string]any, format pkg.Format) (<-chan pkg.Result, func(), error) {
+func (uc *watch) Exec(ctx context.Context, path pkg.QueryPath, params map[string]any, format pkg.Format, origin pkg.Origin) (<-chan pkg.Result, func(), error) {
 	err := ctx.Err()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	formats := mergeFormats(format, uc.cfg.AuditFormats)
+	formats := mergeFormats(format, recordedFormats)
 
 	queryPath, segments, paramsJSON, key, err := queryParts(path, params, formats)
 	if err != nil {
@@ -40,7 +40,9 @@ func (uc *watch) Exec(ctx context.Context, path string, params map[string]any, f
 		return nil, nil, err
 	}
 
-	value, ok := uc.decodeAndAudit(ctx, initial, formats, format, queryPath)
+	var ref course.VisitRef
+
+	value, ok := uc.decodeAndRecord(ctx, &ref, initial, formats, format, queryPath, origin)
 	if !ok {
 		unregister()
 		return nil, nil, fmt.Errorf("node has no %s view", format)
@@ -57,7 +59,7 @@ func (uc *watch) Exec(ctx context.Context, path string, params map[string]any, f
 				if !ok {
 					return
 				}
-				value, ok := uc.decodeAndAudit(ctx, out, formats, format, queryPath)
+				value, ok := uc.decodeAndRecord(ctx, &ref, out, formats, format, queryPath, origin)
 				if !ok {
 					continue
 				}
@@ -75,8 +77,8 @@ func (uc *watch) Exec(ctx context.Context, path string, params map[string]any, f
 	return results, unregister, nil
 }
 
-func (uc *watch) decodeAndAudit(ctx context.Context, out string, formats []pkg.Format, format pkg.Format, queryPath string) (string, bool) {
-	decoded, queryID, err := decodeOutput(out, formats, format)
+func (uc *watch) decodeAndRecord(ctx context.Context, ref *course.VisitRef, out string, formats []pkg.Format, format pkg.Format, queryPath pkg.QueryPath, origin pkg.Origin) (string, bool) {
+	decoded, evaluationID, err := decodeOutput(out, formats, format)
 	if err != nil {
 		return "", false
 	}
@@ -84,8 +86,8 @@ func (uc *watch) decodeAndAudit(ctx context.Context, out string, formats []pkg.F
 	if !ok {
 		return "", false
 	}
-	if len(uc.cfg.AuditFormats) > 0 {
-		uc.appendAudit.Exec(ctx, queryID, queryPath, auditResults(decoded, uc.cfg.AuditFormats))
+	if recordable(decoded) {
+		*ref = uc.course.Record(ctx, *ref, course.EvaluationID(evaluationID), course.Address(queryPath), recordableContents(decoded), courseOrigin(origin))
 	}
 	return value, true
 }

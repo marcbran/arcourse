@@ -20,16 +20,11 @@ type Stage struct {
 	facade  pkg.Facade
 	tempDir string
 
-	observeCh          <-chan pkg.Result
-	observeUnsubscribe func()
-
 	watchCh          <-chan pkg.Result
 	watchUnsubscribe func()
 
-	auditEntries []pkg.AuditEntry
-	auditEntry   pkg.AuditEntry
-
-	queryID string
+	evaluationID pkg.EvaluationID
+	origin       pkg.Origin
 
 	LastOutput string
 	LastError  string
@@ -66,20 +61,20 @@ func (s *Stage) a_node_graph(jsonnet string) *Stage {
 }
 
 func (s *Stage) the_output_is(expected string) *Stage {
-	assert.JSONEq(s.t, expected, withoutQueryID(s.LastOutput))
+	assert.JSONEq(s.t, expected, withoutEvaluationID(s.LastOutput))
 	return s
 }
 
-func withoutQueryID(out string) string {
+func withoutEvaluationID(out string) string {
 	var doc map[string]any
 	err := json.Unmarshal([]byte(out), &doc)
 	if err != nil {
 		return out
 	}
-	if _, ok := doc[pkg.QueryIDField]; !ok {
+	if _, ok := doc[pkg.EvaluationIDField]; !ok {
 		return out
 	}
-	delete(doc, pkg.QueryIDField)
+	delete(doc, pkg.EvaluationIDField)
 	stripped, err := json.Marshal(doc)
 	if err != nil {
 		return out

@@ -10,11 +10,12 @@ import (
 	"strings"
 
 	"github.com/marcbran/arcourse/internal/arcourse"
-	archttp "github.com/marcbran/arcourse/internal/http"
-	"github.com/marcbran/arcourse/internal/http/client"
-	"github.com/marcbran/arcourse/internal/infra/broadcast"
-	jsonfileinfra "github.com/marcbran/arcourse/internal/infra/jsonfile"
-	jsonnetinfra "github.com/marcbran/arcourse/internal/infra/jsonnet"
+	archttp "github.com/marcbran/arcourse/internal/arcourse/http"
+	"github.com/marcbran/arcourse/internal/arcourse/http/client"
+	jsonnetinfra "github.com/marcbran/arcourse/internal/arcourse/infra/jsonnet"
+	"github.com/marcbran/arcourse/internal/course"
+	coursejsonfile "github.com/marcbran/arcourse/internal/course/infra/jsonfile"
+	coursejsonnet "github.com/marcbran/arcourse/internal/course/infra/jsonnet"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 	"github.com/marcbran/jpoet/pkg/jpoet"
 	"sigs.k8s.io/yaml"
@@ -31,10 +32,14 @@ func buildFacade(cfg Config, plugins []*jpoet.Plugin) pkg.Facade {
 
 func buildLocalFacade(cfg Config, plugins []*jpoet.Plugin) pkg.Facade {
 	jpaths := []string{filepath.Join(cfg.Root.Dir, "vendor")}
-	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib, jpaths, plugins)
-	lastQuery := broadcast.NewLastQuery()
-	auditRepo := jsonfileinfra.NewAuditRepo(cfg.Audit.Dir)
-	return arcourse.NewFacade(cfg.Config, evaluator, evaluator, lastQuery, auditRepo)
+	courseDir := arcourse.CourseDir(cfg.Root.Dir)
+	courseRepo := coursejsonfile.NewCourseRepo(courseDir)
+	blobs := coursejsonfile.NewBlobStore(courseDir)
+	courseFacade := course.NewFacade(courseRepo, blobs)
+	coursePlugin, courseWatch := coursejsonnet.Plugin(courseFacade)
+	courseFacade.Observe(courseWatch)
+	evaluator := jsonnetinfra.NewEvaluator(arcourse.Lib, jpaths, append(plugins, coursePlugin))
+	return arcourse.NewFacade(cfg.Config, evaluator, evaluator, courseFacade)
 }
 
 func closePlugins(plugins []*jpoet.Plugin) {
@@ -150,25 +155,6 @@ func findConfigFile(home string) (string, error) {
 	return "", fmt.Errorf("%w: no config.yaml, config.yml, or config.json in %s", errNoConfigFile, home)
 }
 
-func defaultConfig() Config {
-	return Config{
-		Mode: ModeClient,
-		HTTP: archttp.Config{
-			Hostname: "localhost",
-			Port:     "1183",
-		},
-		Config: arcourse.Config{
-			Root: arcourse.RootConfig{
-				Mode: arcourse.ModeCompiledGraph,
-			},
-			Audit: arcourse.AuditConfig{
-				Dir:     "audit",
-				Formats: []pkg.Format{pkg.FormatJSON, pkg.FormatHTML},
-			},
-		},
-	}
-}
-
 func resolveConfigValues(cfg Config, home string) (Config, error) {
 	cfg = mergeConfigDefaults(cfg)
 	evaluateDir, err := resolveRelativeDir(home, cfg.Root.Dir)
@@ -176,11 +162,6 @@ func resolveConfigValues(cfg Config, home string) (Config, error) {
 		return Config{}, err
 	}
 	cfg.Root.Dir = evaluateDir
-	auditDir, err := resolveRelativeDir(home, cfg.Audit.Dir)
-	if err != nil {
-		return Config{}, err
-	}
-	cfg.Audit.Dir = auditDir
 	return cfg, nil
 }
 
@@ -212,11 +193,20 @@ func mergeConfigDefaults(cfg Config) Config {
 	if cfg.Root.Mode == "" {
 		cfg.Root.Mode = def.Root.Mode
 	}
-	if strings.TrimSpace(cfg.Audit.Dir) == "" {
-		cfg.Audit.Dir = def.Audit.Dir
-	}
-	if cfg.Audit.Formats == nil {
-		cfg.Audit.Formats = def.Audit.Formats
-	}
 	return cfg
+}
+
+func defaultConfig() Config {
+	return Config{
+		Mode: ModeClient,
+		HTTP: archttp.Config{
+			Hostname: "localhost",
+			Port:     "1183",
+		},
+		Config: arcourse.Config{
+			Root: arcourse.RootConfig{
+				Mode: arcourse.ModeCompiledGraph,
+			},
+		},
+	}
 }

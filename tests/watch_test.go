@@ -92,20 +92,3 @@ func TestWatchOnlyDeliversToMatchingPath(t *testing.T) {
 	then.
 		the_raw_output_is("")
 }
-
-func TestWatchRecordsAuditEntryWithJSONProjection(t *testing.T) {
-	given, when, then := scenario(t)
-
-	given.
-		a_graph_root(`{ _node: "resource", title: "hello", _view:: { html: "<p>hello</p>" } }`)
-
-	when.
-		a_watcher_subscribes_to("root", pkg.FormatHTML).and().
-		the_watch_event_is_received().and().
-		the_audit_is_listed().and().
-		the_audit_entry_at_index_is_fetched(0)
-
-	then.
-		the_audit_has_entry_count(1).and().
-		the_fetched_audit_entry_records_formats(pkg.FormatJSON, pkg.FormatHTML)
-}

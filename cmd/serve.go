@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/marcbran/arcourse/internal/http/server"
+	"github.com/marcbran/arcourse/internal/arcourse/http/server"
 	"github.com/marcbran/jpoet/pkg/jpoet"
 	"github.com/spf13/cobra"
 )

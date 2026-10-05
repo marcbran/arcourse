@@ -329,10 +329,11 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
   if manifest then j.manifestJsonnet(generated) else generated;
 
 local graph = {
-  manifest: true,
-  contextParams: [],
-  pagination: null,
-  data: {
+  _record: false,
+  manifest:: true,
+  contextParams:: [],
+  pagination:: null,
+  data:: {
     spec: openapi.nestedSpec($.spec),
     links: std.get($, 'links', []),
     columns: std.get($, 'columns', []),

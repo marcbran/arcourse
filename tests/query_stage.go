@@ -25,7 +25,7 @@ func (s *Stage) a_path_is_queried_with_format(path string, format pkg.Format) *S
 }
 
 func (s *Stage) a_path_is_queried_with_params_and_format(path string, params map[string]any, format pkg.Format) *Stage {
-	result, err := s.facade.Query(context.Background(), path, params, format)
+	result, err := s.facade.Query(context.Background(), pkg.NewQueryPath(path), params, format, s.origin)
 	if err != nil {
 		s.LastOutput = ""
 		s.LastError = err.Error()
@@ -38,12 +38,11 @@ func (s *Stage) a_path_is_queried_with_params_and_format(path string, params map
 }
 
 // a_path_is_queried_with_format_promptly queries with a bounded deadline,
-// so a query that hangs (e.g. because publishing to an observer blocked)
-// fails fast with a clear error instead of hanging the whole test run.
+// so a query that hangs fails fast with a clear error instead of hanging the whole test run.
 func (s *Stage) a_path_is_queried_with_format_promptly(path string, format pkg.Format) *Stage {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	result, err := s.facade.Query(ctx, path, nil, format)
+	result, err := s.facade.Query(ctx, pkg.NewQueryPath(path), nil, format, s.origin)
 	if err != nil {
 		s.LastOutput = ""
 		s.LastError = err.Error()
@@ -56,19 +55,19 @@ func (s *Stage) a_path_is_queried_with_format_promptly(path string, format pkg.F
 }
 
 func (s *Stage) the_queried_output_has_a_query_id() *Stage {
-	s.queryID = queryIDOf(s.t, s.LastOutput)
-	assert.NotEmpty(s.t, s.queryID)
+	s.evaluationID = evaluationIDOf(s.t, s.LastOutput)
+	assert.NotEmpty(s.t, s.evaluationID)
 	return s
 }
 
-func queryIDOf(t require.TestingT, out string) string {
+func evaluationIDOf(t require.TestingT, out string) pkg.EvaluationID {
 	var doc map[string]json.RawMessage
 	err := json.Unmarshal([]byte(out), &doc)
 	require.NoError(t, err)
-	raw, ok := doc[pkg.QueryIDField]
-	require.True(t, ok, "output has no %s", pkg.QueryIDField)
+	raw, ok := doc[pkg.EvaluationIDField]
+	require.True(t, ok, "output has no %s", pkg.EvaluationIDField)
 	var id string
 	err = json.Unmarshal(raw, &id)
 	require.NoError(t, err)
-	return id
+	return pkg.EvaluationID(id)
 }

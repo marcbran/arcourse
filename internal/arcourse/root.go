@@ -110,7 +110,7 @@ construct_immediate_graph_root(import %q)`, filepath.ToSlash(entryPath)), nil
 }
 
 func (r *root) rootFilePath() string {
-	return filepath.Join(r.cfg.Dir, ".arcourse", "root.jsonnet")
+	return filepath.Join(CacheDir(r.cfg.Dir), "root.jsonnet")
 }
 
 func (r *root) entryPath() (string, error) {

@@ -3,55 +3,39 @@ package arcourse
 import (
 	"context"
 
+	"github.com/marcbran/arcourse/internal/course"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 
-type AuditConfig struct {
-	Formats []pkg.Format `json:"formats"`
-	Dir     string       `json:"dir"`
-}
-
 type Config struct {
-	Root  RootConfig  `json:"root"`
-	Audit AuditConfig `json:"audit"`
+	Root RootConfig `json:"root"`
 }
 
 type facade struct {
 	evaluate    *evaluate
 	exec        *exec
 	query       *query
-	observe     *observe
 	watch       *watch
-	listAudit   *listAudit
-	getAudit    *getAudit
 	compile     *compile
 	warm        *warm
 	environment *environment
 }
 
-func NewFacade(cfg Config, evaluator Evaluator, executor Executor, lastQuery LastQuery, auditRepo AuditRepo) pkg.Facade {
+func NewFacade(cfg Config, evaluator Evaluator, executor Executor, courseFacade *course.Facade) pkg.Facade {
 	compile := newCompile(cfg.Root, evaluator)
 	root := newRoot(cfg.Root, evaluator)
 	environment := newEnvironment(root, evaluator, executor)
 	evaluate := newEvaluate(environment)
-	appendAudit := newAppendAudit(auditRepo)
-	queryCfg := QueryConfig{AuditFormats: cfg.Audit.Formats}
-	query := newQuery(queryCfg, environment, lastQuery, appendAudit)
-	observe := newObserve(lastQuery)
-	watch := newWatch(queryCfg, environment, appendAudit)
-	listAudit := newListAudit(auditRepo)
-	getAudit := newGetAudit(auditRepo)
+	query := newQuery(environment, courseFacade)
+	watch := newWatch(environment, courseFacade)
 	warm := newWarm(environment)
-	exec := newExec(auditRepo, environment)
+	exec := newExec(courseFacade, environment)
 
 	return &facade{
 		evaluate:    evaluate,
 		exec:        exec,
 		query:       query,
-		observe:     observe,
 		watch:       watch,
-		listAudit:   listAudit,
-		getAudit:    getAudit,
 		compile:     compile,
 		warm:        warm,
 		environment: environment,
@@ -62,27 +46,15 @@ func (f *facade) Evaluate(ctx context.Context, expression string) (pkg.Result, e
 	return f.evaluate.Exec(ctx, expression)
 }
 
-func (f *facade) Query(ctx context.Context, path string, params map[string]any, format pkg.Format) (pkg.Result, error) {
-	return f.query.Exec(ctx, path, params, format)
+func (f *facade) Query(ctx context.Context, path pkg.QueryPath, params map[string]any, format pkg.Format, origin pkg.Origin) (pkg.Result, error) {
+	return f.query.Exec(ctx, path, params, format, origin)
 }
 
-func (f *facade) Observe(ctx context.Context, format pkg.Format) (<-chan pkg.Result, func()) {
-	return f.observe.Exec(ctx, format)
+func (f *facade) Watch(ctx context.Context, path pkg.QueryPath, params map[string]any, format pkg.Format, origin pkg.Origin) (<-chan pkg.Result, func(), error) {
+	return f.watch.Exec(ctx, path, params, format, origin)
 }
 
-func (f *facade) Watch(ctx context.Context, path string, params map[string]any, format pkg.Format) (<-chan pkg.Result, func(), error) {
-	return f.watch.Exec(ctx, path, params, format)
-}
-
-func (f *facade) ListAudit(ctx context.Context) ([]pkg.AuditEntry, error) {
-	return f.listAudit.Exec(ctx)
-}
-
-func (f *facade) GetAudit(ctx context.Context, id string) (pkg.AuditEntry, error) {
-	return f.getAudit.Exec(ctx, id)
-}
-
-func (f *facade) Exec(ctx context.Context, id string) (pkg.ExecResult, error) {
+func (f *facade) Exec(ctx context.Context, id pkg.EvaluationID) (pkg.ExecResult, error) {
 	return f.exec.Exec(ctx, id)
 }
 
@@ -96,4 +68,12 @@ func (f *facade) Warm(ctx context.Context) error {
 
 func (f *facade) Close() error {
 	return f.environment.Close()
+}
+
+func courseOrigin(origin pkg.Origin) course.Origin {
+	return course.Origin{
+		SessionID:   course.SessionID(origin.Session),
+		From:        course.EvaluationID(origin.From),
+		FromAddress: course.Address(pkg.NewQueryPath(origin.FromPath.String())),
+	}
 }

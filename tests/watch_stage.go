@@ -4,14 +4,25 @@ package tests
 
 import (
 	"context"
+	"os"
+	"testing"
 	"time"
 
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 	"github.com/stretchr/testify/require"
 )
 
+const subscribeSettleDelay = 200 * time.Millisecond
+
+func skipIfLocalCLI(t *testing.T) {
+	facade := os.Getenv("ARCOURSE_E2E_FACADE")
+	if facade == "" || facade == "local-cli" {
+		t.Skip("local-cli has no shared state across separate CLI invocations")
+	}
+}
+
 func (s *Stage) a_watcher_subscribes_to(path string, format pkg.Format) *Stage {
-	ch, unsubscribe, err := s.facade.Watch(context.Background(), path, nil, format)
+	ch, unsubscribe, err := s.facade.Watch(context.Background(), pkg.NewQueryPath(path), nil, format, s.origin)
 	require.NoError(s.t, err)
 	s.watchCh = ch
 	s.watchUnsubscribe = unsubscribe

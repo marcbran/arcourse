@@ -127,49 +127,23 @@ func (f *ServerBackedCLIFacade) Evaluate(ctx context.Context, expression string)
 	return f.client.Evaluate(ctx, expression)
 }
 
-func (f *ServerBackedCLIFacade) Query(ctx context.Context, path string, params map[string]any, format pkg.Format) (pkg.Result, error) {
+func (f *ServerBackedCLIFacade) Query(ctx context.Context, path pkg.QueryPath, params map[string]any, format pkg.Format, origin pkg.Origin) (pkg.Result, error) {
 	err := f.start()
 	if err != nil {
 		return pkg.Result{}, err
 	}
-	return f.client.Query(ctx, path, params, format)
+	return f.client.Query(ctx, path, params, format, origin)
 }
 
-func (f *ServerBackedCLIFacade) Observe(ctx context.Context, format pkg.Format) (<-chan pkg.Result, func()) {
-	err := f.start()
-	if err != nil {
-		ch := make(chan pkg.Result)
-		close(ch)
-		return ch, func() {}
-	}
-	return f.client.Observe(ctx, format)
-}
-
-func (f *ServerBackedCLIFacade) Watch(ctx context.Context, path string, params map[string]any, format pkg.Format) (<-chan pkg.Result, func(), error) {
+func (f *ServerBackedCLIFacade) Watch(ctx context.Context, path pkg.QueryPath, params map[string]any, format pkg.Format, origin pkg.Origin) (<-chan pkg.Result, func(), error) {
 	err := f.start()
 	if err != nil {
 		return nil, nil, err
 	}
-	return f.client.Watch(ctx, path, params, format)
+	return f.client.Watch(ctx, path, params, format, origin)
 }
 
-func (f *ServerBackedCLIFacade) ListAudit(ctx context.Context) ([]pkg.AuditEntry, error) {
-	err := f.start()
-	if err != nil {
-		return nil, err
-	}
-	return f.client.ListAudit(ctx)
-}
-
-func (f *ServerBackedCLIFacade) GetAudit(ctx context.Context, id string) (pkg.AuditEntry, error) {
-	err := f.start()
-	if err != nil {
-		return pkg.AuditEntry{}, err
-	}
-	return f.client.GetAudit(ctx, id)
-}
-
-func (f *ServerBackedCLIFacade) Exec(ctx context.Context, id string) (pkg.ExecResult, error) {
+func (f *ServerBackedCLIFacade) Exec(ctx context.Context, id pkg.EvaluationID) (pkg.ExecResult, error) {
 	err := f.start()
 	if err != nil {
 		return pkg.ExecResult{}, err
@@ -340,9 +314,10 @@ func (f *CLIFacade) Evaluate(ctx context.Context, expression string) (pkg.Result
 	return pkg.Result{Output: output.Output}, nil
 }
 
-func (f *CLIFacade) Query(ctx context.Context, path string, params map[string]any, format pkg.Format) (pkg.Result, error) {
-	args := []string{"query", path, "--format", string(format)}
+func (f *CLIFacade) Query(ctx context.Context, path pkg.QueryPath, params map[string]any, format pkg.Format, origin pkg.Origin) (pkg.Result, error) {
+	args := []string{"query", path.String(), "--format", string(format)}
 	args = appendParamArgs(args, params)
+	args = appendOriginArgs(args, origin)
 	cmd := exec.CommandContext(ctx, f.binaryPath, args...)
 	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
 
@@ -362,54 +337,11 @@ func (f *CLIFacade) Query(ctx context.Context, path string, params map[string]an
 	return pkg.Result{Output: strings.TrimSuffix(stdout.String(), "\n")}, nil
 }
 
-func (f *CLIFacade) Observe(ctx context.Context, format pkg.Format) (<-chan pkg.Result, func()) {
+func (f *CLIFacade) Watch(ctx context.Context, path pkg.QueryPath, params map[string]any, format pkg.Format, origin pkg.Origin) (<-chan pkg.Result, func(), error) {
 	cmdCtx, cancel := context.WithCancel(ctx)
 	ch := make(chan pkg.Result)
 
-	cmd := exec.CommandContext(cmdCtx, f.binaryPath, "observe", "--format", string(format))
-	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		cancel()
-		close(ch)
-		return ch, func() {}
-	}
-	err = cmd.Start()
-	if err != nil {
-		cancel()
-		close(ch)
-		return ch, func() {}
-	}
-
-	go func() {
-		defer close(ch)
-		defer func() {
-			_ = cmd.Wait()
-		}()
-		scanner := bufio.NewScanner(stdout)
-		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-		for scanner.Scan() {
-			var out commandOutput
-			err := json.Unmarshal(scanner.Bytes(), &out)
-			if err != nil {
-				continue
-			}
-			select {
-			case ch <- pkg.Result{Output: out.Output}:
-			case <-cmdCtx.Done():
-				return
-			}
-		}
-	}()
-
-	return ch, cancel
-}
-
-func (f *CLIFacade) Watch(ctx context.Context, path string, params map[string]any, format pkg.Format) (<-chan pkg.Result, func(), error) {
-	cmdCtx, cancel := context.WithCancel(ctx)
-	ch := make(chan pkg.Result)
-
-	args := append([]string{"watch", path, "--format", string(format)}, appendParamArgs(nil, params)...)
+	args := append([]string{"watch", path.String(), "--format", string(format)}, appendParamArgs(nil, params)...)
 	cmd := exec.CommandContext(cmdCtx, f.binaryPath, args...)
 	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
 	stdout, err := cmd.StdoutPipe()
@@ -447,58 +379,8 @@ func (f *CLIFacade) Watch(ctx context.Context, path string, params map[string]an
 	return ch, cancel, nil
 }
 
-func (f *CLIFacade) ListAudit(ctx context.Context) ([]pkg.AuditEntry, error) {
-	cmd := exec.CommandContext(ctx, f.binaryPath, "audit")
-	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
-
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
-	if err != nil {
-		if stderr.String() != "" {
-			return nil, errors.New(stderr.String())
-		}
-		return nil, err
-	}
-
-	var entries []pkg.AuditEntry
-	err = json.Unmarshal(stdout.Bytes(), &entries)
-	if err != nil {
-		return nil, err
-	}
-	return entries, nil
-}
-
-func (f *CLIFacade) GetAudit(ctx context.Context, id string) (pkg.AuditEntry, error) {
-	cmd := exec.CommandContext(ctx, f.binaryPath, "audit", id)
-	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
-
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
-	if err != nil {
-		if stderr.String() != "" {
-			return pkg.AuditEntry{}, errors.New(stderr.String())
-		}
-		return pkg.AuditEntry{}, err
-	}
-
-	var entry pkg.AuditEntry
-	err = json.Unmarshal(stdout.Bytes(), &entry)
-	if err != nil {
-		return pkg.AuditEntry{}, err
-	}
-	return entry, nil
-}
-
-func (f *CLIFacade) Exec(ctx context.Context, id string) (pkg.ExecResult, error) {
-	cmd := exec.CommandContext(ctx, f.binaryPath, "exec", id)
+func (f *CLIFacade) Exec(ctx context.Context, id pkg.EvaluationID) (pkg.ExecResult, error) {
+	cmd := exec.CommandContext(ctx, f.binaryPath, "exec", string(id))
 	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
 
 	var stdout bytes.Buffer
@@ -558,6 +440,19 @@ func appendParamArgs(args []string, params map[string]any) []string {
 		default:
 			args = append(args, "--param", key+"="+fmt.Sprint(value))
 		}
+	}
+	return args
+}
+
+func appendOriginArgs(args []string, origin pkg.Origin) []string {
+	if origin.Session != "" {
+		args = append(args, "--session", string(origin.Session))
+	}
+	if origin.From != "" {
+		args = append(args, "--from", string(origin.From))
+	}
+	if origin.FromPath != "" {
+		args = append(args, "--from-path", origin.FromPath.String())
 	}
 	return args
 }

@@ -8,32 +8,26 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/marcbran/arcourse/internal/course"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 
-type QueryConfig struct {
-	AuditFormats []pkg.Format `json:"auditFormats"`
-}
-
 type query struct {
-	cfg         QueryConfig
 	environment *environment
-	lastQuery   LastQuery
-	appendAudit *appendAudit
+	course      *course.Facade
 }
 
-func newQuery(cfg QueryConfig, environment *environment, lastQuery LastQuery, appendAudit *appendAudit) *query {
-	return &query{cfg: cfg, environment: environment, lastQuery: lastQuery, appendAudit: appendAudit}
+func newQuery(environment *environment, courseFacade *course.Facade) *query {
+	return &query{environment: environment, course: courseFacade}
 }
 
-func (uc *query) Exec(ctx context.Context, path string, params map[string]any, format pkg.Format) (pkg.Result, error) {
+func (uc *query) Exec(ctx context.Context, path pkg.QueryPath, params map[string]any, format pkg.Format, origin pkg.Origin) (pkg.Result, error) {
 	err := ctx.Err()
 	if err != nil {
 		return pkg.Result{}, err
 	}
 
-	observed := uc.lastQuery.ObservedFormats()
-	formats := mergeFormats(format, observed, uc.cfg.AuditFormats)
+	formats := mergeFormats(format, recordedFormats)
 
 	queryPath, segments, paramsJSON, key, err := queryParts(path, params, formats)
 	if err != nil {
@@ -51,21 +45,13 @@ func (uc *query) Exec(ctx context.Context, path string, params map[string]any, f
 	}
 	unregister()
 
-	decoded, queryID, err := decodeOutput(out, formats, format)
+	decoded, evaluationID, err := decodeOutput(out, formats, format)
 	if err != nil {
 		return pkg.Result{}, err
 	}
 
-	for _, f := range observed {
-		value, ok := decoded[f]
-		if !ok {
-			continue
-		}
-		uc.lastQuery.Publish(f, pkg.Result{Output: value})
-	}
-
-	if len(uc.cfg.AuditFormats) > 0 {
-		uc.appendAudit.Exec(ctx, queryID, queryPath, auditResults(decoded, uc.cfg.AuditFormats))
+	if recordable(decoded) {
+		uc.course.Record(ctx, course.VisitRef{}, course.EvaluationID(evaluationID), course.Address(queryPath), recordableContents(decoded), courseOrigin(origin))
 	}
 
 	return pkg.Result{Output: decoded[format]}, nil
@@ -87,10 +73,27 @@ func mergeFormats(primary pkg.Format, sets ...[]pkg.Format) []pkg.Format {
 	return formats
 }
 
-func splitPathAndQuery(path string) (string, map[string]any, error) {
-	base, query, found := strings.Cut(path, "?")
+func queryParts(path pkg.QueryPath, params map[string]any, formats []pkg.Format) (queryPath pkg.QueryPath, segments []string, paramsJSON string, key string, err error) {
+	queryPath, queryParams, err := splitPathAndQuery(path)
+	if err != nil {
+		return "", nil, "", "", err
+	}
+	queryPath = pkg.NewQueryPath(queryPath.String())
+	parts := strings.Split(queryPath.String(), "/")
+	segments = parts[1:]
+	paramsBytes, err := json.Marshal(mergeParams(queryParams, params))
+	if err != nil {
+		return "", nil, "", "", err
+	}
+	paramsJSON = string(paramsBytes)
+	key = queryPath.String() + "|" + paramsJSON + "|" + formatsKey(formats)
+	return queryPath, segments, paramsJSON, key, nil
+}
+
+func splitPathAndQuery(path pkg.QueryPath) (pkg.QueryPath, map[string]any, error) {
+	base, query, found := strings.Cut(path.String(), "?")
 	if !found {
-		return base, map[string]any{}, nil
+		return pkg.QueryPath(base), map[string]any{}, nil
 	}
 	values, err := url.ParseQuery(query)
 	if err != nil {
@@ -104,23 +107,18 @@ func splitPathAndQuery(path string) (string, map[string]any, error) {
 			params[key] = vs
 		}
 	}
-	return base, params, nil
+	return pkg.QueryPath(base), params, nil
 }
 
-func queryParts(path string, params map[string]any, formats []pkg.Format) (queryPath string, segments []string, paramsJSON string, key string, err error) {
-	queryPath, queryParams, err := splitPathAndQuery(path)
-	if err != nil {
-		return "", nil, "", "", err
+func mergeParams(base map[string]any, overrides map[string]any) map[string]any {
+	merged := make(map[string]any, len(base)+len(overrides))
+	for k, v := range base {
+		merged[k] = v
 	}
-	parts := strings.Split(strings.Trim(queryPath, "/"), "/")
-	segments = parts[1:]
-	paramsBytes, err := json.Marshal(mergeParams(queryParams, params))
-	if err != nil {
-		return "", nil, "", "", err
+	for k, v := range overrides {
+		merged[k] = v
 	}
-	paramsJSON = string(paramsBytes)
-	key = queryPath + "|" + paramsJSON + "|" + formatsKey(formats)
-	return queryPath, segments, paramsJSON, key, nil
+	return merged
 }
 
 func formatsKey(formats []pkg.Format) string {
@@ -148,35 +146,25 @@ func buildExpression(segments []string, paramsJSON string, formats []pkg.Format)
 	), nil
 }
 
-func mergeParams(base map[string]any, overrides map[string]any) map[string]any {
-	merged := make(map[string]any, len(base)+len(overrides))
-	for k, v := range base {
-		merged[k] = v
-	}
-	for k, v := range overrides {
-		merged[k] = v
-	}
-	return merged
-}
-
-func decodeOutput(out string, formats []pkg.Format, primary pkg.Format) (map[pkg.Format]string, string, error) {
+func decodeOutput(out string, formats []pkg.Format, primary pkg.Format) (map[pkg.Format]string, pkg.EvaluationID, error) {
 	var raw map[string]json.RawMessage
 	err := json.Unmarshal([]byte(out), &raw)
 	if err != nil {
 		return nil, "", err
 	}
-	rawID, ok := raw[pkg.QueryIDField]
+	rawID, ok := raw[pkg.EvaluationIDField]
 	if !ok {
-		return nil, "", fmt.Errorf("output has no %s", pkg.QueryIDField)
+		return nil, "", fmt.Errorf("output has no %s", pkg.EvaluationIDField)
 	}
-	var queryID string
-	err = json.Unmarshal(rawID, &queryID)
+	var rawEvaluationID string
+	err = json.Unmarshal(rawID, &rawEvaluationID)
 	if err != nil {
 		return nil, "", err
 	}
-	if queryID == "" {
-		return nil, "", fmt.Errorf("output has an empty %s", pkg.QueryIDField)
+	if rawEvaluationID == "" {
+		return nil, "", fmt.Errorf("output has an empty %s", pkg.EvaluationIDField)
 	}
+	evaluationID := pkg.EvaluationID(rawEvaluationID)
 	decoded := make(map[pkg.Format]string, len(raw))
 	for _, f := range formats {
 		rawValue, ok := raw[string(f)]
@@ -192,7 +180,7 @@ func decodeOutput(out string, formats []pkg.Format, primary pkg.Format) (map[pkg
 		}
 		decoded[f] = value
 	}
-	return decoded, queryID, nil
+	return decoded, evaluationID, nil
 }
 
 func decodeField(format pkg.Format, raw json.RawMessage) (string, error) {
@@ -205,16 +193,4 @@ func decodeField(format pkg.Format, raw json.RawMessage) (string, error) {
 		return "", err
 	}
 	return s, nil
-}
-
-func auditResults(decoded map[pkg.Format]string, auditFormats []pkg.Format) map[pkg.Format]pkg.Result {
-	results := make(map[pkg.Format]pkg.Result, len(auditFormats))
-	for _, f := range auditFormats {
-		value, ok := decoded[f]
-		if !ok {
-			continue
-		}
-		results[f] = pkg.Result{Output: value}
-	}
-	return results
 }

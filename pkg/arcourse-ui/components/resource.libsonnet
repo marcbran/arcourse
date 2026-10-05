@@ -8,7 +8,8 @@ local style = |||
     align-items: flex-start;
     gap: 0.25em;
   }
-  .resource > .yaml {
+  .resource > .yaml,
+  .resource > .tree {
     flex: 1 1 0;
     min-width: 0;
   }
@@ -17,6 +18,7 @@ local style = |||
 {
   local c = self,
   data:: error 'Resource requires data',
+  content:: yaml { data:: c.data },
   items:: [],
   groups:: [],
   html: [
@@ -27,7 +29,7 @@ local style = |||
       children:
         (if std.length(c.items) > 0 || std.length(c.groups) > 0 then
            [list { items:: c.items, groups:: c.groups, style:: ' min-width: 8em;' }]
-         else []) + [yaml { data:: c.data }],
+         else []) + [c.content],
     },
   ],
 }
