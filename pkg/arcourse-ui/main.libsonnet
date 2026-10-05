@@ -42,7 +42,19 @@ local linksGroups(obj) =
     std.objectFields(links)
   );
 
-local neighborItems(obj) = collectNeighbors(obj, '', ['data', '_view', 'links']) + linksItems(obj);
+local curatedLinks(obj) =
+  std.set([
+    item.link
+    for item in linksItems(obj) + std.flatMap(function(group) group.items, linksGroups(obj))
+  ]);
+
+local neighborItems(obj) =
+  local curated = curatedLinks(obj);
+  [
+    item
+    for item in collectNeighbors(obj, '', ['data', '_view', 'links'])
+    if !std.setMember(item.link, curated)
+  ] + linksItems(obj);
 
 local safeGet(obj, path) =
   std.foldl(
