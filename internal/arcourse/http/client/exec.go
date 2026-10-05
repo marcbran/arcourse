@@ -12,8 +12,9 @@ import (
 )
 
 type execResponse struct {
-	Output   string `json:"output"`
-	Redirect string `json:"redirect"`
+	ExecutionID string `json:"executionId"`
+	Output      string `json:"output"`
+	Redirect    string `json:"redirect"`
 }
 
 func (c *Client) Exec(ctx context.Context, id pkg.EvaluationID) (pkg.ExecResult, error) {
@@ -42,5 +43,5 @@ func (c *Client) Exec(ctx context.Context, id pkg.EvaluationID) (pkg.ExecResult,
 	if err != nil {
 		return pkg.ExecResult{}, err
 	}
-	return pkg.ExecResult{Output: out.Output, Redirect: pkg.NewQueryPath(out.Redirect)}, nil
+	return pkg.ExecResult{ExecutionID: pkg.ExecutionID(out.ExecutionID), Output: out.Output, Redirect: pkg.NewQueryPath(out.Redirect)}, nil
 }

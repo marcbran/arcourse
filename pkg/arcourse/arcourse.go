@@ -13,6 +13,7 @@ var (
 	ErrQueryNotRecorded   = errors.New("query not recorded")
 	ErrContentNotRecorded = errors.New("query has no json content recorded")
 	ErrActionNotFound     = errors.New("node has no action")
+	ErrAlreadyExecuted    = errors.New("query already executed")
 	ErrShapeNotSupported  = errors.New("compiling a root shape requires immediateGraph or compiledGraph mode (root.jsonnet must be a node-spec list, not a finished value)")
 )
 
@@ -50,11 +51,15 @@ func (p QueryPath) String() string {
 
 type EvaluationID string
 
+type ExecutionID string
+
+type EntryID string
+
 type SessionID string
 
 type Origin struct {
 	Session  SessionID
-	From     EvaluationID
+	From     EntryID
 	FromPath QueryPath
 }
 
@@ -63,8 +68,9 @@ type Result struct {
 }
 
 type ExecResult struct {
-	Output   string
-	Redirect QueryPath
+	ExecutionID ExecutionID
+	Output      string
+	Redirect    QueryPath
 }
 
 type Facade interface {

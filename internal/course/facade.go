@@ -6,30 +6,46 @@ import (
 
 type Facade struct {
 	recordVisit          *recordVisit
+	startExecution       *startExecution
+	finishExecution      *finishExecution
 	listSessions         *ListSessions
 	getSession           *GetSession
 	getVisit             *GetVisit
 	getEvaluationContent *getEvaluationContent
+	getExecutionOutput   *getExecutionOutput
 	repo                 Repo
 }
 
 func NewFacade(repo Repo, blobs BlobStore) *Facade {
 	return &Facade{
-		recordVisit:          newRecordVisit(repo, blobs, nil),
+		recordVisit:          newRecordVisit(repo, blobs),
+		startExecution:       newStartExecution(repo),
+		finishExecution:      newFinishExecution(repo, blobs),
 		listSessions:         NewListSessions(repo),
 		getSession:           NewGetSession(repo),
 		getVisit:             NewGetVisit(repo),
 		getEvaluationContent: newGetEvaluationContent(blobs),
+		getExecutionOutput:   newGetExecutionOutput(blobs),
 		repo:                 repo,
 	}
 }
 
 func (f *Facade) Observe(observer Observer) {
 	f.recordVisit.observer = observer
+	f.startExecution.observer = observer
+	f.finishExecution.observer = observer
 }
 
 func (f *Facade) Record(ctx context.Context, ref VisitRef, evaluationID EvaluationID, address Address, contents map[Projection]string, origin Origin) VisitRef {
 	return f.recordVisit.Exec(ctx, ref, evaluationID, address, contents, origin)
+}
+
+func (f *Facade) StartExecution(ctx context.Context, from Evaluation) (Execution, error) {
+	return f.startExecution.Exec(ctx, from)
+}
+
+func (f *Facade) FinishExecution(ctx context.Context, execution Execution, output string, failure error) error {
+	return f.finishExecution.Exec(ctx, execution, output, failure)
 }
 
 func (f *Facade) Sessions(ctx context.Context) ([]SessionSummary, error) {
@@ -44,10 +60,18 @@ func (f *Facade) Visit(ctx context.Context, visitID VisitID) (Visit, error) {
 	return f.getVisit.Exec(ctx, visitID)
 }
 
-func (f *Facade) Evaluation(ctx context.Context, evaluationID EvaluationID) (Event, error) {
-	return f.repo.Get(ctx, evaluationID)
+func (f *Facade) Evaluation(ctx context.Context, evaluationID EvaluationID) (Evaluation, error) {
+	return f.repo.Evaluation(ctx, evaluationID)
 }
 
-func (f *Facade) Content(ctx context.Context, event Event, projection Projection) (string, error) {
-	return f.getEvaluationContent.Exec(ctx, event, projection)
+func (f *Facade) Execution(ctx context.Context, executionID ExecutionID) (Execution, error) {
+	return f.repo.Execution(ctx, executionID)
+}
+
+func (f *Facade) Content(ctx context.Context, evaluation Evaluation, projection Projection) (string, error) {
+	return f.getEvaluationContent.Exec(ctx, evaluation, projection)
+}
+
+func (f *Facade) Output(ctx context.Context, execution Execution) (string, error) {
+	return f.getExecutionOutput.Exec(ctx, execution)
 }

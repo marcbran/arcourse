@@ -73,7 +73,7 @@ func (f *facade) Close() error {
 func courseOrigin(origin pkg.Origin) course.Origin {
 	return course.Origin{
 		SessionID:   course.SessionID(origin.Session),
-		From:        course.EvaluationID(origin.From),
+		From:        course.EntryID(origin.From),
 		FromAddress: course.Address(pkg.NewQueryPath(origin.FromPath.String())),
 	}
 }

@@ -27,8 +27,9 @@ type outputResponse struct {
 }
 
 type execResponse struct {
-	Output   string `json:"output"`
-	Redirect string `json:"redirect"`
+	ExecutionID string `json:"executionId"`
+	Output      string `json:"output"`
+	Redirect    string `json:"redirect"`
 }
 
 func (s *Server) handleEvaluate(w http.ResponseWriter, r *http.Request) {
@@ -76,7 +77,7 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 		returnBadRequest(w, err)
 		return
 	}
-	origin := pkg.Origin{Session: pkg.SessionID(req.Session), From: pkg.EvaluationID(req.From), FromPath: pkg.NewQueryPath(req.FromPath)}
+	origin := pkg.Origin{Session: pkg.SessionID(req.Session), From: pkg.EntryID(req.From), FromPath: pkg.NewQueryPath(req.FromPath)}
 	result, err := s.facade.Query(r.Context(), pkg.NewQueryPath(req.Path), req.Params, format, origin)
 	if err != nil {
 		returnError(w, err)
@@ -96,5 +97,5 @@ func (s *Server) handleExec(w http.ResponseWriter, r *http.Request) {
 		returnError(w, err)
 		return
 	}
-	returnSuccess(w, execResponse{Output: result.Output, Redirect: result.Redirect.String()})
+	returnSuccess(w, execResponse{ExecutionID: string(result.ExecutionID), Output: result.Output, Redirect: result.Redirect.String()})
 }

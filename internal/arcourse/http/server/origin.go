@@ -9,13 +9,44 @@ import (
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 
-const sessionCookieName = "arcourse_session"
+const (
+	sessionCookieName = "arcourse_session"
+	fromCookieName    = "arcourse_from"
+	fromCookieMaxAge  = 60
+)
 
 func browseOrigin(w http.ResponseWriter, r *http.Request) pkg.Origin {
 	return pkg.Origin{
 		Session:  sessionFromCookie(w, r),
+		From:     fromFromCookie(w, r),
 		FromPath: refererPath(r),
 	}
+}
+
+func setFromCookie(w http.ResponseWriter, from pkg.EntryID) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     fromCookieName,
+		Value:    string(from),
+		Path:     "/",
+		MaxAge:   fromCookieMaxAge,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func fromFromCookie(w http.ResponseWriter, r *http.Request) pkg.EntryID {
+	cookie, err := r.Cookie(fromCookieName)
+	if err != nil || cookie.Value == "" {
+		return ""
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     fromCookieName,
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
+	return pkg.EntryID(cookie.Value)
 }
 
 func sessionFromCookie(w http.ResponseWriter, r *http.Request) pkg.SessionID {
@@ -53,7 +84,7 @@ func requestOrigin(r *http.Request) pkg.Origin {
 	query := r.URL.Query()
 	return pkg.Origin{
 		Session:  pkg.SessionID(query.Get("session")),
-		From:     pkg.EvaluationID(query.Get("from")),
+		From:     pkg.EntryID(query.Get("from")),
 		FromPath: pkg.NewQueryPath(query.Get("fromPath")),
 	}
 }

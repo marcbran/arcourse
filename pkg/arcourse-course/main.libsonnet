@@ -63,6 +63,29 @@ local visitItem = {
   ],
 };
 
+local executionItem = {
+  local c = self,
+  node:: error 'ExecutionItem requires a node',
+  html: [
+    {
+      element: 'a',
+      attributes: { href: c.node.link },
+      children: ['execution'],
+    },
+    {
+      element: 'span',
+      attributes: { class: 'detail' },
+      children: ['%s %s' % [c.node.time, c.node.status]],
+    },
+  ],
+};
+
+local courseItem = {
+  local c = self,
+  node:: error 'CourseItem requires a node',
+  html: (if c.node.kind == 'execution' then executionItem else visitItem) { node:: c.node }.html,
+};
+
 [
   [['arcourse', 'sessions'], a.table.node + unrecorded {
     data: { items: invoke('sessions') },
@@ -85,32 +108,63 @@ local visitItem = {
   }],
   [['arcourse', '$session'], a.tree.node + unrecorded {
     data: invoke('session', [$.session]),
-    local visitOf = { [visit.visitId]: visit for visit in $.data.visits },
-    local parentOf = { [edge.to]: edge.from for edge in $.data.edges },
-    local childIdsOf(visitId) = [edge.to for edge in $.data.edges if edge.from == visitId],
-    local branchOf(visitId) = {
-      local visit = visitOf[visitId],
+    local session = root.arcourse.session($.session),
+    local visitIds = { [visit.visitId]: true for visit in $.data.visits },
+    local executionIds = { [execution.executionId]: true for execution in $.data.executions },
+    local branches(visits, executions) = [
+      entry.branch
+      for entry in std.sort(
+        [{ timestamp: visit.timestamp, branch: visitBranch(visit) } for visit in visits] +
+        [{ timestamp: execution.timestamp, branch: executionBranch(execution) } for execution in executions],
+        function(entry) entry.timestamp,
+      )
+    ],
+    local visitBranch(visit) = {
+      kind: 'visit',
       address: visit.address,
       time: std.substr(visit.timestamp, 11, 8),
-      link: root.arcourse.session($.session).visit(visitId)._queryPath,
-      children: [branchOf(childId) for childId in childIdsOf(visitId)],
+      link: session.visit(visit.visitId)._queryPath,
+      children: branches(
+        [child for child in $.data.visits if child.parent.visit == visit.visitId],
+        [execution for execution in $.data.executions if execution.visitId == visit.visitId],
+      ),
+    },
+    local executionBranch(execution) = {
+      kind: 'execution',
+      status: execution.status,
+      time: std.substr(execution.timestamp, 11, 8),
+      link: session.execution(execution.executionId)._queryPath,
+      children: branches(
+        [child for child in $.data.visits if child.parent.execution == execution.executionId],
+        [],
+      ),
     },
     tree:: {
-      nodes: [
-        branchOf(visit.visitId)
-        for visit in $.data.visits
-        if !std.objectHas(parentOf, visit.visitId)
-      ],
-      item: visitItem,
+      nodes: branches(
+        [
+          visit
+          for visit in $.data.visits
+          if !std.objectHas(visitIds, visit.parent.visit)
+             && !std.objectHas(executionIds, visit.parent.execution)
+        ],
+        [
+          execution
+          for execution in $.data.executions
+          if !std.objectHas(visitIds, execution.visitId)
+        ],
+      ),
+      item: courseItem,
     },
   }],
   [['arcourse', '$session', '$visit'], a.resource.node + unrecorded {
     local visit = invoke('visit', [$.visit]),
     local session = invoke('session', [$.session]),
-    local addressOf = { [v.visitId]: v.address for v in session.visits },
-    local parentIds = [edge.from for edge in session.edges if edge.to == $.visit],
-    local childIds = [edge.to for edge in session.edges if edge.from == $.visit],
+    local sessionNode = root.arcourse.session($.session),
+    local visitOf = { [v.visitId]: v for v in session.visits },
+    local parent = std.get(visitOf, $.visit, { parent: { visit: '', execution: '' } }).parent,
+    local childIds = [v.visitId for v in session.visits if v.parent.visit == $.visit],
     local evaluations = visit.evaluations,
+    local executions = visit.executions,
     data: {
       address: visit.address,
       versions: visit.versions,
@@ -120,31 +174,38 @@ local visitItem = {
     links: {
       course: {
         node: { _node: true, _queryPath: '/' + visit.address },
-        session: root.arcourse.session($.session),
+        session: sessionNode,
       },
     } + (
-      if std.length(parentIds) > 0
-      then {
-        from: {
-          [addressOf[parentIds[0]]]:
-            root.arcourse.session($.session).visit(parentIds[0]),
-        },
-      }
+      if std.objectHas(visitOf, parent.visit)
+      then { from: { [visitOf[parent.visit].address]: sessionNode.visit(parent.visit) } }
+      else if parent.execution != ''
+      then { from: { execution: sessionNode.execution(parent.execution) } }
       else {}
     ) + (
       if std.length(childIds) > 0
       then {
         next: {
-          ['%02d %s' % [i + 1, addressOf[childIds[i]]]]:
-            root.arcourse.session($.session).visit(childIds[i])
+          ['%02d %s' % [i + 1, visitOf[childIds[i]].address]]:
+            sessionNode.visit(childIds[i])
           for i in std.range(0, std.length(childIds) - 1)
+        },
+      }
+      else {}
+    ) + (
+      if std.length(executions) > 0
+      then {
+        executions: {
+          ['%02d %s %s' % [i + 1, std.substr(executions[i].timestamp, 11, 8), executions[i].status]]:
+            sessionNode.execution(executions[i].executionId)
+          for i in std.range(0, std.length(executions) - 1)
         },
       }
       else {}
     ) + {
       versions: {
         ['%02d %s' % [i + 1, std.substr(evaluations[i].timestamp, 11, 8)]]:
-          root.arcourse.session($.session).visit($.visit).evaluation(evaluations[i].evaluationId)
+          sessionNode.visit($.visit).evaluation(evaluations[i].evaluationId)
         for i in std.range(0, std.length(evaluations) - 1)
       },
     },
@@ -213,5 +274,46 @@ local visitItem = {
       for key in std.objectFields(content)
       if key != '_node'
     },
+  }],
+  [['arcourse', '$session', '$execution'], a.resource.node + unrecorded {
+    local execution = invoke('execution', [$.execution]),
+    local session = invoke('session', [$.session]),
+    local sessionNode = root.arcourse.session($.session),
+    local content = std.parseJson(invoke('content', [execution.from, 'json'])),
+    local visitOf = { [v.visitId]: v for v in session.visits },
+    local nextIds = [v.visitId for v in session.visits if v.parent.execution == $.execution],
+    data: {
+      address: execution.address,
+      action: std.get(content, '_action', {}),
+      status: execution.status,
+      started: execution.timestamp,
+    } + (
+      if execution.finished != '' then { finished: execution.finished } else {}
+    ) + (
+      if execution['error'] != '' then { 'error': execution['error'] } else {}
+    ),
+    links: {
+      course: {
+        node: { _node: true, _queryPath: '/' + execution.address },
+        evaluation: sessionNode.visit(execution.visitId).evaluation(execution.from),
+        visit: sessionNode.visit(execution.visitId),
+        session: sessionNode,
+      },
+    } + (
+      if execution.hasOutput then { content: { output: $.output } } else {}
+    ) + (
+      if std.length(nextIds) > 0
+      then {
+        next: {
+          ['%02d %s' % [i + 1, visitOf[nextIds[i]].address]]:
+            sessionNode.visit(nextIds[i])
+          for i in std.range(0, std.length(nextIds) - 1)
+        },
+      }
+      else {}
+    ),
+  }],
+  [['arcourse', '$session', '$execution', 'output'], a.yaml.node + unrecorded {
+    data: { output: invoke('output', [$.execution]) },
   }],
 ]

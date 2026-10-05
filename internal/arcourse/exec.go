@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/marcbran/arcourse/internal/course"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
@@ -68,16 +69,29 @@ func (uc *exec) Exec(ctx context.Context, id pkg.EvaluationID) (pkg.ExecResult, 
 		return pkg.ExecResult{}, err
 	}
 
-	output, err := uc.environment.Exec(ctx, command.Plugin, command.Name, command.Data)
+	execution, err := uc.course.StartExecution(ctx, event)
 	if err != nil {
+		if errors.Is(err, course.ErrAlreadyExecuted) {
+			return pkg.ExecResult{}, fmt.Errorf("%w: %s", pkg.ErrAlreadyExecuted, id)
+		}
 		return pkg.ExecResult{}, err
+	}
+	executionID := pkg.ExecutionID(execution.ExecutionID)
+
+	output, failure := uc.environment.Exec(ctx, command.Plugin, command.Name, command.Data)
+	err = uc.course.FinishExecution(context.WithoutCancel(ctx), execution, output, failure)
+	if err != nil {
+		slog.Warn("record execution outcome", "err", err, "execution", execution.ExecutionID)
+	}
+	if failure != nil {
+		return pkg.ExecResult{ExecutionID: executionID}, fmt.Errorf("execution %s: %w", executionID, failure)
 	}
 
 	redirect := pkg.QueryPath(event.Address)
 	if command.Redirect != nil && command.Redirect.QueryPath != "" {
 		redirect = pkg.NewQueryPath(command.Redirect.QueryPath)
 	}
-	return pkg.ExecResult{Output: output, Redirect: redirect}, nil
+	return pkg.ExecResult{ExecutionID: executionID, Output: output, Redirect: redirect}, nil
 }
 
 func decodeCommand(body string, path pkg.QueryPath) (Command, error) {

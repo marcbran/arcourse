@@ -36,9 +36,21 @@ func Plugin(repo Repo) (*jpoet.Plugin, *Watch) {
 			},
 		},
 		{
+			Name: "execution",
+			Func: func(args []any) (any, error) {
+				return natives.execution(course.ExecutionID(stringArg(args, 0)))
+			},
+		},
+		{
 			Name: "content",
 			Func: func(args []any) (any, error) {
 				return natives.content(course.EvaluationID(stringArg(args, 0)), course.Projection(stringArg(args, 1)))
+			},
+		},
+		{
+			Name: "output",
+			Func: func(args []any) (any, error) {
+				return natives.output(course.ExecutionID(stringArg(args, 0)))
 			},
 		},
 	}

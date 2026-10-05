@@ -76,6 +76,7 @@ func (s *Server) handleBrowseExec(w http.ResponseWriter, r *http.Request) {
 		returnError(w, err)
 		return
 	}
+	setFromCookie(w, pkg.EntryID(result.ExecutionID))
 	http.Redirect(w, r, "/"+strings.TrimPrefix(result.Redirect.String(), "/"), http.StatusSeeOther)
 }
 

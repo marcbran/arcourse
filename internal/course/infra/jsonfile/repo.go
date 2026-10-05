@@ -5,12 +5,36 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/marcbran/arcourse/internal/course"
 )
+
+const (
+	kindEvaluation = "evaluation"
+	kindExecution  = "execution"
+	kindOutcome    = "outcome"
+)
+
+type line struct {
+	Kind            string                                 `json:"kind"`
+	EvaluationID    course.EvaluationID                    `json:"evaluationId,omitempty"`
+	ExecutionID     course.ExecutionID                     `json:"executionId,omitempty"`
+	VisitID         course.VisitID                         `json:"visitId,omitempty"`
+	SessionID       course.SessionID                       `json:"sessionId,omitempty"`
+	Address         course.Address                         `json:"address,omitempty"`
+	From            course.EvaluationID                    `json:"from,omitempty"`
+	FromExecution   course.ExecutionID                     `json:"fromExecution,omitempty"`
+	Implicit        bool                                   `json:"implicit,omitempty"`
+	Timestamp       time.Time                              `json:"timestamp"`
+	ContentIDs      map[course.Projection]course.ContentID `json:"contentIds,omitempty"`
+	OutputContentID course.ContentID                       `json:"outputContentId,omitempty"`
+	Error           string                                 `json:"error,omitempty"`
+}
 
 type CourseRepo struct {
 	dir string
@@ -21,17 +45,245 @@ func NewCourseRepo(dir string) *CourseRepo {
 	return &CourseRepo{dir: dir}
 }
 
-func (r *CourseRepo) Append(ctx context.Context, event course.Event) error {
+func (r *CourseRepo) AppendEvaluation(ctx context.Context, evaluation course.Evaluation) error {
 	err := ctx.Err()
-	if err != nil {
-		return err
-	}
-	line, err := json.Marshal(event)
 	if err != nil {
 		return err
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	return r.appendLine(line{
+		Kind:          kindEvaluation,
+		EvaluationID:  evaluation.EvaluationID,
+		VisitID:       evaluation.VisitID,
+		SessionID:     evaluation.SessionID,
+		Address:       evaluation.Address,
+		From:          evaluation.From.Evaluation,
+		FromExecution: evaluation.From.Execution,
+		Implicit:      evaluation.Implicit,
+		Timestamp:     evaluation.Timestamp,
+		ContentIDs:    evaluation.ContentIDs,
+	})
+}
+
+func (r *CourseRepo) AppendExecution(ctx context.Context, execution course.Execution) error {
+	err := ctx.Err()
+	if err != nil {
+		return err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	log, err := r.load()
+	if err != nil {
+		return err
+	}
+	for _, existing := range log.Executions {
+		if existing.From == execution.From {
+			return fmt.Errorf("%w: %s", course.ErrAlreadyExecuted, execution.From)
+		}
+	}
+	return r.appendLine(line{
+		Kind:        kindExecution,
+		ExecutionID: execution.ExecutionID,
+		From:        execution.From,
+		SessionID:   execution.SessionID,
+		Implicit:    execution.Implicit,
+		Timestamp:   execution.Timestamp,
+	})
+}
+
+func (r *CourseRepo) AppendOutcome(ctx context.Context, executionID course.ExecutionID, outcome course.Outcome) error {
+	err := ctx.Err()
+	if err != nil {
+		return err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.appendLine(line{
+		Kind:            kindOutcome,
+		ExecutionID:     executionID,
+		Timestamp:       outcome.Timestamp,
+		OutputContentID: outcome.OutputID,
+		Error:           outcome.Error,
+	})
+}
+
+func (r *CourseRepo) List(ctx context.Context) (course.Log, error) {
+	return r.read(ctx)
+}
+
+func (r *CourseRepo) Evaluation(ctx context.Context, evaluationID course.EvaluationID) (course.Evaluation, error) {
+	log, err := r.read(ctx)
+	if err != nil {
+		return course.Evaluation{}, err
+	}
+	for i := len(log.Evaluations) - 1; i >= 0; i-- {
+		if log.Evaluations[i].EvaluationID == evaluationID {
+			return log.Evaluations[i], nil
+		}
+	}
+	return course.Evaluation{}, course.ErrEvaluationNotRecorded
+}
+
+func (r *CourseRepo) Execution(ctx context.Context, executionID course.ExecutionID) (course.Execution, error) {
+	log, err := r.read(ctx)
+	if err != nil {
+		return course.Execution{}, err
+	}
+	for _, execution := range log.Executions {
+		if execution.ExecutionID == executionID {
+			return execution, nil
+		}
+	}
+	return course.Execution{}, course.ErrExecutionNotRecorded
+}
+
+func (r *CourseRepo) ListSession(ctx context.Context, sessionID course.SessionID) (course.Log, error) {
+	log, err := r.read(ctx)
+	if err != nil {
+		return course.Log{}, err
+	}
+	var result course.Log
+	for _, evaluation := range log.Evaluations {
+		if evaluation.SessionID == sessionID {
+			result.Evaluations = append(result.Evaluations, evaluation)
+		}
+	}
+	for _, execution := range log.Executions {
+		if execution.SessionID == sessionID {
+			result.Executions = append(result.Executions, execution)
+		}
+	}
+	return result, nil
+}
+
+func (r *CourseRepo) ListVisit(ctx context.Context, visitID course.VisitID) (course.Log, error) {
+	log, err := r.read(ctx)
+	if err != nil {
+		return course.Log{}, err
+	}
+	var result course.Log
+	evaluations := map[course.EvaluationID]bool{}
+	for _, evaluation := range log.Evaluations {
+		if evaluation.VisitID == visitID {
+			result.Evaluations = append(result.Evaluations, evaluation)
+			evaluations[evaluation.EvaluationID] = true
+		}
+	}
+	for _, execution := range log.Executions {
+		if evaluations[execution.From] {
+			result.Executions = append(result.Executions, execution)
+		}
+	}
+	return result, nil
+}
+
+func (r *CourseRepo) LatestAtAddress(ctx context.Context, sessionID course.SessionID, address course.Address) (course.Evaluation, bool, error) {
+	log, err := r.read(ctx)
+	if err != nil {
+		return course.Evaluation{}, false, err
+	}
+	for i := len(log.Evaluations) - 1; i >= 0; i-- {
+		evaluation := log.Evaluations[i]
+		if evaluation.SessionID == sessionID && evaluation.Address == address {
+			return evaluation, true, nil
+		}
+	}
+	return course.Evaluation{}, false, nil
+}
+
+func (r *CourseRepo) LatestImplicitActivity(ctx context.Context) (course.SessionID, time.Time, bool, error) {
+	log, err := r.read(ctx)
+	if err != nil {
+		return "", time.Time{}, false, err
+	}
+	var sessionID course.SessionID
+	var at time.Time
+	found := false
+	observe := func(candidate course.SessionID, timestamp time.Time) {
+		if !found || timestamp.After(at) {
+			sessionID = candidate
+			at = timestamp
+			found = true
+		}
+	}
+	for _, evaluation := range log.Evaluations {
+		if evaluation.Implicit {
+			observe(evaluation.SessionID, evaluation.Timestamp)
+		}
+	}
+	for _, execution := range log.Executions {
+		if execution.Implicit {
+			observe(execution.SessionID, execution.Timestamp)
+		}
+	}
+	return sessionID, at, found, nil
+}
+
+func (r *CourseRepo) read(ctx context.Context) (course.Log, error) {
+	err := ctx.Err()
+	if err != nil {
+		return course.Log{}, err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.load()
+}
+
+func (r *CourseRepo) load() (course.Log, error) {
+	lines, err := r.readLines()
+	if err != nil {
+		return course.Log{}, err
+	}
+	var log course.Log
+	executionIndex := map[course.ExecutionID]int{}
+	for _, raw := range lines {
+		var entry line
+		err = json.Unmarshal(raw, &entry)
+		if err != nil {
+			return course.Log{}, err
+		}
+		switch entry.Kind {
+		case "", kindEvaluation:
+			log.Evaluations = append(log.Evaluations, course.Evaluation{
+				EvaluationID: entry.EvaluationID,
+				VisitID:      entry.VisitID,
+				SessionID:    entry.SessionID,
+				Address:      entry.Address,
+				From:         course.From{Evaluation: entry.From, Execution: entry.FromExecution},
+				Implicit:     entry.Implicit,
+				Timestamp:    entry.Timestamp,
+				ContentIDs:   entry.ContentIDs,
+			})
+		case kindExecution:
+			executionIndex[entry.ExecutionID] = len(log.Executions)
+			log.Executions = append(log.Executions, course.Execution{
+				ExecutionID: entry.ExecutionID,
+				From:        entry.From,
+				SessionID:   entry.SessionID,
+				Implicit:    entry.Implicit,
+				Timestamp:   entry.Timestamp,
+			})
+		case kindOutcome:
+			i, ok := executionIndex[entry.ExecutionID]
+			if !ok {
+				continue
+			}
+			log.Executions[i].Outcome = &course.Outcome{
+				Timestamp: entry.Timestamp,
+				OutputID:  entry.OutputContentID,
+				Error:     entry.Error,
+			}
+		}
+	}
+	return log, nil
+}
+
+func (r *CourseRepo) appendLine(entry line) error {
+	encoded, err := json.Marshal(entry)
+	if err != nil {
+		return err
+	}
 	err = os.MkdirAll(r.dir, 0o755)
 	if err != nil {
 		return err
@@ -43,108 +295,11 @@ func (r *CourseRepo) Append(ctx context.Context, event course.Event) error {
 	defer func() {
 		_ = file.Close()
 	}()
-	_, err = file.Write(append(line, '\n'))
+	_, err = file.Write(append(encoded, '\n'))
 	return err
 }
 
-func (r *CourseRepo) List(ctx context.Context) ([]course.Event, error) {
-	lines, err := r.readLines(ctx)
-	if err != nil {
-		return nil, err
-	}
-	events := make([]course.Event, 0, len(lines))
-	for _, line := range lines {
-		var event course.Event
-		err = json.Unmarshal(line, &event)
-		if err != nil {
-			return nil, err
-		}
-		events = append(events, event)
-	}
-	return events, nil
-}
-
-func (r *CourseRepo) Get(ctx context.Context, evaluationID course.EvaluationID) (course.Event, error) {
-	event, found, err := r.findLast(ctx, func(candidate course.Event) bool {
-		return candidate.EvaluationID == evaluationID
-	})
-	if err != nil {
-		return course.Event{}, err
-	}
-	if !found {
-		return course.Event{}, course.ErrEvaluationNotRecorded
-	}
-	return event, nil
-}
-
-func (r *CourseRepo) ListSession(ctx context.Context, sessionID course.SessionID) ([]course.Event, error) {
-	return r.filter(ctx, func(candidate course.Event) bool {
-		return candidate.SessionID == sessionID
-	})
-}
-
-func (r *CourseRepo) ListVisit(ctx context.Context, visitID course.VisitID) ([]course.Event, error) {
-	return r.filter(ctx, func(candidate course.Event) bool {
-		return candidate.VisitID == visitID
-	})
-}
-
-func (r *CourseRepo) LatestAtAddress(ctx context.Context, sessionID course.SessionID, address course.Address) (course.Event, bool, error) {
-	return r.findLast(ctx, func(candidate course.Event) bool {
-		return candidate.SessionID == sessionID && candidate.Address == address
-	})
-}
-
-func (r *CourseRepo) LatestImplicitSession(ctx context.Context) (course.Event, bool, error) {
-	return r.findLast(ctx, func(candidate course.Event) bool {
-		return candidate.Implicit
-	})
-}
-
-func (r *CourseRepo) filter(ctx context.Context, match func(course.Event) bool) ([]course.Event, error) {
-	lines, err := r.readLines(ctx)
-	if err != nil {
-		return nil, err
-	}
-	var events []course.Event
-	for _, line := range lines {
-		var event course.Event
-		err = json.Unmarshal(line, &event)
-		if err != nil {
-			return nil, err
-		}
-		if match(event) {
-			events = append(events, event)
-		}
-	}
-	return events, nil
-}
-
-func (r *CourseRepo) findLast(ctx context.Context, match func(course.Event) bool) (course.Event, bool, error) {
-	lines, err := r.readLines(ctx)
-	if err != nil {
-		return course.Event{}, false, err
-	}
-	for i := len(lines) - 1; i >= 0; i-- {
-		var event course.Event
-		err = json.Unmarshal(lines[i], &event)
-		if err != nil {
-			return course.Event{}, false, err
-		}
-		if match(event) {
-			return event, true, nil
-		}
-	}
-	return course.Event{}, false, nil
-}
-
-func (r *CourseRepo) readLines(ctx context.Context) ([][]byte, error) {
-	err := ctx.Err()
-	if err != nil {
-		return nil, err
-	}
-	r.mu.Lock()
-	defer r.mu.Unlock()
+func (r *CourseRepo) readLines() ([][]byte, error) {
 	file, err := os.Open(r.eventsPath())
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -159,11 +314,11 @@ func (r *CourseRepo) readLines(ctx context.Context) ([][]byte, error) {
 	scanner := bufio.NewScanner(file)
 	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
 	for scanner.Scan() {
-		line := scanner.Bytes()
-		if len(line) == 0 {
+		raw := scanner.Bytes()
+		if len(raw) == 0 {
 			continue
 		}
-		lines = append(lines, append([]byte(nil), line...))
+		lines = append(lines, append([]byte(nil), raw...))
 	}
 	err = scanner.Err()
 	if err != nil {

@@ -29,6 +29,10 @@ func returnError(w http.ResponseWriter, err error) {
 		returnNotFound(w, err)
 		return
 	}
+	if errors.Is(err, pkg.ErrAlreadyExecuted) {
+		returnConflict(w, err)
+		return
+	}
 	returnInternalServerError(w, err)
 }
 
@@ -43,6 +47,13 @@ func returnNotFound(w http.ResponseWriter, err error) {
 	slog.Warn("not found", "err", err)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusNotFound)
+	returnJSON(w, ErrorResponse{Message: err.Error()})
+}
+
+func returnConflict(w http.ResponseWriter, err error) {
+	slog.Warn("conflict", "err", err)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusConflict)
 	returnJSON(w, ErrorResponse{Message: err.Error()})
 }
 

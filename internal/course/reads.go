@@ -14,36 +14,39 @@ type SessionSummary struct {
 }
 
 type Session struct {
-	ID        SessionID
-	FirstSeen time.Time
-	LastSeen  time.Time
-	Visits    []VisitSummary
-	Edges     []SessionEdge
+	ID         SessionID
+	FirstSeen  time.Time
+	LastSeen   time.Time
+	Visits     []VisitSummary
+	Executions []ExecutionSummary
+}
+
+type Parent struct {
+	Visit     VisitID
+	Execution ExecutionID
 }
 
 type VisitSummary struct {
 	VisitID   VisitID
 	Address   Address
 	Timestamp time.Time
+	Parent    Parent
 }
 
-type SessionEdge struct {
-	From VisitID
-	To   VisitID
+type ExecutionSummary struct {
+	ExecutionID ExecutionID
+	Visit       VisitID
+	Timestamp   time.Time
+	Status      ExecutionStatus
 }
 
 type Visit struct {
 	VisitID     VisitID
 	SessionID   SessionID
 	Address     Address
-	From        EvaluationID
+	From        From
 	Evaluations []Evaluation
-}
-
-type Evaluation struct {
-	EvaluationID EvaluationID
-	Timestamp    time.Time
-	ContentIDs   map[Projection]ContentID
+	Executions  []Execution
 }
 
 type ListSessions struct {
@@ -55,23 +58,35 @@ func NewListSessions(repo Repo) *ListSessions {
 }
 
 func (uc *ListSessions) Exec(ctx context.Context) ([]SessionSummary, error) {
-	events, err := uc.repo.List(ctx)
+	log, err := uc.repo.List(ctx)
 	if err != nil {
 		return nil, err
 	}
 	index := map[SessionID]int{}
 	visits := map[SessionID]map[VisitID]bool{}
 	sessions := make([]SessionSummary, 0)
-	for _, event := range events {
-		at, ok := index[event.SessionID]
+	seen := func(sessionID SessionID, at time.Time) int {
+		i, ok := index[sessionID]
 		if !ok {
-			at = len(sessions)
-			index[event.SessionID] = at
-			visits[event.SessionID] = map[VisitID]bool{}
-			sessions = append(sessions, SessionSummary{ID: event.SessionID, FirstSeen: event.Timestamp})
+			i = len(sessions)
+			index[sessionID] = i
+			visits[sessionID] = map[VisitID]bool{}
+			sessions = append(sessions, SessionSummary{ID: sessionID, FirstSeen: at, LastSeen: at})
 		}
-		sessions[at].LastSeen = event.Timestamp
-		visits[event.SessionID][event.VisitID] = true
+		if at.Before(sessions[i].FirstSeen) {
+			sessions[i].FirstSeen = at
+		}
+		if at.After(sessions[i].LastSeen) {
+			sessions[i].LastSeen = at
+		}
+		return i
+	}
+	for _, evaluation := range log.Evaluations {
+		seen(evaluation.SessionID, evaluation.Timestamp)
+		visits[evaluation.SessionID][evaluation.VisitID] = true
+	}
+	for _, execution := range log.Executions {
+		seen(execution.SessionID, execution.Timestamp)
 	}
 	for i := range sessions {
 		sessions[i].Visits = len(visits[sessions[i].ID])
@@ -88,39 +103,51 @@ func NewGetSession(repo Repo) *GetSession {
 }
 
 func (uc *GetSession) Exec(ctx context.Context, sessionID SessionID) (Session, error) {
-	events, err := uc.repo.ListSession(ctx, sessionID)
+	log, err := uc.repo.ListSession(ctx, sessionID)
 	if err != nil {
 		return Session{}, err
 	}
-	result := Session{ID: sessionID, Visits: []VisitSummary{}, Edges: []SessionEdge{}}
-	seen := map[VisitID]bool{}
-	visitOfEvaluation := map[EvaluationID]VisitID{}
-	type pending struct {
-		from EvaluationID
-		to   VisitID
-	}
-	var edges []pending
-	for _, event := range events {
-		visitOfEvaluation[event.EvaluationID] = event.VisitID
-		if result.FirstSeen.IsZero() {
-			result.FirstSeen = event.Timestamp
+	result := Session{ID: sessionID, Visits: []VisitSummary{}, Executions: []ExecutionSummary{}}
+	observe := func(at time.Time) {
+		if result.FirstSeen.IsZero() || at.Before(result.FirstSeen) {
+			result.FirstSeen = at
 		}
-		result.LastSeen = event.Timestamp
-		if seen[event.VisitID] {
+		if at.After(result.LastSeen) {
+			result.LastSeen = at
+		}
+	}
+	visitOfEvaluation := map[EvaluationID]VisitID{}
+	for _, evaluation := range log.Evaluations {
+		visitOfEvaluation[evaluation.EvaluationID] = evaluation.VisitID
+	}
+	executions := map[ExecutionID]bool{}
+	for _, execution := range log.Executions {
+		observe(execution.Timestamp)
+		executions[execution.ExecutionID] = true
+		result.Executions = append(result.Executions, ExecutionSummary{
+			ExecutionID: execution.ExecutionID,
+			Visit:       visitOfEvaluation[execution.From],
+			Timestamp:   execution.Timestamp,
+			Status:      execution.Status(),
+		})
+	}
+	seen := map[VisitID]bool{}
+	for _, evaluation := range log.Evaluations {
+		observe(evaluation.Timestamp)
+		if seen[evaluation.VisitID] {
 			continue
 		}
-		seen[event.VisitID] = true
-		result.Visits = append(result.Visits, VisitSummary{
-			VisitID:   event.VisitID,
-			Address:   event.Address,
-			Timestamp: event.Timestamp,
-		})
-		if event.From != "" {
-			edges = append(edges, pending{from: event.From, to: event.VisitID})
+		seen[evaluation.VisitID] = true
+		parent := Parent{Visit: visitOfEvaluation[evaluation.From.Evaluation]}
+		if executions[evaluation.From.Execution] {
+			parent = Parent{Execution: evaluation.From.Execution}
 		}
-	}
-	for _, edge := range edges {
-		result.Edges = append(result.Edges, SessionEdge{From: visitOfEvaluation[edge.from], To: edge.to})
+		result.Visits = append(result.Visits, VisitSummary{
+			VisitID:   evaluation.VisitID,
+			Address:   evaluation.Address,
+			Timestamp: evaluation.Timestamp,
+			Parent:    parent,
+		})
 	}
 	return result, nil
 }
@@ -134,27 +161,20 @@ func NewGetVisit(repo Repo) *GetVisit {
 }
 
 func (uc *GetVisit) Exec(ctx context.Context, visitID VisitID) (Visit, error) {
-	events, err := uc.repo.ListVisit(ctx, visitID)
+	log, err := uc.repo.ListVisit(ctx, visitID)
 	if err != nil {
 		return Visit{}, err
 	}
-	if len(events) == 0 {
+	if len(log.Evaluations) == 0 {
 		return Visit{}, fmt.Errorf("%w: %s", ErrVisitNotRecorded, visitID)
 	}
-	head := events[0]
-	visit := Visit{
+	head := log.Evaluations[0]
+	return Visit{
 		VisitID:     head.VisitID,
 		SessionID:   head.SessionID,
 		Address:     head.Address,
 		From:        head.From,
-		Evaluations: make([]Evaluation, 0, len(events)),
-	}
-	for _, event := range events {
-		visit.Evaluations = append(visit.Evaluations, Evaluation{
-			EvaluationID: event.EvaluationID,
-			Timestamp:    event.Timestamp,
-			ContentIDs:   event.ContentIDs,
-		})
-	}
-	return visit, nil
+		Evaluations: log.Evaluations,
+		Executions:  log.Executions,
+	}, nil
 }
