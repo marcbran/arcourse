@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.19.0](https://github.com/marcbran/arcourse/compare/v0.18.0...v0.19.0) (2026-10-06)
+
+
+### Features
+
+* actions ([#131](https://github.com/marcbran/arcourse/issues/131)) ([28bdf53](https://github.com/marcbran/arcourse/commit/28bdf5392eabf73e1c4878664e32311e10c97bb6))
+* course history ([#132](https://github.com/marcbran/arcourse/issues/132)) ([060b144](https://github.com/marcbran/arcourse/commit/060b1449ae1363005fa96c067e07fedd4349f9ca))
+* logs view columns ([#128](https://github.com/marcbran/arcourse/issues/128)) ([4dfe963](https://github.com/marcbran/arcourse/commit/4dfe963e466b341bdca6ee7b9e47e999febf4f97))
+* record executions and remarks in the course history ([#134](https://github.com/marcbran/arcourse/issues/134)) ([c5752a3](https://github.com/marcbran/arcourse/commit/c5752a368230a7bb9004c9a0611a937ba82fe4a3))
+* record query id for each query ([#130](https://github.com/marcbran/arcourse/issues/130)) ([2268135](https://github.com/marcbran/arcourse/commit/2268135ea4edb4ebb41633d0fc65fb13c67b75e5))
+* single log record view ([#127](https://github.com/marcbran/arcourse/issues/127)) ([64f781f](https://github.com/marcbran/arcourse/commit/64f781ff9baaf12ce3e2ed60eebc0dc9beea76bf))
+
+
+### Bug Fixes
+
+* chart.js import ([#125](https://github.com/marcbran/arcourse/issues/125)) ([80746dd](https://github.com/marcbran/arcourse/commit/80746ddd940948d981de1cd1da0aec60c68cf9b8))
+* deduplicate telemetry log link ([#126](https://github.com/marcbran/arcourse/issues/126)) ([3068fc0](https://github.com/marcbran/arcourse/commit/3068fc048f283f9c7c2c5c9ca15d45b4cc066568))
+* import in telemetry-kubernetes ([#124](https://github.com/marcbran/arcourse/issues/124)) ([1dfd000](https://github.com/marcbran/arcourse/commit/1dfd000ae1a254676660d9f3eca4259ebc488a4e))
+* mismatching keys on different formats ([#129](https://github.com/marcbran/arcourse/issues/129)) ([d5b2145](https://github.com/marcbran/arcourse/commit/d5b2145fc9991c430e03429d575c0a7b571539f3))
+* use injection for telemetry-kubernetes ([#122](https://github.com/marcbran/arcourse/issues/122)) ([b54e2cd](https://github.com/marcbran/arcourse/commit/b54e2cdff063cf6307d6aae4d381998af949f370))
+
 ## [0.18.0](https://github.com/marcbran/arcourse/compare/v0.17.0...v0.18.0) (2026-09-20)
 
 
