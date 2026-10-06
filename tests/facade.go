@@ -151,6 +151,14 @@ func (f *ServerBackedCLIFacade) Exec(ctx context.Context, id pkg.EvaluationID) (
 	return f.client.Exec(ctx, id)
 }
 
+func (f *ServerBackedCLIFacade) Remark(ctx context.Context, id pkg.EvaluationID, text string) (pkg.RemarkID, error) {
+	err := f.start()
+	if err != nil {
+		return "", err
+	}
+	return f.client.Remark(ctx, id, text)
+}
+
 func (f *ServerBackedCLIFacade) Compile(ctx context.Context) (pkg.Result, error) {
 	err := f.start()
 	if err != nil {
@@ -379,8 +387,14 @@ func (f *CLIFacade) Watch(ctx context.Context, path pkg.QueryPath, params map[st
 	return ch, cancel, nil
 }
 
+type execOutput struct {
+	ExecutionID string `json:"executionId"`
+	Output      string `json:"output"`
+	Redirect    string `json:"redirect"`
+}
+
 func (f *CLIFacade) Exec(ctx context.Context, id pkg.EvaluationID) (pkg.ExecResult, error) {
-	cmd := exec.CommandContext(ctx, f.binaryPath, "exec", string(id))
+	cmd := exec.CommandContext(ctx, f.binaryPath, "exec", string(id), "--format", "json")
 	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
 
 	var stdout bytes.Buffer
@@ -395,7 +409,35 @@ func (f *CLIFacade) Exec(ctx context.Context, id pkg.EvaluationID) (pkg.ExecResu
 		}
 		return pkg.ExecResult{}, err
 	}
-	return pkg.ExecResult{Output: strings.TrimSuffix(stdout.String(), "\n")}, nil
+	var output execOutput
+	err = json.Unmarshal(stdout.Bytes(), &output)
+	if err != nil {
+		return pkg.ExecResult{}, err
+	}
+	return pkg.ExecResult{
+		ExecutionID: pkg.ExecutionID(output.ExecutionID),
+		Output:      output.Output,
+		Redirect:    pkg.NewQueryPath(output.Redirect),
+	}, nil
+}
+
+func (f *CLIFacade) Remark(ctx context.Context, id pkg.EvaluationID, text string) (pkg.RemarkID, error) {
+	cmd := exec.CommandContext(ctx, f.binaryPath, "remark", string(id), text)
+	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		if stderr.String() != "" {
+			return "", errors.New(stderr.String())
+		}
+		return "", err
+	}
+	return pkg.RemarkID(strings.TrimSuffix(stdout.String(), "\n")), nil
 }
 
 func (f *CLIFacade) Compile(ctx context.Context) (pkg.Result, error) {

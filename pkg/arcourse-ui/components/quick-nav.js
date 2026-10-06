@@ -144,6 +144,7 @@
         document.addEventListener('keydown', function (e) {
           if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
           var el = document.activeElement;
+          while (el && el.shadowRoot && el.shadowRoot.activeElement) el = el.shadowRoot.activeElement;
           var tag = el && el.tagName;
           if (tag === 'INPUT' || tag === 'TEXTAREA' || (el && el.isContentEditable)) return;
           var nav = document.querySelector('quick-nav');

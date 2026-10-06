@@ -51,5 +51,5 @@ func (c *Client) Query(ctx context.Context, path pkg.QueryPath, params map[strin
 	if err != nil {
 		return pkg.Result{}, err
 	}
-	return pkg.Result{Output: out.Output}, nil
+	return pkg.Result{Output: out.Output, EvaluationID: pkg.EvaluationID(out.EvaluationID)}, nil
 }

@@ -11,7 +11,7 @@ const sessionEnvVar = "ARCOURSE_SESSION"
 
 func addOriginFlags(cmd *cobra.Command) {
 	cmd.Flags().String("session", "", "Record this query into the named session")
-	cmd.Flags().String("from", "", "Query id of the response this path was read from")
+	cmd.Flags().String("from", "", "Evaluation or execution id this path was reached from")
 	cmd.Flags().String("from-path", "", "Path of the node this path was read from, when no query id is known")
 }
 
@@ -31,5 +31,5 @@ func originFrom(cmd *cobra.Command) (pkg.Origin, error) {
 	if err != nil {
 		return pkg.Origin{}, err
 	}
-	return pkg.Origin{Session: pkg.SessionID(session), From: pkg.EvaluationID(from), FromPath: pkg.NewQueryPath(fromPath)}, nil
+	return pkg.Origin{Session: pkg.SessionID(session), From: pkg.EntryID(from), FromPath: pkg.NewQueryPath(fromPath)}, nil
 }

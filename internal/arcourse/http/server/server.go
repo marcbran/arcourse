@@ -90,9 +90,11 @@ func NewServer(ctx context.Context, facade pkg.Facade) *Server {
 	s.mux.HandleFunc("POST /api/evaluate", s.handleEvaluate)
 	s.mux.HandleFunc("POST /api/query", s.handleQuery)
 	s.mux.HandleFunc("POST /api/exec/{id}", s.handleExec)
+	s.mux.HandleFunc("POST /api/remark/{id}", s.handleRemark)
 	s.mux.HandleFunc("GET /api/watch", s.handleWatch)
 	s.mux.HandleFunc("GET /watch", s.handleBrowseWatch)
 	s.mux.HandleFunc("POST /exec", s.handleBrowseExec)
+	s.mux.HandleFunc("GET "+quickRemarkPath, s.handleQuickRemarkScript)
 	s.mux.HandleFunc("GET /{path...}", s.handleBrowse)
 	return s
 }

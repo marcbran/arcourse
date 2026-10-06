@@ -2,9 +2,11 @@ package server
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -17,12 +19,24 @@ import (
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 )
 
+//go:embed quick-remark.js
+var quickRemarkScript []byte
+
+const quickRemarkPath = "/assets/quick-remark.js"
+
 const browseTemplate = `<div id="node">%s</div>
-<script>
+%s<script>
   new EventSource(%s).onmessage = e => {
-    document.getElementById('node').innerHTML = JSON.parse(e.data).output;
+    const message = JSON.parse(e.data);
+    document.getElementById('node').innerHTML = message.output;
+    const remark = document.querySelector('quick-remark');
+    if (remark && message.evaluationId) remark.setAttribute('from', message.evaluationId);
   };
 </script>
+`
+
+const quickRemarkTemplate = `<quick-remark from="%s"></quick-remark>
+<script src="%s"></script>
 `
 
 func (s *Server) handleBrowse(w http.ResponseWriter, r *http.Request) {
@@ -54,7 +68,7 @@ func (s *Server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 	watchURL := browseWatchURL(token)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	_, err = fmt.Fprintf(w, browseTemplate, result.Output, watchURL)
+	_, err = fmt.Fprintf(w, browseTemplate, result.Output, browseRemark(result.EvaluationID), watchURL)
 	if err != nil {
 		slog.Warn("write browse response", "err", err)
 	}
@@ -76,7 +90,24 @@ func (s *Server) handleBrowseExec(w http.ResponseWriter, r *http.Request) {
 		returnError(w, err)
 		return
 	}
+	setFromCookie(w, pkg.EntryID(result.ExecutionID))
 	http.Redirect(w, r, "/"+strings.TrimPrefix(result.Redirect.String(), "/"), http.StatusSeeOther)
+}
+
+func browseRemark(evaluationID pkg.EvaluationID) string {
+	if evaluationID == "" {
+		return ""
+	}
+	return fmt.Sprintf(quickRemarkTemplate, html.EscapeString(string(evaluationID)), quickRemarkPath)
+}
+
+func (s *Server) handleQuickRemarkScript(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, err := w.Write(quickRemarkScript)
+	if err != nil {
+		slog.Warn("write quick remark script", "err", err)
+	}
 }
 
 func browseWatchURL(token string) []byte {

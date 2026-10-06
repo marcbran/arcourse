@@ -14,6 +14,7 @@ type Config struct {
 type facade struct {
 	evaluate    *evaluate
 	exec        *exec
+	remark      *remark
 	query       *query
 	watch       *watch
 	compile     *compile
@@ -30,10 +31,12 @@ func NewFacade(cfg Config, evaluator Evaluator, executor Executor, courseFacade 
 	watch := newWatch(environment, courseFacade)
 	warm := newWarm(environment)
 	exec := newExec(courseFacade, environment)
+	remark := newRemark(courseFacade)
 
 	return &facade{
 		evaluate:    evaluate,
 		exec:        exec,
+		remark:      remark,
 		query:       query,
 		watch:       watch,
 		compile:     compile,
@@ -58,6 +61,10 @@ func (f *facade) Exec(ctx context.Context, id pkg.EvaluationID) (pkg.ExecResult,
 	return f.exec.Exec(ctx, id)
 }
 
+func (f *facade) Remark(ctx context.Context, id pkg.EvaluationID, text string) (pkg.RemarkID, error) {
+	return f.remark.Exec(ctx, id, text)
+}
+
 func (f *facade) Compile(ctx context.Context) (pkg.Result, error) {
 	return f.compile.Exec(ctx)
 }
@@ -73,7 +80,7 @@ func (f *facade) Close() error {
 func courseOrigin(origin pkg.Origin) course.Origin {
 	return course.Origin{
 		SessionID:   course.SessionID(origin.Session),
-		From:        course.EvaluationID(origin.From),
+		From:        course.EntryID(origin.From),
 		FromAddress: course.Address(pkg.NewQueryPath(origin.FromPath.String())),
 	}
 }

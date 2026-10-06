@@ -24,6 +24,7 @@ type Stage struct {
 	watchUnsubscribe func()
 
 	evaluationID pkg.EvaluationID
+	executionID  string
 	origin       pkg.Origin
 
 	LastOutput string

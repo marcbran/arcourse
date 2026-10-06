@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,7 +16,11 @@ const implicitSessionIdleGap = 30 * time.Minute
 var (
 	ErrVisitNotRecorded      = errors.New("visit not recorded")
 	ErrEvaluationNotRecorded = errors.New("evaluation not recorded")
+	ErrExecutionNotRecorded  = errors.New("execution not recorded")
 	ErrContentNotRecorded    = errors.New("evaluation has no content recorded")
+	ErrOutputNotRecorded     = errors.New("execution has no output recorded")
+	ErrAlreadyExecuted       = errors.New("evaluation already executed")
+	ErrEmptyRemark           = errors.New("remark text is empty")
 )
 
 type SessionID string
@@ -23,6 +28,12 @@ type SessionID string
 type VisitID string
 
 type EvaluationID string
+
+type ExecutionID string
+
+type RemarkID string
+
+type EntryID string
 
 type ContentID string
 
@@ -36,40 +47,108 @@ func (a Address) String() string {
 
 type Origin struct {
 	SessionID   SessionID
-	From        EvaluationID
+	From        EntryID
 	FromAddress Address
 }
 
-type Event struct {
-	EvaluationID EvaluationID             `json:"evaluationId"`
-	VisitID      VisitID                  `json:"visitId"`
-	SessionID    SessionID                `json:"sessionId"`
-	Address      Address                  `json:"address"`
-	From         EvaluationID             `json:"from,omitempty"`
-	Implicit     bool                     `json:"implicit,omitempty"`
-	Timestamp    time.Time                `json:"timestamp"`
-	ContentIDs   map[Projection]ContentID `json:"contentIds,omitempty"`
+type From struct {
+	Evaluation EvaluationID
+	Execution  ExecutionID
+}
+
+func (f From) IsZero() bool {
+	return f.Evaluation == "" && f.Execution == ""
+}
+
+type Evaluation struct {
+	EvaluationID EvaluationID
+	VisitID      VisitID
+	SessionID    SessionID
+	Address      Address
+	From         From
+	Implicit     bool
+	Timestamp    time.Time
+	ContentIDs   map[Projection]ContentID
+}
+
+type ExecutionStatus string
+
+const (
+	ExecutionUnknown   ExecutionStatus = "unknown"
+	ExecutionSucceeded ExecutionStatus = "succeeded"
+	ExecutionFailed    ExecutionStatus = "failed"
+)
+
+type Execution struct {
+	ExecutionID ExecutionID
+	From        EvaluationID
+	SessionID   SessionID
+	Implicit    bool
+	Timestamp   time.Time
+	Outcome     *Outcome
+}
+
+func (e Execution) Status() ExecutionStatus {
+	if e.Outcome == nil {
+		return ExecutionUnknown
+	}
+	if e.Outcome.Error != "" {
+		return ExecutionFailed
+	}
+	return ExecutionSucceeded
+}
+
+type Outcome struct {
+	Timestamp time.Time
+	OutputID  ContentID
+	Error     string
+}
+
+type Remark struct {
+	RemarkID  RemarkID
+	From      EvaluationID
+	SessionID SessionID
+	Implicit  bool
+	Timestamp time.Time
+	Text      string
+}
+
+type Log struct {
+	Evaluations []Evaluation
+	Executions  []Execution
+	Remarks     []Remark
 }
 
 type VisitRef struct {
-	VisitID    VisitID
-	SessionID  SessionID
-	Implicit   bool
-	ContentIDs map[Projection]ContentID
+	VisitID      VisitID
+	SessionID    SessionID
+	Implicit     bool
+	EvaluationID EvaluationID
+	ContentIDs   map[Projection]ContentID
+}
+
+type Change struct {
+	SessionID   SessionID
+	VisitID     VisitID
+	ExecutionID ExecutionID
 }
 
 type Repo interface {
-	Append(ctx context.Context, event Event) error
-	List(ctx context.Context) ([]Event, error)
-	Get(ctx context.Context, evaluationID EvaluationID) (Event, error)
-	ListSession(ctx context.Context, sessionID SessionID) ([]Event, error)
-	ListVisit(ctx context.Context, visitID VisitID) ([]Event, error)
-	LatestAtAddress(ctx context.Context, sessionID SessionID, address Address) (Event, bool, error)
-	LatestImplicitSession(ctx context.Context) (Event, bool, error)
+	AppendEvaluation(ctx context.Context, evaluation Evaluation) error
+	AppendExecution(ctx context.Context, execution Execution) error
+	AppendOutcome(ctx context.Context, executionID ExecutionID, outcome Outcome) error
+	AppendRemark(ctx context.Context, remark Remark) error
+	List(ctx context.Context) (Log, error)
+	Evaluation(ctx context.Context, evaluationID EvaluationID) (Evaluation, error)
+	Execution(ctx context.Context, executionID ExecutionID) (Execution, error)
+	ListSession(ctx context.Context, sessionID SessionID) (Log, error)
+	ListVisit(ctx context.Context, visitID VisitID) (Log, error)
+	LatestAtAddress(ctx context.Context, sessionID SessionID, address Address) (Evaluation, bool, error)
+	LatestImplicitActivity(ctx context.Context) (SessionID, time.Time, bool, error)
 }
 
 type Observer interface {
-	Appended(event Event)
+	Changed(change Change)
 }
 
 type BlobStore interface {
@@ -83,51 +162,38 @@ type recordVisit struct {
 	observer Observer
 }
 
-func newRecordVisit(repo Repo, blobs BlobStore, observer Observer) *recordVisit {
-	return &recordVisit{repo: repo, blobs: blobs, observer: observer}
+func newRecordVisit(repo Repo, blobs BlobStore) *recordVisit {
+	return &recordVisit{repo: repo, blobs: blobs}
 }
 
 func (uc *recordVisit) Exec(ctx context.Context, ref VisitRef, evaluationID EvaluationID, address Address, contents map[Projection]string, origin Origin) VisitRef {
-	event := Event{EvaluationID: evaluationID, Address: address, Timestamp: time.Now()}
+	evaluation := Evaluation{EvaluationID: evaluationID, Address: address, Timestamp: time.Now()}
 	first := ref.VisitID == ""
 	if first {
 		sessionID, from, implicit := uc.resolveOrigin(ctx, origin)
 		ref = VisitRef{VisitID: VisitID(uuid.Must(uuid.NewV7()).String()), SessionID: sessionID, Implicit: implicit}
-		event.From = from
+		evaluation.From = from
 	}
-	event.VisitID = ref.VisitID
-	event.SessionID = ref.SessionID
-	event.Implicit = ref.Implicit
-	event.ContentIDs = uc.put(ctx, contents, address)
-	if !first && sameContentIDs(event.ContentIDs, ref.ContentIDs) {
+	evaluation.VisitID = ref.VisitID
+	evaluation.SessionID = ref.SessionID
+	evaluation.Implicit = ref.Implicit
+	evaluation.ContentIDs = uc.put(ctx, contents, address)
+	if !first && sameContentIDs(evaluation.ContentIDs, ref.ContentIDs) {
 		return ref
 	}
-	ref.ContentIDs = event.ContentIDs
-	err := uc.repo.Append(ctx, event)
+	err := uc.repo.AppendEvaluation(ctx, evaluation)
 	if err != nil {
-		slog.Warn("append course event", "err", err, "address", address)
+		slog.Warn("append course evaluation", "err", err, "address", address)
 		return ref
 	}
-	if uc.observer != nil {
-		uc.observer.Appended(event)
-	}
+	ref.ContentIDs = evaluation.ContentIDs
+	ref.EvaluationID = evaluation.EvaluationID
+	notify(uc.observer, Change{SessionID: evaluation.SessionID, VisitID: evaluation.VisitID})
 	return ref
 }
 
-func (uc *recordVisit) resolveOrigin(ctx context.Context, origin Origin) (SessionID, EvaluationID, bool) {
-	from := origin.From
-	fromSession := SessionID("")
-	fromImplicit := false
-	if from != "" {
-		event, err := uc.repo.Get(ctx, from)
-		if err != nil {
-			slog.Warn("from names no recorded evaluation", "from", from)
-			from = ""
-		} else {
-			fromSession = event.SessionID
-			fromImplicit = event.Implicit
-		}
-	}
+func (uc *recordVisit) resolveOrigin(ctx context.Context, origin Origin) (SessionID, From, bool) {
+	from, fromSession, fromImplicit := uc.resolveFrom(ctx, origin.From)
 	sessionID := origin.SessionID
 	implicit := false
 	if sessionID == "" {
@@ -138,24 +204,40 @@ func (uc *recordVisit) resolveOrigin(ctx context.Context, origin Origin) (Sessio
 		sessionID = uc.implicitSession(ctx)
 		implicit = true
 	}
-	if from == "" && origin.FromAddress != "" {
-		from = uc.resolveFromAddress(ctx, sessionID, origin.FromAddress)
+	if from.IsZero() && origin.FromAddress != "" {
+		from = From{Evaluation: uc.resolveFromAddress(ctx, sessionID, origin.FromAddress)}
 	}
 	return sessionID, from, implicit
 }
 
+func (uc *recordVisit) resolveFrom(ctx context.Context, id EntryID) (From, SessionID, bool) {
+	if id == "" {
+		return From{}, "", false
+	}
+	evaluation, err := uc.repo.Evaluation(ctx, EvaluationID(id))
+	if err == nil {
+		return From{Evaluation: evaluation.EvaluationID}, evaluation.SessionID, evaluation.Implicit
+	}
+	execution, err := uc.repo.Execution(ctx, ExecutionID(id))
+	if err == nil {
+		return From{Execution: execution.ExecutionID}, execution.SessionID, execution.Implicit
+	}
+	slog.Warn("from names no recorded evaluation or execution", "from", id)
+	return From{}, "", false
+}
+
 func (uc *recordVisit) resolveFromAddress(ctx context.Context, sessionID SessionID, address Address) EvaluationID {
-	event, found, err := uc.repo.LatestAtAddress(ctx, sessionID, address)
+	evaluation, found, err := uc.repo.LatestAtAddress(ctx, sessionID, address)
 	if err != nil || !found {
 		return ""
 	}
-	return event.EvaluationID
+	return evaluation.EvaluationID
 }
 
 func (uc *recordVisit) implicitSession(ctx context.Context) SessionID {
-	event, found, err := uc.repo.LatestImplicitSession(ctx)
-	if err == nil && found && time.Since(event.Timestamp) < implicitSessionIdleGap {
-		return event.SessionID
+	sessionID, at, found, err := uc.repo.LatestImplicitActivity(ctx)
+	if err == nil && found && time.Since(at) < implicitSessionIdleGap {
+		return sessionID
 	}
 	return SessionID(uuid.Must(uuid.NewV7()).String())
 }
@@ -185,6 +267,106 @@ func sameContentIDs(left map[Projection]ContentID, right map[Projection]ContentI
 	return true
 }
 
+type startExecution struct {
+	repo     Repo
+	observer Observer
+}
+
+func newStartExecution(repo Repo) *startExecution {
+	return &startExecution{repo: repo}
+}
+
+func (uc *startExecution) Exec(ctx context.Context, from Evaluation) (Execution, error) {
+	execution := Execution{
+		ExecutionID: ExecutionID(uuid.Must(uuid.NewV7()).String()),
+		From:        from.EvaluationID,
+		SessionID:   from.SessionID,
+		Implicit:    from.Implicit,
+		Timestamp:   time.Now(),
+	}
+	err := uc.repo.AppendExecution(ctx, execution)
+	if err != nil {
+		return Execution{}, err
+	}
+	notify(uc.observer, Change{SessionID: execution.SessionID, VisitID: from.VisitID, ExecutionID: execution.ExecutionID})
+	return execution, nil
+}
+
+type finishExecution struct {
+	repo     Repo
+	blobs    BlobStore
+	observer Observer
+}
+
+func newFinishExecution(repo Repo, blobs BlobStore) *finishExecution {
+	return &finishExecution{repo: repo, blobs: blobs}
+}
+
+func (uc *finishExecution) Exec(ctx context.Context, execution Execution, output string, failure error) error {
+	outcome := Outcome{Timestamp: time.Now()}
+	if output != "" {
+		id, err := uc.blobs.Put(ctx, output)
+		if err != nil {
+			return err
+		}
+		outcome.OutputID = id
+	}
+	if failure != nil {
+		outcome.Error = failure.Error()
+	}
+	err := uc.repo.AppendOutcome(ctx, execution.ExecutionID, outcome)
+	if err != nil {
+		return err
+	}
+	change := Change{SessionID: execution.SessionID, ExecutionID: execution.ExecutionID}
+	from, err := uc.repo.Evaluation(ctx, execution.From)
+	if err == nil {
+		change.VisitID = from.VisitID
+	}
+	notify(uc.observer, change)
+	return nil
+}
+
+type recordRemark struct {
+	repo     Repo
+	observer Observer
+}
+
+func newRecordRemark(repo Repo) *recordRemark {
+	return &recordRemark{repo: repo}
+}
+
+func (uc *recordRemark) Exec(ctx context.Context, from EvaluationID, text string) (RemarkID, error) {
+	if strings.TrimSpace(text) == "" {
+		return "", ErrEmptyRemark
+	}
+	evaluation, err := uc.repo.Evaluation(ctx, from)
+	if err != nil {
+		return "", err
+	}
+	remark := Remark{
+		RemarkID:  RemarkID(uuid.Must(uuid.NewV7()).String()),
+		From:      evaluation.EvaluationID,
+		SessionID: evaluation.SessionID,
+		Implicit:  evaluation.Implicit,
+		Timestamp: time.Now(),
+		Text:      text,
+	}
+	err = uc.repo.AppendRemark(ctx, remark)
+	if err != nil {
+		return "", err
+	}
+	notify(uc.observer, Change{SessionID: remark.SessionID, VisitID: evaluation.VisitID})
+	return remark.RemarkID, nil
+}
+
+func notify(observer Observer, change Change) {
+	if observer == nil {
+		return
+	}
+	observer.Changed(change)
+}
+
 type getEvaluationContent struct {
 	blobs BlobStore
 }
@@ -193,10 +375,25 @@ func newGetEvaluationContent(blobs BlobStore) *getEvaluationContent {
 	return &getEvaluationContent{blobs: blobs}
 }
 
-func (uc *getEvaluationContent) Exec(ctx context.Context, event Event, projection Projection) (string, error) {
-	id, ok := event.ContentIDs[projection]
+func (uc *getEvaluationContent) Exec(ctx context.Context, evaluation Evaluation, projection Projection) (string, error) {
+	id, ok := evaluation.ContentIDs[projection]
 	if !ok {
-		return "", fmt.Errorf("%w: %s %s", ErrContentNotRecorded, event.Address, projection)
+		return "", fmt.Errorf("%w: %s %s", ErrContentNotRecorded, evaluation.Address, projection)
 	}
 	return uc.blobs.Get(ctx, id)
+}
+
+type getExecutionOutput struct {
+	blobs BlobStore
+}
+
+func newGetExecutionOutput(blobs BlobStore) *getExecutionOutput {
+	return &getExecutionOutput{blobs: blobs}
+}
+
+func (uc *getExecutionOutput) Exec(ctx context.Context, execution Execution) (string, error) {
+	if execution.Outcome == nil || execution.Outcome.OutputID == "" {
+		return "", fmt.Errorf("%w: %s", ErrOutputNotRecorded, execution.ExecutionID)
+	}
+	return uc.blobs.Get(ctx, execution.Outcome.OutputID)
 }

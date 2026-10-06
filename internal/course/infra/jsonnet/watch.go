@@ -29,6 +29,8 @@ func (w *Watch) InvocationKey(funcName string, args []any) jpoetwatch.Invocation
 		return sessionKey(course.SessionID(stringArg(args, 0)))
 	case "visit":
 		return visitKey(course.VisitID(stringArg(args, 0)))
+	case "execution":
+		return executionKey(course.ExecutionID(stringArg(args, 0)))
 	default:
 		return ""
 	}
@@ -44,18 +46,24 @@ func (w *Watch) SetChanges(changes func(keys []jpoetwatch.InvocationKey)) {
 	w.changes = changes
 }
 
-func (w *Watch) Appended(event course.Event) {
+func (w *Watch) Changed(change course.Change) {
 	w.mu.Lock()
 	changes := w.changes
 	w.mu.Unlock()
 	if changes == nil {
 		return
 	}
-	changes([]jpoetwatch.InvocationKey{
+	keys := []jpoetwatch.InvocationKey{
 		sessionsKey,
-		sessionKey(event.SessionID),
-		visitKey(event.VisitID),
-	})
+		sessionKey(change.SessionID),
+	}
+	if change.VisitID != "" {
+		keys = append(keys, visitKey(change.VisitID))
+	}
+	if change.ExecutionID != "" {
+		keys = append(keys, executionKey(change.ExecutionID))
+	}
+	changes(keys)
 }
 
 func sessionKey(sessionID course.SessionID) jpoetwatch.InvocationKey {
@@ -64,4 +72,8 @@ func sessionKey(sessionID course.SessionID) jpoetwatch.InvocationKey {
 
 func visitKey(visitID course.VisitID) jpoetwatch.InvocationKey {
 	return jpoetwatch.InvocationKey("course://visit/" + string(visitID))
+}
+
+func executionKey(executionID course.ExecutionID) jpoetwatch.InvocationKey {
+	return jpoetwatch.InvocationKey("course://execution/" + string(executionID))
 }
