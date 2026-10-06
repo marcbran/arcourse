@@ -58,7 +58,11 @@ local visitItem = {
     {
       element: 'span',
       attributes: { class: 'detail' },
-      children: [c.node.time],
+      children: [
+        if c.node.remarks == 0 then c.node.time
+        else if c.node.remarks == 1 then '%s 1 remark' % c.node.time
+        else '%s %d remarks' % [c.node.time, c.node.remarks],
+      ],
     },
   ],
 };
@@ -123,6 +127,7 @@ local courseItem = {
       kind: 'visit',
       address: visit.address,
       time: std.substr(visit.timestamp, 11, 8),
+      remarks: visit.remarks,
       link: session.visit(visit.visitId)._queryPath,
       children: branches(
         [child for child in $.data.visits if child.parent.visit == visit.visitId],
@@ -170,7 +175,11 @@ local courseItem = {
       versions: visit.versions,
       first: evaluations[0].timestamp,
       last: evaluations[std.length(evaluations) - 1].timestamp,
-    },
+    } + (
+      if std.length(visit.remarks) > 0
+      then { remarks: [{ time: remark.timestamp, text: remark.text } for remark in visit.remarks] }
+      else {}
+    ),
     links: {
       course: {
         node: { _node: true, _queryPath: '/' + visit.address },
@@ -212,7 +221,9 @@ local courseItem = {
   }],
   [['arcourse', '$session', '$visit', '$evaluation'], a.resource.node + unrecorded {
     local evaluation = invoke('evaluation', [$.evaluation]),
-    local evaluations = invoke('visit', [$.visit]).evaluations,
+    local visit = invoke('visit', [$.visit]),
+    local evaluations = visit.evaluations,
+    local remarks = [remark for remark in visit.remarks if remark.from == $.evaluation],
     local positions = [
       i
       for i in std.range(0, std.length(evaluations) - 1)
@@ -238,7 +249,11 @@ local courseItem = {
       address: evaluation.address,
       timestamp: evaluation.timestamp,
       version: '%d of %d' % [position + 1, std.length(evaluations)],
-    },
+    } + (
+      if std.length(remarks) > 0
+      then { remarks: [{ time: remark.timestamp, text: remark.text } for remark in remarks] }
+      else {}
+    ),
     links: {
       format: {
         html: $.html,

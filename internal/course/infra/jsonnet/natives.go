@@ -64,6 +64,7 @@ func (n *natives) session(sessionID course.SessionID) (any, error) {
 				"visit":     string(visit.Parent.Visit),
 				"execution": string(visit.Parent.Execution),
 			},
+			"remarks": visit.Remarks,
 		})
 	}
 	executions := make([]any, 0, len(result.Executions))
@@ -109,6 +110,15 @@ func (n *natives) visit(visitID course.VisitID) (any, error) {
 			"status":      string(execution.Status()),
 		})
 	}
+	remarks := make([]any, 0, len(visit.Remarks))
+	for _, remark := range visit.Remarks {
+		remarks = append(remarks, map[string]any{
+			"remarkId":  string(remark.RemarkID),
+			"from":      string(remark.From),
+			"timestamp": remark.Timestamp.Format(time.RFC3339),
+			"text":      remark.Text,
+		})
+	}
 	return map[string]any{
 		"visitId":     string(visit.VisitID),
 		"sessionId":   string(visit.SessionID),
@@ -117,6 +127,7 @@ func (n *natives) visit(visitID course.VisitID) (any, error) {
 		"versions":    len(visit.Evaluations),
 		"evaluations": evaluations,
 		"executions":  executions,
+		"remarks":     remarks,
 	}, nil
 }
 

@@ -151,6 +151,14 @@ func (f *ServerBackedCLIFacade) Exec(ctx context.Context, id pkg.EvaluationID) (
 	return f.client.Exec(ctx, id)
 }
 
+func (f *ServerBackedCLIFacade) Remark(ctx context.Context, id pkg.EvaluationID, text string) (pkg.RemarkID, error) {
+	err := f.start()
+	if err != nil {
+		return "", err
+	}
+	return f.client.Remark(ctx, id, text)
+}
+
 func (f *ServerBackedCLIFacade) Compile(ctx context.Context) (pkg.Result, error) {
 	err := f.start()
 	if err != nil {
@@ -396,6 +404,25 @@ func (f *CLIFacade) Exec(ctx context.Context, id pkg.EvaluationID) (pkg.ExecResu
 		return pkg.ExecResult{}, err
 	}
 	return pkg.ExecResult{Output: strings.TrimSuffix(stdout.String(), "\n")}, nil
+}
+
+func (f *CLIFacade) Remark(ctx context.Context, id pkg.EvaluationID, text string) (pkg.RemarkID, error) {
+	cmd := exec.CommandContext(ctx, f.binaryPath, "remark", string(id), text)
+	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		if stderr.String() != "" {
+			return "", errors.New(stderr.String())
+		}
+		return "", err
+	}
+	return pkg.RemarkID(strings.TrimSuffix(stdout.String(), "\n")), nil
 }
 
 func (f *CLIFacade) Compile(ctx context.Context) (pkg.Result, error) {

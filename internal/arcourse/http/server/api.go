@@ -23,7 +23,16 @@ type queryRequest struct {
 }
 
 type outputResponse struct {
-	Output string `json:"output"`
+	Output       string `json:"output"`
+	EvaluationID string `json:"evaluationId,omitempty"`
+}
+
+type remarkRequest struct {
+	Text string `json:"text"`
+}
+
+type remarkResponse struct {
+	RemarkID string `json:"remarkId"`
 }
 
 type execResponse struct {
@@ -83,7 +92,7 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 		returnError(w, err)
 		return
 	}
-	returnSuccess(w, outputResponse{Output: result.Output})
+	returnSuccess(w, outputResponse{Output: result.Output, EvaluationID: string(result.EvaluationID)})
 }
 
 func (s *Server) handleExec(w http.ResponseWriter, r *http.Request) {
@@ -98,4 +107,29 @@ func (s *Server) handleExec(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	returnSuccess(w, execResponse{ExecutionID: string(result.ExecutionID), Output: result.Output, Redirect: result.Redirect.String()})
+}
+
+func (s *Server) handleRemark(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		returnBadRequest(w, errors.New("id is required"))
+		return
+	}
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		returnBadRequest(w, err)
+		return
+	}
+	var req remarkRequest
+	err = json.Unmarshal(body, &req)
+	if err != nil {
+		returnBadRequest(w, err)
+		return
+	}
+	remarkID, err := s.facade.Remark(r.Context(), pkg.EvaluationID(id), req.Text)
+	if err != nil {
+		returnError(w, err)
+		return
+	}
+	returnSuccess(w, remarkResponse{RemarkID: string(remarkID)})
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,6 +20,7 @@ var (
 	ErrContentNotRecorded    = errors.New("evaluation has no content recorded")
 	ErrOutputNotRecorded     = errors.New("execution has no output recorded")
 	ErrAlreadyExecuted       = errors.New("evaluation already executed")
+	ErrEmptyRemark           = errors.New("remark text is empty")
 )
 
 type SessionID string
@@ -28,6 +30,8 @@ type VisitID string
 type EvaluationID string
 
 type ExecutionID string
+
+type RemarkID string
 
 type EntryID string
 
@@ -100,16 +104,27 @@ type Outcome struct {
 	Error     string
 }
 
+type Remark struct {
+	RemarkID  RemarkID
+	From      EvaluationID
+	SessionID SessionID
+	Implicit  bool
+	Timestamp time.Time
+	Text      string
+}
+
 type Log struct {
 	Evaluations []Evaluation
 	Executions  []Execution
+	Remarks     []Remark
 }
 
 type VisitRef struct {
-	VisitID    VisitID
-	SessionID  SessionID
-	Implicit   bool
-	ContentIDs map[Projection]ContentID
+	VisitID      VisitID
+	SessionID    SessionID
+	Implicit     bool
+	EvaluationID EvaluationID
+	ContentIDs   map[Projection]ContentID
 }
 
 type Change struct {
@@ -122,6 +137,7 @@ type Repo interface {
 	AppendEvaluation(ctx context.Context, evaluation Evaluation) error
 	AppendExecution(ctx context.Context, execution Execution) error
 	AppendOutcome(ctx context.Context, executionID ExecutionID, outcome Outcome) error
+	AppendRemark(ctx context.Context, remark Remark) error
 	List(ctx context.Context) (Log, error)
 	Evaluation(ctx context.Context, evaluationID EvaluationID) (Evaluation, error)
 	Execution(ctx context.Context, executionID ExecutionID) (Execution, error)
@@ -165,12 +181,13 @@ func (uc *recordVisit) Exec(ctx context.Context, ref VisitRef, evaluationID Eval
 	if !first && sameContentIDs(evaluation.ContentIDs, ref.ContentIDs) {
 		return ref
 	}
-	ref.ContentIDs = evaluation.ContentIDs
 	err := uc.repo.AppendEvaluation(ctx, evaluation)
 	if err != nil {
 		slog.Warn("append course evaluation", "err", err, "address", address)
 		return ref
 	}
+	ref.ContentIDs = evaluation.ContentIDs
+	ref.EvaluationID = evaluation.EvaluationID
 	notify(uc.observer, Change{SessionID: evaluation.SessionID, VisitID: evaluation.VisitID})
 	return ref
 }
@@ -308,6 +325,39 @@ func (uc *finishExecution) Exec(ctx context.Context, execution Execution, output
 	}
 	notify(uc.observer, change)
 	return nil
+}
+
+type recordRemark struct {
+	repo     Repo
+	observer Observer
+}
+
+func newRecordRemark(repo Repo) *recordRemark {
+	return &recordRemark{repo: repo}
+}
+
+func (uc *recordRemark) Exec(ctx context.Context, from EvaluationID, text string) (RemarkID, error) {
+	if strings.TrimSpace(text) == "" {
+		return "", ErrEmptyRemark
+	}
+	evaluation, err := uc.repo.Evaluation(ctx, from)
+	if err != nil {
+		return "", err
+	}
+	remark := Remark{
+		RemarkID:  RemarkID(uuid.Must(uuid.NewV7()).String()),
+		From:      evaluation.EvaluationID,
+		SessionID: evaluation.SessionID,
+		Implicit:  evaluation.Implicit,
+		Timestamp: time.Now(),
+		Text:      text,
+	}
+	err = uc.repo.AppendRemark(ctx, remark)
+	if err != nil {
+		return "", err
+	}
+	notify(uc.observer, Change{SessionID: remark.SessionID, VisitID: evaluation.VisitID})
+	return remark.RemarkID, nil
 }
 
 func notify(observer Observer, change Change) {

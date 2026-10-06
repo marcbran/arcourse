@@ -42,14 +42,14 @@ func (uc *watch) Exec(ctx context.Context, path pkg.QueryPath, params map[string
 
 	var ref course.VisitRef
 
-	value, ok := uc.decodeAndRecord(ctx, &ref, initial, formats, format, queryPath, origin)
+	result, ok := uc.decodeAndRecord(ctx, &ref, initial, formats, format, queryPath, origin)
 	if !ok {
 		unregister()
 		return nil, nil, fmt.Errorf("node has no %s view", format)
 	}
 
 	results := make(chan pkg.Result, 1)
-	results <- pkg.Result{Output: value}
+	results <- result
 	go func() {
 		defer close(results)
 
@@ -59,12 +59,12 @@ func (uc *watch) Exec(ctx context.Context, path pkg.QueryPath, params map[string
 				if !ok {
 					return
 				}
-				value, ok := uc.decodeAndRecord(ctx, &ref, out, formats, format, queryPath, origin)
+				result, ok := uc.decodeAndRecord(ctx, &ref, out, formats, format, queryPath, origin)
 				if !ok {
 					continue
 				}
 				select {
-				case results <- pkg.Result{Output: value}:
+				case results <- result:
 				case <-ctx.Done():
 					return
 				}
@@ -77,17 +77,19 @@ func (uc *watch) Exec(ctx context.Context, path pkg.QueryPath, params map[string
 	return results, unregister, nil
 }
 
-func (uc *watch) decodeAndRecord(ctx context.Context, ref *course.VisitRef, out string, formats []pkg.Format, format pkg.Format, queryPath pkg.QueryPath, origin pkg.Origin) (string, bool) {
+func (uc *watch) decodeAndRecord(ctx context.Context, ref *course.VisitRef, out string, formats []pkg.Format, format pkg.Format, queryPath pkg.QueryPath, origin pkg.Origin) (pkg.Result, bool) {
 	decoded, evaluationID, err := decodeOutput(out, formats, format)
 	if err != nil {
-		return "", false
+		return pkg.Result{}, false
 	}
 	value, ok := decoded[format]
 	if !ok {
-		return "", false
+		return pkg.Result{}, false
 	}
+	result := pkg.Result{Output: value}
 	if recordable(decoded) {
 		*ref = uc.course.Record(ctx, *ref, course.EvaluationID(evaluationID), course.Address(queryPath), recordableContents(decoded), courseOrigin(origin))
+		result.EvaluationID = pkg.EvaluationID(ref.EvaluationID)
 	}
-	return value, true
+	return result, true
 }

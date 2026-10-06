@@ -16,7 +16,8 @@ type evaluateRequest struct {
 }
 
 type outputResponse struct {
-	Output string `json:"output"`
+	Output       string `json:"output"`
+	EvaluationID string `json:"evaluationId"`
 }
 
 func (c *Client) Evaluate(ctx context.Context, expression string) (pkg.Result, error) {

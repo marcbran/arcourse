@@ -50,11 +50,13 @@ func (uc *query) Exec(ctx context.Context, path pkg.QueryPath, params map[string
 		return pkg.Result{}, err
 	}
 
+	result := pkg.Result{Output: decoded[format]}
 	if recordable(decoded) {
-		uc.course.Record(ctx, course.VisitRef{}, course.EvaluationID(evaluationID), course.Address(queryPath), recordableContents(decoded), courseOrigin(origin))
+		ref := uc.course.Record(ctx, course.VisitRef{}, course.EvaluationID(evaluationID), course.Address(queryPath), recordableContents(decoded), courseOrigin(origin))
+		result.EvaluationID = pkg.EvaluationID(ref.EvaluationID)
 	}
 
-	return pkg.Result{Output: decoded[format]}, nil
+	return result, nil
 }
 
 func mergeFormats(primary pkg.Format, sets ...[]pkg.Format) []pkg.Format {

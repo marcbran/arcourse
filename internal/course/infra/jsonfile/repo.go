@@ -18,12 +18,14 @@ const (
 	kindEvaluation = "evaluation"
 	kindExecution  = "execution"
 	kindOutcome    = "outcome"
+	kindRemark     = "remark"
 )
 
 type line struct {
 	Kind            string                                 `json:"kind"`
 	EvaluationID    course.EvaluationID                    `json:"evaluationId,omitempty"`
 	ExecutionID     course.ExecutionID                     `json:"executionId,omitempty"`
+	RemarkID        course.RemarkID                        `json:"remarkId,omitempty"`
 	VisitID         course.VisitID                         `json:"visitId,omitempty"`
 	SessionID       course.SessionID                       `json:"sessionId,omitempty"`
 	Address         course.Address                         `json:"address,omitempty"`
@@ -34,6 +36,7 @@ type line struct {
 	ContentIDs      map[course.Projection]course.ContentID `json:"contentIds,omitempty"`
 	OutputContentID course.ContentID                       `json:"outputContentId,omitempty"`
 	Error           string                                 `json:"error,omitempty"`
+	Text            string                                 `json:"text,omitempty"`
 }
 
 type CourseRepo struct {
@@ -108,6 +111,24 @@ func (r *CourseRepo) AppendOutcome(ctx context.Context, executionID course.Execu
 	})
 }
 
+func (r *CourseRepo) AppendRemark(ctx context.Context, remark course.Remark) error {
+	err := ctx.Err()
+	if err != nil {
+		return err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.appendLine(line{
+		Kind:      kindRemark,
+		RemarkID:  remark.RemarkID,
+		From:      remark.From,
+		SessionID: remark.SessionID,
+		Implicit:  remark.Implicit,
+		Timestamp: remark.Timestamp,
+		Text:      remark.Text,
+	})
+}
+
 func (r *CourseRepo) List(ctx context.Context) (course.Log, error) {
 	return r.read(ctx)
 }
@@ -154,6 +175,11 @@ func (r *CourseRepo) ListSession(ctx context.Context, sessionID course.SessionID
 			result.Executions = append(result.Executions, execution)
 		}
 	}
+	for _, remark := range log.Remarks {
+		if remark.SessionID == sessionID {
+			result.Remarks = append(result.Remarks, remark)
+		}
+	}
 	return result, nil
 }
 
@@ -173,6 +199,11 @@ func (r *CourseRepo) ListVisit(ctx context.Context, visitID course.VisitID) (cou
 	for _, execution := range log.Executions {
 		if evaluations[execution.From] {
 			result.Executions = append(result.Executions, execution)
+		}
+	}
+	for _, remark := range log.Remarks {
+		if evaluations[remark.From] {
+			result.Remarks = append(result.Remarks, remark)
 		}
 	}
 	return result, nil
@@ -215,6 +246,11 @@ func (r *CourseRepo) LatestImplicitActivity(ctx context.Context) (course.Session
 	for _, execution := range log.Executions {
 		if execution.Implicit {
 			observe(execution.SessionID, execution.Timestamp)
+		}
+	}
+	for _, remark := range log.Remarks {
+		if remark.Implicit {
+			observe(remark.SessionID, remark.Timestamp)
 		}
 	}
 	return sessionID, at, found, nil
@@ -263,6 +299,15 @@ func (r *CourseRepo) load() (course.Log, error) {
 				SessionID:   entry.SessionID,
 				Implicit:    entry.Implicit,
 				Timestamp:   entry.Timestamp,
+			})
+		case kindRemark:
+			log.Remarks = append(log.Remarks, course.Remark{
+				RemarkID:  entry.RemarkID,
+				From:      entry.From,
+				SessionID: entry.SessionID,
+				Implicit:  entry.Implicit,
+				Timestamp: entry.Timestamp,
+				Text:      entry.Text,
 			})
 		case kindOutcome:
 			i, ok := executionIndex[entry.ExecutionID]

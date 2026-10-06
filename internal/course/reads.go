@@ -31,6 +31,7 @@ type VisitSummary struct {
 	Address   Address
 	Timestamp time.Time
 	Parent    Parent
+	Remarks   int
 }
 
 type ExecutionSummary struct {
@@ -47,6 +48,7 @@ type Visit struct {
 	From        From
 	Evaluations []Evaluation
 	Executions  []Execution
+	Remarks     []Remark
 }
 
 type ListSessions struct {
@@ -87,6 +89,9 @@ func (uc *ListSessions) Exec(ctx context.Context) ([]SessionSummary, error) {
 	}
 	for _, execution := range log.Executions {
 		seen(execution.SessionID, execution.Timestamp)
+	}
+	for _, remark := range log.Remarks {
+		seen(remark.SessionID, remark.Timestamp)
 	}
 	for i := range sessions {
 		sessions[i].Visits = len(visits[sessions[i].ID])
@@ -131,6 +136,11 @@ func (uc *GetSession) Exec(ctx context.Context, sessionID SessionID) (Session, e
 			Status:      execution.Status(),
 		})
 	}
+	remarks := map[VisitID]int{}
+	for _, remark := range log.Remarks {
+		observe(remark.Timestamp)
+		remarks[visitOfEvaluation[remark.From]]++
+	}
 	seen := map[VisitID]bool{}
 	for _, evaluation := range log.Evaluations {
 		observe(evaluation.Timestamp)
@@ -147,6 +157,7 @@ func (uc *GetSession) Exec(ctx context.Context, sessionID SessionID) (Session, e
 			Address:   evaluation.Address,
 			Timestamp: evaluation.Timestamp,
 			Parent:    parent,
+			Remarks:   remarks[evaluation.VisitID],
 		})
 	}
 	return result, nil
@@ -176,5 +187,6 @@ func (uc *GetVisit) Exec(ctx context.Context, visitID VisitID) (Visit, error) {
 		From:        head.From,
 		Evaluations: log.Evaluations,
 		Executions:  log.Executions,
+		Remarks:     log.Remarks,
 	}, nil
 }

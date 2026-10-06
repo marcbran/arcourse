@@ -8,6 +8,7 @@ type Facade struct {
 	recordVisit          *recordVisit
 	startExecution       *startExecution
 	finishExecution      *finishExecution
+	recordRemark         *recordRemark
 	listSessions         *ListSessions
 	getSession           *GetSession
 	getVisit             *GetVisit
@@ -21,6 +22,7 @@ func NewFacade(repo Repo, blobs BlobStore) *Facade {
 		recordVisit:          newRecordVisit(repo, blobs),
 		startExecution:       newStartExecution(repo),
 		finishExecution:      newFinishExecution(repo, blobs),
+		recordRemark:         newRecordRemark(repo),
 		listSessions:         NewListSessions(repo),
 		getSession:           NewGetSession(repo),
 		getVisit:             NewGetVisit(repo),
@@ -34,6 +36,7 @@ func (f *Facade) Observe(observer Observer) {
 	f.recordVisit.observer = observer
 	f.startExecution.observer = observer
 	f.finishExecution.observer = observer
+	f.recordRemark.observer = observer
 }
 
 func (f *Facade) Record(ctx context.Context, ref VisitRef, evaluationID EvaluationID, address Address, contents map[Projection]string, origin Origin) VisitRef {
@@ -46,6 +49,10 @@ func (f *Facade) StartExecution(ctx context.Context, from Evaluation) (Execution
 
 func (f *Facade) FinishExecution(ctx context.Context, execution Execution, output string, failure error) error {
 	return f.finishExecution.Exec(ctx, execution, output, failure)
+}
+
+func (f *Facade) Remark(ctx context.Context, from EvaluationID, text string) (RemarkID, error) {
+	return f.recordRemark.Exec(ctx, from, text)
 }
 
 func (f *Facade) Sessions(ctx context.Context) ([]SessionSummary, error) {
