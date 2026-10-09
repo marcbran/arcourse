@@ -1045,7 +1045,7 @@ local arcourseOpenapi = import './main.libsonnet';
           },
         };
         local generated = arcourseOpenapi.graph {
-          service: 'pagerduty',
+          service: 'tracker',
           manifest: false,
           columns: [{ sourcePath: '/incidents', array: ['incidents'] }],
           data+: { spec: spec },

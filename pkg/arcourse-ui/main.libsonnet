@@ -1,6 +1,6 @@
+local linkspecs = import '../arcourse-graph/linkspecs.libsonnet';
 local c = import 'components/main.libsonnet';
 local html = import 'html/main.libsonnet';
-local linkspecs = import 'linkspecs.libsonnet';
 
 local isNode(value) =
   std.type(value) == 'object' && std.objectHas(value, '_node') && std.objectHasAll(value, '_queryPath');

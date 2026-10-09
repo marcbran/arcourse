@@ -82,7 +82,14 @@ func queryParts(path pkg.QueryPath, params map[string]any, formats []pkg.Format)
 	}
 	queryPath = pkg.NewQueryPath(queryPath.String())
 	parts := strings.Split(queryPath.String(), "/")
-	segments = parts[1:]
+	segments = make([]string, 0, len(parts)-1)
+	for _, part := range parts[1:] {
+		segment, err := url.PathUnescape(part)
+		if err != nil {
+			return "", nil, "", "", err
+		}
+		segments = append(segments, segment)
+	}
 	paramsBytes, err := json.Marshal(mergeParams(queryParams, params))
 	if err != nil {
 		return "", nil, "", "", err

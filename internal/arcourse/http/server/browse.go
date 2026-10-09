@@ -40,7 +40,7 @@ const quickRemarkTemplate = `<quick-remark from="%s"></quick-remark>
 `
 
 func (s *Server) handleBrowse(w http.ResponseWriter, r *http.Request) {
-	path := strings.TrimRight(r.PathValue("path"), "/")
+	path := pkg.NewQueryPath(r.URL.EscapedPath())
 	if path == "" {
 		http.Redirect(w, r, "/root", http.StatusFound)
 		return
@@ -54,7 +54,7 @@ func (s *Server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	watchCtx, cancel := context.WithCancel(context.Background())
-	ch, unregister, err := s.facade.Watch(watchCtx, pkg.NewQueryPath(path), params, pkg.FormatHTML, browseOrigin(w, r))
+	ch, unregister, err := s.facade.Watch(watchCtx, path, params, pkg.FormatHTML, browseOrigin(w, r))
 	if err != nil {
 		cancel()
 		returnError(w, err)
