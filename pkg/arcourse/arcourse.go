@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -43,7 +44,37 @@ func ParseFormat(s string) (Format, error) {
 type QueryPath string
 
 func NewQueryPath(raw string) QueryPath {
-	return QueryPath(strings.Trim(raw, "/"))
+	base, query, hasQuery := strings.Cut(raw, "?")
+	segments := strings.Split(strings.Trim(base, "/"), "/")
+	for i, segment := range segments {
+		decoded, err := url.PathUnescape(segment)
+		if err == nil {
+			segments[i] = escapePathSegment(decoded)
+		}
+	}
+	path := strings.Join(segments, "/")
+	if hasQuery {
+		return QueryPath(path + "?" + query)
+	}
+	return QueryPath(path)
+}
+
+func escapePathSegment(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if isUnreserved(c) {
+			b.WriteByte(c)
+		} else {
+			fmt.Fprintf(&b, "%%%02X", c)
+		}
+	}
+	return b.String()
+}
+
+func isUnreserved(c byte) bool {
+	return 'A' <= c && c <= 'Z' || 'a' <= c && c <= 'z' || '0' <= c && c <= '9' ||
+		c == '-' || c == '_' || c == '.' || c == '~'
 }
 
 func (p QueryPath) String() string {

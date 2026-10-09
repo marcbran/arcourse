@@ -81,6 +81,13 @@ local style = |||
   }
 |||;
 
+local valueAt(fields, path) =
+  std.foldl(function(acc, seg) if std.isObject(acc) then std.get(acc, seg, null) else null, path, fields);
+
+local cellText(fields, path) =
+  local value = valueAt(fields, path);
+  if value == null then '' else std.toString(value);
+
 local logRow = {
   local r = self,
   record:: error 'LogRow requires record',
@@ -89,6 +96,7 @@ local logRow = {
   link:: null,
   columns:: [],
   template:: null,
+  embeddedLinks:: null,
   local rec = r.record,
   local fields = std.get(rec, 'fields', {}),
   local expandable = std.length(fields) > 0,
@@ -101,7 +109,7 @@ local logRow = {
   local cells =
     if tabular then
       [timeEl] + [
-        { element: 'span', attributes: { class: 'log-cell' }, children: [std.toString(std.get(fields, col, ''))] }
+        { element: 'span', attributes: { class: 'log-cell' }, children: [cellText(fields, col)] }
         for col in r.columns
       ]
     else
@@ -114,7 +122,16 @@ local logRow = {
       attributes: entryAttrs,
       children: [
         { element: 'summary', attributes: rowAttrs, children: cells },
-        { element: 'div', attributes: { class: 'log-detail' }, children: [yaml { data:: fields }] },
+        {
+          element: 'div',
+          attributes: { class: 'log-detail' },
+          children: [
+            yaml {
+              data:: fields,
+              embeddedLinks:: if r.embeddedLinks == null then null else std.get(r.embeddedLinks, 'fields', null),
+            },
+          ],
+        },
       ],
     } else {
       element: 'div',
@@ -132,11 +149,12 @@ local logRow = {
   timeFormat:: '2006-01-02 15:04:05.000',
   links:: {},
   columns:: [],
+  embeddedLinks:: [],
   local tabular = std.length(c.columns) > 0,
   local fieldWidth(col) = std.foldl(
-    function(m, rec) std.max(m, std.length(std.toString(std.get(std.get(rec, 'fields', {}), col, '')))),
+    function(m, rec) std.max(m, std.length(cellText(std.get(rec, 'fields', {}), col))),
     c.records,
-    std.length(col),
+    std.length(std.join('.', col)),
   ),
   local template =
     if tabular then std.join(' ', ['%dch' % std.length(c.timeFormat)] + ['%dch' % fieldWidth(col) for col in c.columns])
@@ -150,22 +168,23 @@ local logRow = {
         (if tabular then [{
            element: 'div',
            attributes: { class: 'log-header', style: 'grid-template-columns: %s' % template },
-           children: [{ element: 'span', children: ['time'] }] + [{ element: 'span', children: [col] } for col in c.columns],
+           children: [{ element: 'span', children: ['time'] }] + [{ element: 'span', children: [std.join('.', col)] } for col in c.columns],
          }] else [])
         + (
           if std.length(c.records) == 0 then
             [{ element: 'div', attributes: { class: 'logs-empty' }, children: ['No logs'] }]
           else
             [
-              (logRow {
-                 record:: rec,
-                 colors:: c.colors,
-                 timeFormat:: c.timeFormat,
-                 link:: std.get(c.links, std.get(rec, 'id', ''), null),
-                 columns:: c.columns,
-                 template:: template,
-               }).html
-              for rec in c.records
+              logRow {
+                record:: c.records[i],
+                colors:: c.colors,
+                timeFormat:: c.timeFormat,
+                link:: std.get(c.links, std.get(c.records[i], 'id', ''), null),
+                columns:: c.columns,
+                template:: template,
+                embeddedLinks:: if i < std.length(c.embeddedLinks) then c.embeddedLinks[i] else null,
+              }
+              for i in std.range(0, std.length(c.records) - 1)
             ]
         ),
     },

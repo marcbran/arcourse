@@ -28,6 +28,13 @@ test: test-go test-jsonnet test-node
 lint:
     golangci-lint run ./...
 
+check-graph-sync:
+    for f in internal/arcourse/lib/arcourse-graph/*.libsonnet; do \
+        diff -q "$f" "pkg/arcourse-graph/$(basename "$f")" || exit 1; \
+    done
+
+check: check-graph-sync
+
 build-go:
     go build -o arco .
 
@@ -49,4 +56,4 @@ test-e2e-facade facade:
 bench:
     go test -tags e2e -bench=. -benchmem -run=^$ ./tests/...
 
-ci: lint test test-race build test-e2e
+ci: lint test test-race check build test-e2e

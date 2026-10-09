@@ -38,7 +38,8 @@ local coerceRawValue(spec, raw, label='parameter value') =
     if !std.isArray(value) then
       error '%s %s cannot be coerced to array' % [label, std.manifestJsonEx(value, '')]
     else
-      [coerceRawValue({ type: spec.items }, element, 'array element') for element in value]
+      local itemSpec = if std.isObject(spec.items) then spec.items else { type: spec.items };
+      [coerceRawValue(itemSpec, element, 'array element') for element in value]
   else
     local value = if std.isString(raw) then std.parseJson(raw) else raw;
     if label == 'array element' then

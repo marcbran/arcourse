@@ -1,3 +1,5 @@
+local url = import 'url.libsonnet';
+
 local walk(current, remaining, buildFn) =
   if std.length(remaining) == 0 then
     if std.type(current) == 'array' then
@@ -76,19 +78,6 @@ local resolvable(item, valueSegs) =
     ]
   );
 
-local hexDigits = '0123456789ABCDEF';
-
-local percentEncode(s) =
-  std.join('', [
-    local c = s[i];
-    local cp = std.codepoint(c);
-    if (cp >= 65 && cp <= 90) || (cp >= 97 && cp <= 122) || (cp >= 48 && cp <= 57)
-       || c == '-' || c == '_' || c == '.' || c == '~'
-    then c
-    else '%' + hexDigits[std.floor(cp / 16)] + hexDigits[cp % 16]
-    for i in std.range(0, std.length(s) - 1)
-  ]);
-
 local resolveLiteralSegment(node, item, seg) =
   if std.objectHas(seg, 'const') then seg.const
   else if std.objectHas(seg, 'origin') then std.toString(node[seg.origin])
@@ -97,31 +86,18 @@ local resolveLiteralSegment(node, item, seg) =
 local resolveLiteralSegments(node, item, segs) =
   std.foldl(function(acc, seg) acc + resolveLiteralSegment(node, item, seg), segs, '');
 
-local resolveQuery(node, item, queryObj) =
-  local keys = std.objectFields(queryObj);
-  if std.length(keys) == 0 then ''
-  else '?' + std.join('&', [
-    percentEncode(k) + '=' + percentEncode(resolveLiteralSegments(node, item, queryObj[k]))
-    for k in keys
-  ]);
+local resolveUrl(node, item, literal) =
+  local query = std.get(literal, 'query', {});
+  url({
+    scheme: std.get(literal, 'scheme', null),
+    host: resolveLiteralSegments(node, item, std.get(literal, 'host', [])),
+    path: [resolveLiteralSegment(node, item, seg) for seg in std.get(literal, 'path', [])],
+    params: { [k]: resolveLiteralSegments(node, item, query[k]) for k in std.objectFields(query) },
+  });
 
-local resolveUrl(node, item, url) =
-  local scheme = std.get(url, 'scheme', null);
-  local host = std.get(url, 'host', []);
-  local path = std.get(url, 'path', []);
-  local query = std.get(url, 'query', {});
-  (if scheme != null then scheme + '://' else '')
-  + resolveLiteralSegments(node, item, host)
-  + (
-      if std.length(path) > 0 then
-        '/' + std.join('/', [percentEncode(resolveLiteralSegment(node, item, seg)) for seg in path])
-      else ''
-    )
-  + resolveQuery(node, item, query);
-
-local urlSegments(url) =
-  std.get(url, 'host', []) + std.get(url, 'path', [])
-  + std.flattenArrays([url.query[k] for k in std.objectFields(std.get(url, 'query', {}))]);
+local urlSegments(literal) =
+  std.get(literal, 'host', []) + std.get(literal, 'path', [])
+  + std.flattenArrays([literal.query[k] for k in std.objectFields(std.get(literal, 'query', {}))]);
 
 local buildLinks(node, specs, root=import 'root') =
   std.foldl(

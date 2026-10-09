@@ -9,7 +9,12 @@ function(query, timeRange, record=null)
     type:: 'logql',
     expr:: error 'Logs requires expr',
     columns:: [],
-    _paramSpecs: timeRange.paramSpecs,
+    _paramSpecs: timeRange.paramSpecs + [{
+      name: 'columns',
+      type: 'array',
+      items: { type: 'array', items: 'string' },
+      default: [if std.isString(col) then [col] else col for col in n.columns],
+    }],
     _telemetryItems:: [{ type: n.type, expr: n.expr }],
     data: query(n.datasource, n._telemetryItems, n._params.from, n._params.to),
     local records = std.reverse(std.sort(
@@ -24,6 +29,14 @@ function(query, timeRange, record=null)
         if std.get(rec, 'id', '') != ''
       },
     _view:: {
+      local columnLink(path, value) =
+        if std.isObject(value) || std.isArray(value) then null
+        else if std.any([std.isNumber(seg) for seg in path]) || std.member(n._params.columns, path) then null
+        else { key: n { _params+: { columns: n._params.columns + [path] } } },
+      local embeddedLinks = [
+        { fields: ui.yaml.mapLeaves(std.get(rec, 'fields', {}), columnLink) }
+        for rec in records
+      ],
       local hasRecords = std.length(records) > 0,
       local nav = timeRange.element {
         from:: n._params.from,
@@ -37,7 +50,8 @@ function(query, timeRange, record=null)
         logs {
           records:: records,
           links:: { [id]: n.links[id]._queryPath for id in std.objectFields(n.links) },
-          columns:: n.columns,
+          columns:: n._params.columns,
+          embeddedLinks:: embeddedLinks,
         },
         nav.html,
       ],

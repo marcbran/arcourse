@@ -1,3 +1,5 @@
+local url = import 'url.libsonnet';
+
 local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
 local varNameOf(seg) = std.substr(seg, 1, std.length(seg) - 1);
 
@@ -8,13 +10,23 @@ local resolvePath(node, path) =
     for p in path
   ]);
 
-local resolveUrlPath(node, path) =
-  std.join('/', ['/root'] + std.flatMap(
+local urlPathSegments(node, path) =
+  ['root'] + std.flatMap(
     function(p)
       if isVar(p) then [varNameOf(p), node[varNameOf(p)]]
       else [p],
     path
-  ));
+  );
+
+local nonDefaultParams(node) =
+  local params = if std.objectHasAll(node, '_params') then node._params else {};
+  local specs = if std.objectHasAll(node, '_paramSpecs') then node._paramSpecs else [];
+  local defaults = { [spec.name]: spec.default for spec in specs if std.objectHas(spec, 'default') };
+  {
+    [k]: params[k]
+    for k in std.objectFields(params)
+    if !std.objectHas(defaults, k) || defaults[k] != params[k]
+  };
 
 local mergeLayers(layers) =
   std.foldl(function(acc, l) acc + l, layers, {});
@@ -28,7 +40,7 @@ local node(path, body={}) =
     _vars:: vars,
     _pathTemplate:: path,
     _evalPath:: resolvePath(self, path),
-    _queryPath:: resolveUrlPath(self, path),
+    _queryPath:: local n = self; url({ path: urlPathSegments(n, path), params: nonDefaultParams(n) }),
   } +
   mergeLayers(layers);
 
@@ -66,7 +78,7 @@ local instantiateFromShape(shapeNode, layers, defaultView={}, vars={}) =
     [if isVar(k) then varNameOf(k) else k]:
       if isVar(k) then
         local vName = varNameOf(k);
-        function(val) instantiateFromShape(shapeNode.children[k], layers, defaultView, vars + { [vName]: val })
+        function(val) instantiateFromShape(shapeNode.children[k], layers, defaultView, vars { [vName]: val })
       else
         instantiateFromShape(shapeNode.children[k], layers, defaultView, vars)
     for k in std.objectFields(shapeNode.children)

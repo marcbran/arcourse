@@ -89,6 +89,18 @@ local nodeWithParams(params, extra={}) = {
       },
     },
     {
+      name: 'nested array param parsed and coerced',
+      input:: {
+        node: nodeWithParams([{ name: 'paths', type: 'array', items: { type: 'array', items: 'string' } }]),
+        params: { paths: '[["a","b"],["c"]]' },
+      },
+      expected: {
+        _node: true,
+        _paramSpecs: [{ name: 'paths', type: 'array', items: { type: 'array', items: 'string' } }],
+        _params: { paths: [['a', 'b'], ['c']] },
+      },
+    },
+    {
       name: 'number param accepts native json number',
       input:: {
         node: nodeWithParams([{ name: 'page', type: 'number' }]),

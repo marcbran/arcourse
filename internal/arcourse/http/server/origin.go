@@ -77,7 +77,7 @@ func refererPath(r *http.Request) pkg.QueryPath {
 	if parsed.Host != "" && r.Host != "" && parsed.Host != r.Host {
 		return ""
 	}
-	return pkg.NewQueryPath(parsed.Path)
+	return pkg.NewQueryPath(parsed.EscapedPath())
 }
 
 func requestOrigin(r *http.Request) pkg.Origin {
