@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.1](https://github.com/marcbran/arcourse/compare/v0.20.0...v0.20.1) (2026-10-10)
+
+
+### Bug Fixes
+
+* disable column links ([#138](https://github.com/marcbran/arcourse/issues/138)) ([c2c295e](https://github.com/marcbran/arcourse/commit/c2c295e54f622a27ed551a27f411d582c7b314bf))
+
 ## [0.20.0](https://github.com/marcbran/arcourse/compare/v0.19.0...v0.20.0) (2026-10-09)
 
 
