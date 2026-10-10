@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.20.0](https://github.com/marcbran/arcourse/compare/v0.19.0...v0.20.0) (2026-10-09)
+
+
+### Features
+
+* more standard query param handling ([#137](https://github.com/marcbran/arcourse/issues/137)) ([bf78ec0](https://github.com/marcbran/arcourse/commit/bf78ec0210f2164cfd8860c6bd0c6462c43470db))
+
+
+### Bug Fixes
+
+* forward time range to links ([#135](https://github.com/marcbran/arcourse/issues/135)) ([a10b09f](https://github.com/marcbran/arcourse/commit/a10b09fd4605d537bc699d880982d9220d3e6394))
+
 ## [0.19.0](https://github.com/marcbran/arcourse/compare/v0.18.0...v0.19.0) (2026-10-06)
 
 
