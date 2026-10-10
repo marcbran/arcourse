@@ -9,6 +9,7 @@ function(query, timeRange, record=null)
     type:: 'logql',
     expr:: error 'Logs requires expr',
     columns:: [],
+    columnLinks:: false,
     _paramSpecs: timeRange.paramSpecs + [{
       name: 'columns',
       type: 'array',
@@ -33,10 +34,11 @@ function(query, timeRange, record=null)
         if std.isObject(value) || std.isArray(value) then null
         else if std.any([std.isNumber(seg) for seg in path]) || std.member(n._params.columns, path) then null
         else { key: n { _params+: { columns: n._params.columns + [path] } } },
-      local embeddedLinks = [
-        { fields: ui.yaml.mapLeaves(std.get(rec, 'fields', {}), columnLink) }
-        for rec in records
-      ],
+      local embeddedLinks =
+        if n.columnLinks then [
+          { fields: ui.yaml.mapLeaves(std.get(rec, 'fields', {}), columnLink) }
+          for rec in records
+        ] else [],
       local hasRecords = std.length(records) > 0,
       local nav = timeRange.element {
         from:: n._params.from,

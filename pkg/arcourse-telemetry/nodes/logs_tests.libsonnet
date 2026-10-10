@@ -11,8 +11,8 @@ local records = [{
 
 local query(datasource, items, from, to) = { results: [{ records: records }] };
 
-local logsNode(columns, params) =
-  g.node(['telemetry', 'logs'], nodesLogsLib(query, timeRange) { expr:: 'x', columns:: columns })
+local logsNode(columns, params, body={}) =
+  g.node(['telemetry', 'logs'], nodesLogsLib(query, timeRange) { expr:: 'x', columns:: columns } + body)
   + { _params: params };
 
 local view(node) = node._view.fragment[2];
@@ -27,16 +27,22 @@ local view(node) = node._view.fragment[2];
       expected: [['namespace'], ['k8s', 'pod']],
     },
     {
+      name: 'logs column links are disabled by default',
+      input:: function()
+        view(logsNode(['namespace'], { from: 'now-1h', to: 'now', columns: [['namespace']] })).embeddedLinks,
+      expected: [],
+    },
+    {
       name: 'logs embedded links add the clicked leaf path to the current columns and keep other params',
       input:: function()
-        local node = logsNode(['namespace'], { from: 'now-6h', to: 'now', columns: [['namespace']] });
+        local node = logsNode(['namespace'], { from: 'now-6h', to: 'now', columns: [['namespace']] }, { columnLinks:: true });
         view(node).embeddedLinks[0].fields.k8s.labels.app.key._queryPath,
       expected: '/root/telemetry/logs?columns=%5B%5B%22namespace%22%5D%2C%5B%22k8s%22%2C%22labels%22%2C%22app%22%5D%5D&from=now-6h',
     },
     {
       name: 'logs embedded links skip existing columns, array elements and empty containers',
       input:: function()
-        local node = logsNode(['namespace'], { from: 'now-1h', to: 'now', columns: [['namespace']] });
+        local node = logsNode(['namespace'], { from: 'now-1h', to: 'now', columns: [['namespace']] }, { columnLinks:: true });
         local fields = view(node).embeddedLinks[0].fields;
         { namespace: fields.namespace, tags: fields.tags, empty: fields.empty },
       expected: { namespace: null, tags: [null], empty: null },
