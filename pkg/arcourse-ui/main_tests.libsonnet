@@ -4,13 +4,13 @@ local a = import './main.libsonnet';
   output(input):: input(),
   tests: [
     {
-      name: 'table rows are fully clickable when a rowLink is supplied',
+      name: 'table rows are fully clickable when rowLinks are supplied',
       input:: function()
         local c = import './components/main.libsonnet';
         local t = c.table {
           items:: [{ id: 'i1', name: 'alpha' }, { id: 'i2', name: 'beta' }],
-          columns:: [{ label: 'Name', path: ['name'] }, { label: 'ID', path: ['id'] }],
-          rowLink:: function(item) { _node: true, _queryPath: '/x/' + item.id },
+          columns:: [{ key: 'name', label: 'Name' }, { key: 'id', label: 'ID' }],
+          rowLinks:: [{ _node: true, _queryPath: '/x/i1' }, { _node: true, _queryPath: '/x/i2' }],
         };
         local rows = t.html[1].children[0].children[1].children;
         local cellsOf(row) = [td.children[0].html for td in row.children];
@@ -35,12 +35,12 @@ local a = import './main.libsonnet';
       },
     },
     {
-      name: 'table cells wrap in a non-link span when no rowLink is supplied',
+      name: 'table cells wrap in a non-link span when no rowLinks are supplied',
       input:: function()
         local c = import './components/main.libsonnet';
         local t = c.table {
           items:: [{ name: 'alpha' }],
-          columns:: [{ label: 'Name', path: ['name'] }],
+          columns:: [{ key: 'name', label: 'Name' }],
         };
         local row = t.html[1].children[0].children[1].children[0];
         local cell = row.children[0].children[0].html;
@@ -53,7 +53,7 @@ local a = import './main.libsonnet';
         local c = import './components/main.libsonnet';
         local t = c.table {
           items:: [{ name: 'alpha' }],
-          columns:: [{ label: 'Name', path: ['name'] }],
+          columns:: [{ key: 'name', label: 'Name' }],
         };
         { cardChildCount: std.length(t.html[1].children) },
       expected: { cardChildCount: 1 },
@@ -64,7 +64,7 @@ local a = import './main.libsonnet';
         local c = import './components/main.libsonnet';
         local t = c.table {
           items:: [{ name: 'alpha' }],
-          columns:: [{ label: 'Name', path: ['name'] }],
+          columns:: [{ key: 'name', label: 'Name' }],
           pagination:: {
             first: { _node: true, _queryPath: 'root/x?page=1' },
             prev: { _node: true, _queryPath: 'root/x?page=2' },
@@ -92,7 +92,7 @@ local a = import './main.libsonnet';
         local c = import './components/main.libsonnet';
         local t = c.table {
           items:: [{ name: 'alpha' }],
-          columns:: [{ label: 'Name', path: ['name'] }],
+          columns:: [{ key: 'name', label: 'Name' }],
           pagination:: {
             next: { _node: true, _queryPath: 'root/x?page=2' },
           },
@@ -139,6 +139,82 @@ local a = import './main.libsonnet';
         local rows = node._view.fragment.html[1].children[0].children[1].children;
         { rowTexts: [row.children[0].children[0].html.children[0] for row in rows] },
       expected: { rowTexts: ['Alpha', 'Beta'] },
+    },
+    {
+      name: 'a.table.node projects data items into a flat items list keyed by lowerCamelCase label or explicit key, computing value columns and dropping missing fields',
+      input:: function()
+        local node = a.table.node {
+          data: {
+            kind: 'PodList',
+            items: [
+              { metadata: { name: 'api' }, status: { podIP: '10.0.0.1', containerStatuses: [{ ready: true }, { ready: false }] } },
+              { metadata: { name: 'db' }, spec: { nodeName: 'node-a' }, status: { containerStatuses: [{ ready: true }] } },
+            ],
+          },
+          table: {
+            at: ['items'],
+            columns: [
+              { label: 'Name', path: ['metadata', 'name'] },
+              {
+                label: 'Ready',
+                paths: [['status', 'containerStatuses']],
+                value(item):: '%d/%d' % [std.length([s for s in item.status.containerStatuses if s.ready]), std.length(item.status.containerStatuses)],
+              },
+              { label: 'Pod IP', path: ['status', 'podIP'] },
+              { key: 'host', label: 'Node', path: ['spec', 'nodeName'] },
+            ],
+          },
+        };
+        {
+          items: node.items,
+          dataVisible: std.objectHas(node, 'data'),
+        },
+      expected: {
+        items: [
+          { name: 'api', ready: '1/2', podIP: '10.0.0.1' },
+          { name: 'db', ready: '1/1', host: 'node-a' },
+        ],
+        dataVisible: false,
+      },
+    },
+    {
+      name: 'column keys default to the label in lowerCamelCase, keeping the casing of later words',
+      input:: function()
+        local labels = ['Name', 'First seen', 'Resource Version', 'Pod IP', 'ID', 'CPU %', 'last-seen at'];
+        local node = a.table.node {
+          data: { items: [{}] },
+          table: { columns: [{ label: label, value(item):: label } for label in labels] },
+        };
+        std.objectFields(node.items[0]),
+      expected: std.sort(['name', 'firstSeen', 'resourceVersion', 'podIP', 'id', 'cpu', 'lastSeenAt']),
+    },
+    {
+      name: 'a.table.node projects scalar items with an empty column path',
+      input:: function()
+        local node = a.table.node {
+          data: ['alpha', 'beta'],
+          table: { at: [], columns: [{ label: 'Value', path: [] }] },
+        };
+        node.items,
+      expected: [{ value: 'alpha' }, { value: 'beta' }],
+    },
+    {
+      name: 'a.table.node resolves links from data fields that are not columns',
+      input:: function()
+        local node = a.table.node {
+          data: { items: [{ id: 'P1', name: 'alpha' }, { id: 'P2', name: 'beta' }] },
+          linkSpecs:: [{
+            at: ['items'],
+            keys: [{ path: ['id'] }],
+            value: { scheme: 'https', host: [{ const: 'svc.example.com' }], path: [{ path: ['id'] }] },
+          }],
+          table: { at: ['items'], columns: [{ label: 'Name', path: ['name'] }] },
+        };
+        { items: node.items, links: node.links },
+      expected: {
+        items: [{ name: 'alpha' }, { name: 'beta' }],
+        links: { P1: 'https://svc.example.com/P1', P2: 'https://svc.example.com/P2' },
+      },
     },
     {
       name: 'a URL link opens in a new tab with rel=noopener, unlike a node-backed link',

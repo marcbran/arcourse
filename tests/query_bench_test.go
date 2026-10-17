@@ -35,7 +35,7 @@ local namespaceSiblings(n) = [
 ];
 
 local podsSpec = [['kubernetes', '$context', 'pods'], a.table.node {
-  data: data,
+  data:: data,
   linkSpecs:: [
     {
       at: ['items'],

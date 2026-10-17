@@ -100,11 +100,13 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
         {
           kind: nodeKind(entries[2]),
           fieldNames: fieldNames(body),
+          dataHide: [f for f in body.fields if f.id == 'data'][0].Hide,
           columnLabels: [manifestLiteral(field(col.expr, 'label')) for col in field(field(body, 'table'), 'columns').elements],
         },
       expected: {
         kind: ['node', 'table', 'a'],
         fieldNames: ['data', 'linkSpecs', 'table'],
+        dataHide: 0,
         columnLabels: ['Name'],
       },
     },

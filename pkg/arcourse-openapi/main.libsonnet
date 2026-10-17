@@ -252,7 +252,7 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
     local ls = linksFor(op);
     local table = tableField(op);
     local specs = paramSpecsField(op);
-    local fields = [responseField(expr), dataField(access(selfResponse, 'body'))] +
+    local fields = [responseField(expr), dataField(access(selfResponse, 'body'), table != null)] +
       (if std.length(ls) == 0 then [] else [linkSpecsField(ls)]) +
       (if table != null then [table] else []) +
       (if specs == null then [] else [specs]);

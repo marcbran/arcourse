@@ -91,16 +91,47 @@ local yamlView = baseView {
   },
 };
 
+local columnValue(item, col) =
+  if std.objectHasAll(col, 'value') then col.value(item) else safeGet(item, col.path);
+
+local isAlphanumeric(ch) =
+  (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9');
+
+local labelWords(label) = [
+  word
+  for word in std.split(std.join('', [if isAlphanumeric(ch) then ch else ' ' for ch in std.stringChars(label)]), ' ')
+  if word != ''
+];
+
+local lowerCamelCase(label) =
+  local parts = labelWords(std.toString(label));
+  if std.length(parts) == 0 then ''
+  else std.asciiLower(parts[0]) + std.join('', [std.asciiUpper(part[0]) + part[1:] for part in parts[1:]]);
+
+local columnKey(col) = std.get(col, 'key', lowerCamelCase(col.label));
+
+local projectItem(item, columns) = {
+  [col.key]: value
+  for col in columns
+  for value in [columnValue(item, col)]
+  if value != null
+};
+
 local tableView = baseView {
+  data:: error 'table requires data',
+  local table = std.get($, 'table', {}),
+  local at = std.get(table, 'at', ['items']),
+  local columns = [col { key: columnKey(col) } for col in std.get(table, 'columns', [])],
+  local found = safeGet($.data, at),
+  local dataItems = if std.isArray(found) then found else [],
+  items: [projectItem(item, columns) for item in dataItems],
   _view+:: {
     fragment:
-      local table = std.get($, 'table', {});
-      local at = std.get(table, 'at', ['items']);
-      local items = safeGet($.data, at);
+      local rowLink = linkspecs.rowLinkFor($, std.get($, 'linkSpecs', []), at);
       c.table {
-        items:: items,
-        columns:: std.get(table, 'columns', []),
-        rowLink:: linkspecs.rowLinkFor($, std.get($, 'linkSpecs', []), at),
+        items:: $.items,
+        columns:: columns,
+        rowLinks:: if rowLink == null then [] else [rowLink(item) for item in dataItems],
         pagination:: std.get(std.get($, 'links', {}), 'pagination', null),
       },
   },

@@ -1,6 +1,27 @@
 local j = import 'jsonnet/main.libsonnet';
 local kubernetes = import 'kubernetes/main.libsonnet';
 
+local fieldListMixin = |||
+  {
+    kubernetes+: {
+      table+: {
+        fieldList(columns, linkSpecs)::
+          std.set([
+            std.join('.', path)
+            for col in columns
+            for path in std.get(col, 'paths', [col.path])
+          ] + [
+            std.join('.', seg.path)
+            for spec in linkSpecs
+            if std.isArray(spec.value)
+            for seg in std.get(spec, 'keys', []) + spec.value
+            if std.objectHas(seg, 'path')
+          ]),
+      },
+    },
+  }
+|||;
+
 local resourceVerbs(resource) = std.get(resource, 'verbs', []);
 
 local mergeResource(left, right) =
@@ -203,7 +224,7 @@ local generate(resources, group, links=[], globalLinkSpecs=[]) =
     2
   );
   local listObject(dataExpr, linkSpecs, columnsExpr=null) = prettyObject(
-    [dataField(dataExpr), j.Field('linkSpecs', prettyArray([linkSpecEntry(s) for s in linkSpecs], 4)) { Hide: 0 }] +
+    [dataField(dataExpr, columnsExpr != null), j.Field('linkSpecs', prettyArray([linkSpecEntry(s) for s in linkSpecs], 4)) { Hide: 0 }] +
     (if columnsExpr != null then [j.Field('table', prettyObject([
        j.Field('at', j.Array([j.String('items')])),
        j.Field('columns', columnsExpr),
@@ -224,21 +245,17 @@ local generate(resources, group, links=[], globalLinkSpecs=[]) =
   local listView(resource) =
     if std.length(std.get(resource, 'columns', [])) > 0 then nodeView('table') else nodeView('list');
 
-  local pathSegments(seg) = if std.objectHas(seg, 'path') then [std.join('.', seg.path)] else [];
-  local linkSpecPaths(linkSpecs) = std.flattenArrays([
-    std.flattenArrays([pathSegments(k) for k in std.get(spec, 'keys', [])]) +
-    std.flattenArrays([pathSegments(v) for v in std.get(spec, 'value', [])])
-    for spec in linkSpecs
-  ]);
-  local columnPaths(resource) =
-    [std.join('.', c.path) for c in std.get(resource, 'columns', []) if std.objectHas(c, 'path')];
-  local fieldsFor(resource, linkSpecs) = std.set(columnPaths(resource) + linkSpecPaths(linkSpecs));
+  local tableFields = call(
+    member(member(member(var('a'), 'kubernetes'), 'table'), 'fieldList'),
+    [member(member(j.Dollar, 'table'), 'columns'), member(j.Dollar, 'linkSpecs')]
+  );
+  local listData(resource, pathExpr) =
+    if resourceColumns(resource) != null then k8sGet(pathExpr, tableFields) else k8sNeatGet(pathExpr);
 
   local namespacedAllList(resource) =
     local linkSpecs = [allNamespacesLinkSpec(resource)];
     local columnsExpr = resourceColumns(resource);
-    local fieldsExpr = if columnsExpr != null then compactLiteral(fieldsFor(resource, linkSpecs)) else null;
-    local data = if fieldsExpr != null then k8sGet(namespacedAllPath(resource), fieldsExpr) else k8sNeatGet(namespacedAllPath(resource));
+    local data = listData(resource, namespacedAllPath(resource));
     node(
       ['kubernetes', '$context'] + resourcePrefix + [route(resource)],
       listView(resource),
@@ -248,8 +265,7 @@ local generate(resources, group, links=[], globalLinkSpecs=[]) =
   local namespacedList(resource) =
     local linkSpecs = [singleNamespaceLinkSpec(resource)];
     local columnsExpr = resourceColumns(resource);
-    local fieldsExpr = if columnsExpr != null then compactLiteral(fieldsFor(resource, linkSpecs)) else null;
-    local data = if fieldsExpr != null then k8sGet(namespacedListPath(resource), fieldsExpr) else k8sNeatGet(namespacedListPath(resource));
+    local data = listData(resource, namespacedListPath(resource));
     node(
       ['kubernetes', '$context', '$namespace'] + resourcePrefix + [route(resource)],
       listView(resource),
@@ -266,8 +282,7 @@ local generate(resources, group, links=[], globalLinkSpecs=[]) =
   local clusterList(resource) =
     local linkSpecs = [clusterLinkSpec(resource)];
     local columnsExpr = resourceColumns(resource);
-    local fieldsExpr = if columnsExpr != null then compactLiteral(fieldsFor(resource, linkSpecs)) else null;
-    local data = if fieldsExpr != null then k8sGet(clusterListPath(resource), fieldsExpr) else k8sNeatGet(clusterListPath(resource));
+    local data = listData(resource, clusterListPath(resource));
     node(
       ['kubernetes', '$context'] + resourcePrefix + [route(resource)],
       listView(resource),
@@ -338,13 +353,18 @@ local generateAll(groups, manifest=true, globalLinkSpecs=[]) =
     generate(g.resources, g.group, std.get(g, 'links', []), globalLinkSpecs)
     for g in groups
   ]);
-  local generated = j.Locals(
-    [
-      j.LocalBind('a', j.Import('arcourse-ui/main.libsonnet')),
-      j.LocalBind('kubernetes', j.Import('kubernetes/main.libsonnet')),
-      j.LocalBind('root', j.Import('root')),
-    ],
-    prettyArray(allRouteNodes)
+  local binds = [
+    j.LocalBind('base', j.Import('arcourse-ui/main.libsonnet')),
+    j.LocalBind('a', j.Add(var('base'), j.parseJsonnet(fieldListMixin))),
+    j.LocalBind('kubernetes', j.Import('kubernetes/main.libsonnet')),
+    j.LocalBind('root', j.Import('root')),
+  ];
+  local generated = std.foldr(
+    function(i, acc)
+      local node = j.Local(binds[i], acc);
+      if i == 0 then node else node.fodder(j.Fodder.LineEnd(0, 0)),
+    std.range(0, std.length(binds) - 1),
+    prettyArray(allRouteNodes).fodder(j.Fodder.LineEnd(0, 0))
   );
   if manifest then j.manifestJsonnet(generated) else generated;
 
