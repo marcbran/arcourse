@@ -27,9 +27,31 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
   output(input):: input(),
   tests: [
     {
-      name: 'exports graph package entrypoint',
+      name: 'exports the graph and the core, apps and networking.k8s.io node lists',
       input:: function() std.objectFields(arcourseKubernetes),
-      expected: ['graph'],
+      expected: ['apps', 'core', 'graph', 'networking.k8s.io'],
+    },
+    {
+      name: 'the core pod table node orders columns like kubectl and computes ready and restarts',
+      input:: function()
+        local a = import '../arcourse-ui/main.libsonnet';
+        local node = a.table.node + arcourseKubernetes.core.podTableNode {
+          data: {
+            items: [{
+              metadata: { name: 'api', namespace: 'default', creationTimestamp: '2026-10-12T08:14:03Z' },
+              spec: { nodeName: 'node-a', containers: [{}, {}] },
+              status: { phase: 'Running', podIP: '10.0.0.1', containerStatuses: [{ ready: true, restartCount: 1 }, { ready: false, restartCount: 3 }] },
+            }],
+          },
+        };
+        {
+          labels: [col.label for col in node.table.columns],
+          items: node.items,
+        },
+      expected: {
+        labels: ['Name', 'Namespace', 'Ready', 'Status', 'Restarts', 'Node', 'Pod IP', 'Created'],
+        items: [{ name: 'api', namespace: 'default', ready: '1/2', status: 'Running', restarts: 4, node: 'node-a', podIP: '10.0.0.1', created: '2026-10-12T08:14:03Z' }],
+      },
     },
     {
       name: 'empty groups yields only the contexts and $context scaffold nodes',

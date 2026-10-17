@@ -1,21 +1,7 @@
 {
   contexts(): std.native('invoke:kubernetes')('contexts', []),
-  get(ctx, path): std.native('invoke:kubernetes')('get', [ctx, path]),
+  get(ctx, path, fields=[]): std.native('invoke:kubernetes')('get', [ctx, path, fields]),
   neat: {
-    get(ctx, path):
-      local result = $.get(ctx, path);
-      if std.objectHas(result, 'items') then
-        result {
-          items: [
-            item { metadata+: { managedFields:: [] } }
-            for item in super.items
-          ],
-        }
-      else
-        result {
-          metadata+: {
-            managedFields:: [],
-          },
-        },
+    get(ctx, path, fields=[]): std.native('invoke:kubernetes')('neatGet', [ctx, path, fields]),
   },
 }
