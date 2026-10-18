@@ -18,7 +18,9 @@ p.pkg({
   `pod`, `container`, `pvc`, `deployment`, `node`) via kube-state-metrics and
   cAdvisor queries, with drilldown charts and cross-links to the matching
   `arcourse-kubernetes` resource nodes (and back). The `context`, `namespace`,
-  `pod`, and `container` entities also expose a `logs` view.
+  `pod`, and `container` entities also expose `logs` views: each field of an
+  entity's `logs` object becomes a logs node at `logs/<field>` (by default `all`
+  and `errors`), so more views are added as more fields.
 
   This is an opinionated, backend-coupled convenience layer: metric drilldowns
   assume Prometheus/PromQL (kube-state-metrics + cAdvisor), and the `logs`
@@ -31,10 +33,10 @@ p.pkg({
   mounted at `root.kubernetes`. Each entity is exposed as an overridable field;
   `nodeList` materializes them all through `arcourse-telemetry`'s `entities.nodeList`.
 |||, {
-  context: p.desc('Entity spec for the cluster/context dimension, with a logs view.'),
-  namespace: p.desc('Entity spec for the namespace dimension, with a logs view.'),
-  pod: p.desc('Entity spec for the pod dimension, with a pod-phase state timeline drilldown and a logs view.'),
-  container: p.desc('Entity spec for the container dimension, with restarts/cpu/memory drilldowns and a logs view.'),
+  context: p.desc('Entity spec for the cluster/context dimension, with all/errors logs views.'),
+  namespace: p.desc('Entity spec for the namespace dimension, with all/errors logs views.'),
+  pod: p.desc('Entity spec for the pod dimension, with a pod-phase state timeline drilldown and all/errors logs views.'),
+  container: p.desc('Entity spec for the container dimension, with restarts/cpu/memory drilldowns and all/errors logs views.'),
   pvc: p.desc('Entity spec for the persistent volume claim dimension, with a usage drilldown.'),
   deployment: p.desc('Entity spec for the deployment dimension, with an availability drilldown.'),
   node: p.desc('Entity spec for the node dimension, with a conditions drilldown.'),

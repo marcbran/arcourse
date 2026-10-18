@@ -81,7 +81,7 @@ local orderGroups(groups, order) =
   [entry.group for entry in std.sort(keyed, function(entry) entry.key)];
 
 local neighborGroups(obj) =
-  orderGroups(childGroups(obj) + linksGroups(obj), std.get(std.get(obj, 'list', {}), 'groupOrder', []));
+  linksGroups(obj) + orderGroups(childGroups(obj), std.get(std.get(obj, 'list', {}), 'groupOrder', []));
 
 local safeGet(obj, path) =
   std.foldl(

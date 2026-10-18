@@ -9,7 +9,10 @@ local telemetry = import '../arcourse-telemetry/main.libsonnet';
     labels:: ['cluster'],
     entityBase:: ['kubernetes'],
     listExpr:: 'count by (%(groupBy)s) (kube_pod_info{%(matchers)s})' % self,
-    logs:: { expr:: '{cluster="%(context)s"}' % self },
+    logs:: {
+      all: { expr:: '{cluster="%(context)s"}' % self },
+      errors: { expr:: '{cluster="%(context)s"} | detected_level=~"error|critical|fatal"' % self },
+    },
     drillDowns:: {},
   },
 
@@ -19,7 +22,10 @@ local telemetry = import '../arcourse-telemetry/main.libsonnet';
     labels:: ['cluster', 'namespace'],
     entityBase:: ['kubernetes'],
     listExpr:: 'count by (%(groupBy)s) (kube_pod_info{%(matchers)s})' % self,
-    logs:: { expr:: '{cluster="%(context)s", namespace="%(namespace)s"}' % self },
+    logs:: {
+      all: { expr:: '{cluster="%(context)s", namespace="%(namespace)s"}' % self },
+      errors: { expr:: '{cluster="%(context)s", namespace="%(namespace)s"} | detected_level=~"error|critical|fatal"' % self },
+    },
     drillDowns:: {},
   },
 
@@ -29,7 +35,10 @@ local telemetry = import '../arcourse-telemetry/main.libsonnet';
     labels:: ['cluster', 'namespace', 'pod'],
     entityBase:: ['kubernetes'],
     listExpr:: 'kube_pod_info{%(matchers)s}' % self,
-    logs:: { expr:: '{cluster="%(context)s", namespace="%(namespace)s"} | pod="%(pod)s"' % self },
+    logs:: {
+      all: { expr:: '{cluster="%(context)s", namespace="%(namespace)s"} | pod="%(pod)s"' % self },
+      errors: { expr:: '{cluster="%(context)s", namespace="%(namespace)s"} | pod="%(pod)s" | detected_level=~"error|critical|fatal"' % self },
+    },
     drillDowns:: {
       phase: $.a.promql.stateTimeline.chart {
         expr:: 'sum by (%(groupBy)s, phase) (kube_pod_status_phase{%(matchers)s}) > 0' % self,
@@ -57,7 +66,10 @@ local telemetry = import '../arcourse-telemetry/main.libsonnet';
     vars:: ['context', 'namespace', 'pod', 'container'],
     labels:: ['cluster', 'namespace', 'pod', 'container'],
     listExpr:: 'container_memory_working_set_bytes{%(matchers)s}' % self,
-    logs:: { expr:: '{cluster="%(context)s", namespace="%(namespace)s", container="%(container)s"} | pod="%(pod)s"' % self },
+    logs:: {
+      all: { expr:: '{cluster="%(context)s", namespace="%(namespace)s", container="%(container)s"} | pod="%(pod)s"' % self },
+      errors: { expr:: '{cluster="%(context)s", namespace="%(namespace)s", container="%(container)s"} | pod="%(pod)s" | detected_level=~"error|critical|fatal"' % self },
+    },
     drillDowns:: {
       restarts: $.a.promql.line.chart {
         expr::

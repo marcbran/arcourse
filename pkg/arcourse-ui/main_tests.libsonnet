@@ -310,8 +310,8 @@ local a = import './main.libsonnet';
         };
         [{ title: g.title, items: [i.text for i in g.items] } for g in node._view.fragment.groups],
       expected: [
-        { title: 'apps', items: ['statefulsets'] },
         { title: 'curated', items: ['deployments'] },
+        { title: 'apps', items: ['statefulsets'] },
       ],
     },
     {
