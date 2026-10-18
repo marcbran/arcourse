@@ -97,7 +97,7 @@ local arcourseOpenapi = import './main.libsonnet';
       },
     },
     {
-      name: 'list operation includes matching links with hidden data and default columns per target param',
+      name: 'list operation includes matching links with hidden data, visible items and default columns per target param',
       input:: function()
         local spec = {
           paths: {
@@ -169,7 +169,7 @@ local arcourseOpenapi = import './main.libsonnet';
         path: ['demo', 'user', 'repos'],
         nodeElementCount: 2,
         fieldNames: ['response', 'data', 'linkSpecs', 'table'],
-        dataHide: 1,
+        dataHide: 0,
         specsHide: 0,
         specs: [
           {
@@ -562,7 +562,7 @@ local arcourseOpenapi = import './main.libsonnet';
       expected: {
         nodeElementCount: 2,
         fieldNames: ['response', 'data', 'linkSpecs', 'table'],
-        dataHide: 1,
+        dataHide: 0,
       },
     },
     {

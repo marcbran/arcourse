@@ -6,6 +6,7 @@ p.pkg({
   branch: 'arcourse/arcourse-kubernetes',
   path: 'arcourse/arcourse-kubernetes',
   target: 'arcourse-kubernetes',
+  external: ['root'],
   plugins: [
     p.plugin.github('marcbran/jsonnet-plugin-kubernetes', 'v0.1.0'),
     p.plugin.github('marcbran/jsonnet-plugin-jsonnet', 'v0.3.0'),
@@ -23,5 +24,17 @@ p.pkg({
     `links` (both keyed by group version) override the defaults per resource, and
     `manifest` (default `true`) controls whether `_view.jsonnet` is rendered as a
     string or returned as an AST.
+  |||),
+  core: p.desc(|||
+    Hand-written core layers on top of the generated graph. `nodeList` adds the pod
+    table layer to both generated pod lists; `podTableNode` is that layer: kubectl-style
+    pod columns including computed Ready and Restarts.
+  |||),
+  apps: p.desc(|||
+    `nodeList` adds pod tables for deployments, statefulsets and daemonsets (selected
+    by their label selector) and restart actions for each of them.
+  |||),
+  'networking.k8s.io': p.desc(|||
+    `nodeList` adds an external https link per ingress rule host.
   |||),
 })

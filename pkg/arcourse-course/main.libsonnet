@@ -92,7 +92,7 @@ local courseItem = {
 
 [
   [['arcourse', 'sessions'], a.table.node + unrecorded {
-    data: { items: invoke('sessions') },
+    data:: { items: invoke('sessions') },
     table:: {
       at: ['items'],
       columns: [
