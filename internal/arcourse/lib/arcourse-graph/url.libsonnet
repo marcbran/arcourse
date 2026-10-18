@@ -4,8 +4,11 @@ local unreserved(b) =
   (b >= 65 && b <= 90) || (b >= 97 && b <= 122) || (b >= 48 && b <= 57)
   || b == 45 || b == 95 || b == 46 || b == 126;
 
+local unreservedChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~';
+
 local percentEncode(s) =
-  std.join('', [
+  if std.length(std.stripChars(s, unreservedChars)) == 0 then s
+  else std.join('', [
     if unreserved(b) then std.char(b)
     else '%' + hexDigits[std.floor(b / 16)] + hexDigits[b % 16]
     for b in std.encodeUTF8(s)
