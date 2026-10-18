@@ -99,6 +99,7 @@ local listView = baseView {
     fragment: c.list {
       items:: neighborItems($),
       groups:: neighborGroups($),
+      columns:: std.get(std.get($, 'list', {}), 'columns', 1),
     },
   },
 };
@@ -162,6 +163,7 @@ local treeView = baseView {
       c.resource {
         items:: neighborItems($),
         groups:: neighborGroups($),
+        columns:: std.get(std.get($, 'list', {}), 'columns', 1),
         content:: c.tree {
           nodes:: std.get(tree, 'nodes', []),
           item:: std.get(tree, 'item', super.item),
@@ -176,6 +178,8 @@ local resourceView = baseView {
       data:: $.data,
       items:: neighborItems($),
       groups:: neighborGroups($),
+      columns:: std.get(std.get($, 'list', {}), 'columns', 1),
+      stacked:: std.get(std.get($, 'resource', {}), 'stacked', false),
     },
   },
 };

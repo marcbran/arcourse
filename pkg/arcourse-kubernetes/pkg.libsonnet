@@ -26,7 +26,9 @@ p.pkg({
     string or returned as an AST. `groupNodes` (default `true`) generates an empty node
     per API group under the context and namespace; with `false` the group segment is a
     plain object, so the context and namespace views link each group's resources
-    directly.
+    directly. `listColumns` (default `4`) is the number of columns the context node and
+    the namespace detail node lay out their links in; the namespace detail node also
+    shows its YAML above the links.
   |||),
   core: p.desc(|||
     Hand-written core layers on top of the generated graph. `nodeList` adds the pod

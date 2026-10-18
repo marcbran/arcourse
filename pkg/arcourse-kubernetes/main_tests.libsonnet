@@ -223,6 +223,32 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
       },
     },
     {
+      name: 'the context node gets the list column count and the namespaces detail node is stacked with the same columns',
+      input:: function()
+        local namespaces = { name: 'namespaces', kind: 'Namespace', namespaced: false, verbs: ['get'], version: 'v1' };
+        local entriesWith(listColumns) =
+          unwrap(arcourseKubernetes.graph {
+            manifest: false,
+            listColumns: listColumns,
+            data+: { groups: [{ group: '', resources: [namespaces] }] },
+          }._view.jsonnet).elements;
+        local entry(entries, path) = [e for e in entries if nodePath(e) == path][0];
+        local columns(body) = field(field(body, 'list'), 'columns').originalString;
+        local summary(listColumns) =
+          local entries = entriesWith(listColumns);
+          local detail = nodeBody(entry(entries, ['kubernetes', '$context', '$namespace']));
+          {
+            context: columns(entry(entries, ['kubernetes', '$context']).expr.elements[1].expr),
+            detailStacked: field(field(detail, 'resource'), 'stacked').__kind__,
+            detailColumns: columns(detail),
+          };
+        { default: summary(4), overridden: summary(3) },
+      expected: {
+        default: { context: '4', detailStacked: 'LiteralBoolean', detailColumns: '4' },
+        overridden: { context: '3', detailStacked: 'LiteralBoolean', detailColumns: '3' },
+      },
+    },
+    {
       name: 'a bundled specs.json entry for a core resource derives a namespaced resource with list and get verbs from its OpenAPI paths',
       input:: function()
         local spec = {

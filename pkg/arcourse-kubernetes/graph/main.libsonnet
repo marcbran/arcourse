@@ -57,7 +57,7 @@ local ownerReferenceLinkSpec = {
   ],
 };
 
-local generate(resources, group, links=[], globalLinkSpecs=[], groupNodes=true) =
+local generate(resources, group, links=[], globalLinkSpecs=[], groupNodes=true, listColumns=4) =
   local le(indent=0) = j.Fodder.LineEnd(0, indent);
   local prettyArray(elements, indent=0) =
     j.Array([elem.fodder(le(indent + 2)) for elem in elements]).closeFodder(le(indent));
@@ -218,9 +218,10 @@ local generate(resources, group, links=[], globalLinkSpecs=[], groupNodes=true) 
     j.Field('data', expr) { Hide: if hidden then 0 else 1 };
   local linkSpecEntry(spec) =
     prettyObject([objectField(field, compactLiteral(spec[field])) for field in ['at', 'keys', 'value']], 6);
-  local dataObject(expr, linkSpecs=[]) = prettyObject(
+  local dataObject(expr, linkSpecs=[], viewFields=[]) = prettyObject(
     [dataField(expr)] +
-    (if std.length(linkSpecs) > 0 then [j.Field('linkSpecs', prettyArray([linkSpecEntry(s) for s in linkSpecs], 4)) { Hide: 0 }] else []),
+    (if std.length(linkSpecs) > 0 then [j.Field('linkSpecs', prettyArray([linkSpecEntry(s) for s in linkSpecs], 4)) { Hide: 0 }] else []) +
+    viewFields,
     2
   );
   local listObject(dataExpr, linkSpecs, columnsExpr=null) = prettyObject(
@@ -289,11 +290,16 @@ local generate(resources, group, links=[], globalLinkSpecs=[], groupNodes=true) 
       listObject(data, linkSpecs, columnsExpr)
     );
 
+  local namespaceViewFields(resource) =
+    if group == '' && resource.name == 'namespaces' then [
+      j.Field('resource', compactLiteral({ stacked: true })) { Hide: 0 },
+      j.Field('list', compactLiteral({ columns: listColumns })) { Hide: 0 },
+    ] else [];
   local clusterDetail(resource) =
     node(
       ['kubernetes', '$context'] + resourcePrefix + ['$' + itemVar(resource)],
       nodeView('resource'),
-      dataObject(k8sNeatGet(clusterDetailPath(resource)), globalLinkSpecs + linksAt(clusterDetailPathStr(resource)))
+      dataObject(k8sNeatGet(clusterDetailPath(resource)), globalLinkSpecs + linksAt(clusterDetailPathStr(resource)), namespaceViewFields(resource))
     );
 
   local resourceNodes(resource) =
@@ -315,7 +321,7 @@ local generate(resources, group, links=[], globalLinkSpecs=[], groupNodes=true) 
   groupNamespaceNodes +
   std.flattenArrays([resourceNodes(r) for r in resources]);
 
-local generateAll(groups, manifest=true, globalLinkSpecs=[], groupNodes=true) =
+local generateAll(groups, manifest=true, globalLinkSpecs=[], groupNodes=true, listColumns=4) =
   local le(indent=0) = j.Fodder.LineEnd(0, indent);
   local prettyArray(elements, indent=0) =
     j.Array([elem.fodder(le(indent + 2)) for elem in elements]).closeFodder(le(indent));
@@ -346,11 +352,13 @@ local generateAll(groups, manifest=true, globalLinkSpecs=[], groupNodes=true) =
   ]);
   local contextNode = j.Array([
     j.Array([j.String('kubernetes'), j.String('$context')]),
-    j.Object(),
+    prettyObject([
+      j.Field('list', j.Object([j.Field('columns', j.Number(std.toString(listColumns)))])) { Hide: 0 },
+    ], 2),
   ]);
 
   local allRouteNodes = [contextsNode, contextNode] + std.flattenArrays([
-    generate(g.resources, g.group, std.get(g, 'links', []), globalLinkSpecs, groupNodes)
+    generate(g.resources, g.group, std.get(g, 'links', []), globalLinkSpecs, groupNodes, listColumns)
     for g in groups
   ]);
   local binds = [
@@ -525,6 +533,7 @@ local groupsFromSpecs(specs, columns, links) =
   _record: false,
   manifest:: true,
   groupNodes:: true,
+  listColumns:: 4,
   contexts:: [],
   specs:: {},
   globalLinkSpecs:: [namespaceLinkSpec, ownerReferenceLinkSpec],
@@ -538,6 +547,6 @@ local groupsFromSpecs(specs, columns, links) =
       ),
     },
   _view:: {
-    jsonnet: generateAll($.data.groups, $.manifest, $.globalLinkSpecs, $.groupNodes),
+    jsonnet: generateAll($.data.groups, $.manifest, $.globalLinkSpecs, $.groupNodes, $.listColumns),
   },
 }

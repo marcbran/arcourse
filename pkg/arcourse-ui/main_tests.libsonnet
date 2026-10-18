@@ -327,6 +327,47 @@ local a = import './main.libsonnet';
       expected: [],
     },
     {
+      name: 'list.columns splits the cards in order into that many columns balanced by line count',
+      input:: function()
+        local link(name) = { _node: true, _queryPath: '/root/' + name };
+        local node = a.list.node {
+          list:: { columns: 2 },
+          core: link('core'),
+          a: { x1: link('a/x1'), x2: link('a/x2'), x3: link('a/x3') },
+          b: { y1: link('b/y1') },
+          c: { z1: link('c/z1'), z2: link('c/z2') },
+        };
+        local aside = node._view.fragment.html[1];
+        local cardTitle(nav) = if std.get(nav.children[0], 'element', null) == 'strong' then nav.children[0].children[0] else 'items';
+        {
+          class: aside.attributes.class,
+          columns: [[cardTitle(nav) for nav in column.children] for column in aside.children],
+        },
+      expected: {
+        class: 'list columns',
+        columns: [['items', 'a'], ['b', 'c']],
+      },
+    },
+    {
+      name: 'a.resource.node keeps links beside the content by default and puts the content first when resource.stacked is set',
+      input:: function()
+        local base = a.resource.node {
+          data: { id: 'x' },
+          child: { _node: true, _queryPath: '/root/x/child' },
+        };
+        local layout(node) =
+          local div = node._view.fragment.html[1];
+          { class: div.attributes.class, first: div.children[0].html[1].attributes.class };
+        {
+          default: layout(base),
+          stacked: layout(base { resource:: { stacked: true } }),
+        },
+      expected: {
+        default: { class: 'resource', first: 'list' },
+        stacked: { class: 'resource stacked', first: 'yaml card' },
+      },
+    },
+    {
       name: 'a.resource.node without linkSpecs exposes an empty links object',
       input:: function()
         local node = a.resource.node {
