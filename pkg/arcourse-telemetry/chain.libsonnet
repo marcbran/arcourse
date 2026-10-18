@@ -8,6 +8,13 @@ local promote(arr, idx, val) = arr[:idx] + [val] + arr[idx + 1:];
 
 local chain(node, calls) = std.foldl(function(n, call) n[call[0]](call[1]), calls, node);
 local chainFields(node, fields) = std.foldl(function(n, f) n[f], fields, node);
+local walkPath(node, path, values) = std.foldl(
+  function(acc, seg)
+    if std.startsWith(seg, '$') then { node: acc.node[seg[1:]](values[acc.i]), i: acc.i + 1 }
+    else { node: acc.node[seg], i: acc.i },
+  path,
+  { node: node, i: 0 }
+).node;
 
 local accs(labels, vars) =
   local n = std.length(labels);
@@ -35,5 +42,6 @@ local accs(labels, vars) =
   promote: promote,
   chain: chain,
   chainFields: chainFields,
+  walkPath: walkPath,
   accs: accs,
 }

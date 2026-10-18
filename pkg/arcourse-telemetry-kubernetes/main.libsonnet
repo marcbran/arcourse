@@ -7,7 +7,7 @@ local telemetry = import '../arcourse-telemetry/main.libsonnet';
     base:: ['telemetry', 'kubernetes'],
     vars:: ['context'],
     labels:: ['cluster'],
-    entityBase:: ['kubernetes'],
+    entityPath:: ['kubernetes', '$context'],
     listExpr:: 'count by (%(groupBy)s) (kube_pod_info{%(matchers)s})' % self,
     logs:: {
       all: { expr:: '{cluster="%(context)s"}' % self },
@@ -20,7 +20,7 @@ local telemetry = import '../arcourse-telemetry/main.libsonnet';
     base:: ['telemetry', 'kubernetes'],
     vars:: ['context', 'namespace'],
     labels:: ['cluster', 'namespace'],
-    entityBase:: ['kubernetes'],
+    entityPath:: ['kubernetes', '$context', '$namespace'],
     listExpr:: 'count by (%(groupBy)s) (kube_pod_info{%(matchers)s})' % self,
     logs:: {
       all: { expr:: '{cluster="%(context)s", namespace="%(namespace)s"}' % self },
@@ -33,7 +33,7 @@ local telemetry = import '../arcourse-telemetry/main.libsonnet';
     base:: ['telemetry', 'kubernetes'],
     vars:: ['context', 'namespace', 'pod'],
     labels:: ['cluster', 'namespace', 'pod'],
-    entityBase:: ['kubernetes'],
+    entityPath:: ['kubernetes', '$context', '$namespace', '$pod'],
     listExpr:: 'kube_pod_info{%(matchers)s}' % self,
     logs:: {
       all: { expr:: '{cluster="%(context)s", namespace="%(namespace)s"} | pod="%(pod)s"' % self },
@@ -93,6 +93,7 @@ local telemetry = import '../arcourse-telemetry/main.libsonnet';
   pvc:: {
     base:: ['telemetry', 'kubernetes'],
     vars:: ['context', 'namespace', 'pvc'],
+    entityPath:: ['kubernetes', '$context', '$namespace', '$persistentvolumeclaim'],
     labels:: ['cluster', 'namespace', 'persistentvolumeclaim'],
     titles:: ['Context', 'Namespace', 'PVC'],
     listExpr:: 'kubelet_volume_stats_capacity_bytes{%(matchers)s}' % self,
@@ -111,6 +112,7 @@ local telemetry = import '../arcourse-telemetry/main.libsonnet';
   deployment:: {
     base:: ['telemetry', 'kubernetes'],
     vars:: ['context', 'namespace', 'deployment'],
+    entityPath:: ['kubernetes', '$context', '$namespace', 'apps', '$deployment'],
     labels:: ['cluster', 'namespace', 'deployment'],
     listExpr:: 'kube_deployment_spec_replicas{%(matchers)s}' % self,
     drillDowns:: {
@@ -129,7 +131,7 @@ local telemetry = import '../arcourse-telemetry/main.libsonnet';
     base:: ['telemetry', 'kubernetes'],
     vars:: ['context', 'node'],
     labels:: ['cluster', 'node'],
-    entityBase:: ['kubernetes'],
+    entityPath:: ['kubernetes', '$context', '$node'],
     listExpr:: 'count by (%(groupBy)s) (kube_node_info{%(matchers)s})' % self,
     drillDowns:: {
       conditions: $.a.promql.line.chart {

@@ -17,11 +17,10 @@ function(c, listNode, drilldown, logsNode)
     local ctx = params { groupBy:: labels[last], matchers:: matchers };
 
     local entityEntries =
-      if std.objectHasAll(params, 'entityBase') then
-        local entityNode = c.chainFields(c.root, params.entityBase);
-        local entityPath = params.entityBase + ['$' + v for v in vars];
+      if std.objectHasAll(params, 'entityPath') then
+        local entityPath = params.entityPath;
         [
-          [placeholderPath, { links+: { entity: c.chain(entityNode, [[v, $[v]] for v in vars]) } }],
+          [placeholderPath, { links+: { entity: c.walkPath(c.root, entityPath, [$[v] for v in vars]) } }],
           [entityPath, {
             local telemetry = c.chain(rootNode, [[v, $[v]] for v in vars]),
             links+: { telemetry: telemetry } + (if std.objectHas(telemetry, 'metrics') then { metrics: telemetry.metrics } else {}),
@@ -50,9 +49,8 @@ function(c, listNode, drilldown, logsNode)
           [placeholderPath + ['logs', view], logsNode + params.logs[view]]
           for view in std.objectFields(params.logs)
         ] + (
-          if std.objectHasAll(params, 'entityBase') then
-            local entityPath = params.entityBase + ['$' + v for v in vars];
-            [[entityPath, { links+: { logs: c.chain(rootNode, [[v, $[v]] for v in vars]).logs } }]]
+          if std.objectHasAll(params, 'entityPath') then
+            [[params.entityPath, { links+: { logs: c.chain(rootNode, [[v, $[v]] for v in vars]).logs } }]]
           else []
         )
       else [];
