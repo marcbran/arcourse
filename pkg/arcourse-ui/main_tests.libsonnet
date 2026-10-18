@@ -275,17 +275,43 @@ local a = import './main.libsonnet';
       ],
     },
     {
-      name: 'a non-node child recurses to render each reachable node as a slash-labeled link',
+      name: 'a non-node child renders as a titled group of its reachable nodes, deeper nodes slash-labeled within the group, empty ones omitted',
       input:: function()
         local node = a.list.node {
           arcourse: { _node: true, _queryPath: '/root/arcourse' },
-          kubernetes: { contexts: { _node: true, _queryPath: '/root/kubernetes/contexts' } },
+          kubernetes: {
+            contexts: { _node: true, _queryPath: '/root/kubernetes/contexts' },
+            nested: { deep: { _node: true, _queryPath: '/root/kubernetes/nested/deep' } },
+          },
           form3: {},
         };
-        [{ link: i.link, text: i.text } for i in node._view.fragment.items],
+        {
+          items: [{ link: i.link, text: i.text } for i in node._view.fragment.items],
+          groups: [{ title: g.title, items: [{ link: i.link, text: i.text } for i in g.items] } for g in node._view.fragment.groups],
+        },
+      expected: {
+        items: [{ link: '/root/arcourse', text: 'arcourse' }],
+        groups: [{
+          title: 'kubernetes',
+          items: [
+            { link: '/root/kubernetes/contexts', text: 'contexts' },
+            { link: '/root/kubernetes/nested/deep', text: 'nested/deep' },
+          ],
+        }],
+      },
+    },
+    {
+      name: 'a node reachable through a links group is not repeated in a child group',
+      input:: function()
+        local deployments = { _node: true, _queryPath: '/root/apps/deployments' };
+        local node = a.list.node {
+          apps: { deployments: deployments, statefulsets: { _node: true, _queryPath: '/root/apps/statefulsets' } },
+          links: { curated: { deployments: deployments } },
+        };
+        [{ title: g.title, items: [i.text for i in g.items] } for g in node._view.fragment.groups],
       expected: [
-        { link: '/root/arcourse', text: 'arcourse' },
-        { link: '/root/kubernetes/contexts', text: 'kubernetes/contexts' },
+        { title: 'apps', items: ['statefulsets'] },
+        { title: 'curated', items: ['deployments'] },
       ],
     },
     {

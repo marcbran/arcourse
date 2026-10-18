@@ -57,7 +57,7 @@ local ownerReferenceLinkSpec = {
   ],
 };
 
-local generate(resources, group, links=[], globalLinkSpecs=[]) =
+local generate(resources, group, links=[], globalLinkSpecs=[], groupNodes=true) =
   local le(indent=0) = j.Fodder.LineEnd(0, indent);
   local prettyArray(elements, indent=0) =
     j.Array([elem.fodder(le(indent + 2)) for elem in elements]).closeFodder(le(indent));
@@ -305,9 +305,9 @@ local generate(resources, group, links=[], globalLinkSpecs=[]) =
       (if hasVerb(resource, 'get') then [clusterDetail(resource)] else []);
 
   local hasNamespacedResources = std.length([r for r in resources if r.namespaced]) > 0;
-  local groupContextNodes = if group != '' then [emptyNode(['kubernetes', '$context', group])] else [];
+  local groupContextNodes = if groupNodes && group != '' then [emptyNode(['kubernetes', '$context', group])] else [];
   local groupNamespaceNodes =
-    if group != '' && hasNamespacedResources
+    if groupNodes && group != '' && hasNamespacedResources
     then [emptyNode(['kubernetes', '$context', '$namespace', group])]
     else [];
 
@@ -315,7 +315,7 @@ local generate(resources, group, links=[], globalLinkSpecs=[]) =
   groupNamespaceNodes +
   std.flattenArrays([resourceNodes(r) for r in resources]);
 
-local generateAll(groups, manifest=true, globalLinkSpecs=[]) =
+local generateAll(groups, manifest=true, globalLinkSpecs=[], groupNodes=true) =
   local le(indent=0) = j.Fodder.LineEnd(0, indent);
   local prettyArray(elements, indent=0) =
     j.Array([elem.fodder(le(indent + 2)) for elem in elements]).closeFodder(le(indent));
@@ -350,7 +350,7 @@ local generateAll(groups, manifest=true, globalLinkSpecs=[]) =
   ]);
 
   local allRouteNodes = [contextsNode, contextNode] + std.flattenArrays([
-    generate(g.resources, g.group, std.get(g, 'links', []), globalLinkSpecs)
+    generate(g.resources, g.group, std.get(g, 'links', []), globalLinkSpecs, groupNodes)
     for g in groups
   ]);
   local binds = [
@@ -524,6 +524,7 @@ local groupsFromSpecs(specs, columns, links) =
 {
   _record: false,
   manifest:: true,
+  groupNodes:: true,
   contexts:: [],
   specs:: {},
   globalLinkSpecs:: [namespaceLinkSpec, ownerReferenceLinkSpec],
@@ -537,6 +538,6 @@ local groupsFromSpecs(specs, columns, links) =
       ),
     },
   _view:: {
-    jsonnet: generateAll($.data.groups, $.manifest, $.globalLinkSpecs),
+    jsonnet: generateAll($.data.groups, $.manifest, $.globalLinkSpecs, $.groupNodes),
   },
 }

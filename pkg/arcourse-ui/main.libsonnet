@@ -48,13 +48,31 @@ local curatedLinks(obj) =
     for item in linksItems(obj) + std.flatMap(function(group) group.items, linksGroups(obj))
   ]);
 
+local neighborKeys(obj) = [
+  k
+  for k in std.objectFields(obj)
+  if !std.member(['data', '_view', 'links'], k) && std.substr(k, 0, 1) != '_' && std.type(obj[k]) == 'object'
+];
+
 local neighborItems(obj) =
   local curated = curatedLinks(obj);
   [
-    item
-    for item in collectNeighbors(obj, '', ['data', '_view', 'links'])
-    if !std.setMember(item.link, curated)
+    { link: obj[k]._queryPath, text: k }
+    for k in neighborKeys(obj)
+    if isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated)
   ] + linksItems(obj);
+
+local childGroups(obj) =
+  local curated = curatedLinks(obj);
+  [
+    group
+    for k in neighborKeys(obj)
+    if !isNode(obj[k])
+    for group in [{ title: k, items: [item for item in collectNeighbors(obj[k]) if !std.setMember(item.link, curated)] }]
+    if std.length(group.items) > 0
+  ];
+
+local neighborGroups(obj) = childGroups(obj) + linksGroups(obj);
 
 local safeGet(obj, path) =
   std.foldl(
@@ -80,7 +98,7 @@ local listView = baseView {
   _view+:: {
     fragment: c.list {
       items:: neighborItems($),
-      groups:: linksGroups($),
+      groups:: neighborGroups($),
     },
   },
 };
@@ -143,7 +161,7 @@ local treeView = baseView {
       local tree = std.get($, 'tree', {});
       c.resource {
         items:: neighborItems($),
-        groups:: linksGroups($),
+        groups:: neighborGroups($),
         content:: c.tree {
           nodes:: std.get(tree, 'nodes', []),
           item:: std.get(tree, 'item', super.item),
@@ -157,7 +175,7 @@ local resourceView = baseView {
     fragment: c.resource {
       data:: $.data,
       items:: neighborItems($),
-      groups:: linksGroups($),
+      groups:: neighborGroups($),
     },
   },
 };

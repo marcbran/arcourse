@@ -8,9 +8,10 @@ local manifestLiteral(expr) =
 
 local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
 
-local nodes(groups, globalLinkSpecs=[]) =
+local nodes(groups, globalLinkSpecs=[], groupNodes=true) =
   unwrap(arcourseKubernetes.graph {
     manifest: false,
+    groupNodes: groupNodes,
     globalLinkSpecs: globalLinkSpecs,
     data+: { groups: groups },
   }._view.jsonnet).elements;
@@ -203,6 +204,19 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
         paths: [
           ['kubernetes', '$context', 'acme.io'],
           ['kubernetes', '$context', '$namespace', 'acme.io'],
+          ['kubernetes', '$context', 'acme.io', 'widgets'],
+          ['kubernetes', '$context', '$namespace', 'acme.io', 'widgets'],
+        ],
+      },
+    },
+    {
+      name: 'groupNodes false omits the empty group scaffold nodes and keeps the resource nodes',
+      input:: function()
+        local resource = { name: 'widgets', kind: 'Widget', namespaced: true, verbs: ['list'], version: 'v1' };
+        local entries = nodes([{ group: 'acme.io', resources: [resource] }], groupNodes=false);
+        { paths: [nodePath(e) for e in entries[2:]] },
+      expected: {
+        paths: [
           ['kubernetes', '$context', 'acme.io', 'widgets'],
           ['kubernetes', '$context', '$namespace', 'acme.io', 'widgets'],
         ],

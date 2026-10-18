@@ -23,7 +23,10 @@ p.pkg({
     Root package. `contexts` are the configured kubeconfig context(s), `columns` and
     `links` (both keyed by group version) override the defaults per resource, and
     `manifest` (default `true`) controls whether `_view.jsonnet` is rendered as a
-    string or returned as an AST.
+    string or returned as an AST. `groupNodes` (default `true`) generates an empty node
+    per API group under the context and namespace; with `false` the group segment is a
+    plain object, so the context and namespace views link each group's resources
+    directly.
   |||),
   core: p.desc(|||
     Hand-written core layers on top of the generated graph. `nodeList` adds the pod
