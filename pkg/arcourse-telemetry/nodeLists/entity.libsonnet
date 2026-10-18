@@ -22,7 +22,10 @@ function(c, listNode, drilldown, logsNode)
         local entityPath = params.entityBase + ['$' + v for v in vars];
         [
           [placeholderPath, { links+: { entity: c.chain(entityNode, [[v, $[v]] for v in vars]) } }],
-          [entityPath, { links+: { telemetry: c.chain(rootNode, [[v, $[v]] for v in vars]) } }],
+          [entityPath, {
+            local telemetry = c.chain(rootNode, [[v, $[v]] for v in vars]),
+            links+: { telemetry: telemetry } + (if std.objectHas(telemetry, 'metrics') then { metrics: telemetry.metrics } else {}),
+          }],
         ]
       else [[placeholderPath]];
 

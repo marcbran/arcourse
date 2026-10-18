@@ -24,8 +24,8 @@ function(c)
         title: titles[idx],
         ancestorVars: accs[i].ancestorVars,
         matchers: c.matcherClause(accs[i].matchers),
-        path: base + ['$' + v for v in accs[i].ancestorVars] + pathSuffixes[i],
-        nextPathSuffix: if i < n then pathSuffixes[i + 1] else null,
+        path: base + ['$' + v for v in accs[i].ancestorVars] + ['metrics'] + pathSuffixes[i],
+        nextPathSuffix: if i < n then ['metrics'] + pathSuffixes[i + 1] else null,
       }
       for i in std.range(0, n)
     ];
