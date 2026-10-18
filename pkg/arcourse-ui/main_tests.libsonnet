@@ -349,6 +349,20 @@ local a = import './main.libsonnet';
       },
     },
     {
+      name: 'list.groupOrder sorts the group cards by their position in it and keeps unlisted groups after them in their original order',
+      input:: function()
+        local link(name) = { _node: true, _queryPath: '/root/' + name };
+        local node = a.list.node {
+          list:: { groupOrder: ['traefik.io', 'apps', 'missing'] },
+          'apps': { deployments: link('apps/deployments') },
+          'hub.traefik.io': { aiservices: link('hub.traefik.io/aiservices') },
+          'cilium.io': { ciliumnodes: link('cilium.io/ciliumnodes') },
+          'traefik.io': { middlewares: link('traefik.io/middlewares') },
+        };
+        [group.title for group in node._view.fragment.groups],
+      expected: ['traefik.io', 'apps', 'cilium.io', 'hub.traefik.io'],
+    },
+    {
       name: 'a.resource.node keeps links beside the content by default and puts the content first when resource.stacked is set',
       input:: function()
         local base = a.resource.node {

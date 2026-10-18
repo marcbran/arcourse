@@ -26,7 +26,8 @@ p.pkg({
     string or returned as an AST. `groupNodes` (default `true`) generates an empty node
     per API group under the context and namespace; with `false` the group segment is a
     plain object, so the context and namespace views link each group's resources
-    directly. `listColumns` (default `4`) is the number of columns the context node and
+    directly, ordered as groups without dots, then `*.k8s.io` groups, then the rest,
+    each as a domain tree so a subdomain follows its parent domain. `listColumns` (default `4`) is the number of columns the context node and
     the namespace detail node lay out their links in; the namespace detail node also
     shows its YAML above the links.
   |||),

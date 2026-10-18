@@ -72,7 +72,16 @@ local childGroups(obj) =
     if std.length(group.items) > 0
   ];
 
-local neighborGroups(obj) = childGroups(obj) + linksGroups(obj);
+local orderGroups(groups, order) =
+  local rank = { [order[i]]: i for i in std.range(0, std.length(order) - 1) };
+  local keyed = [
+    { group: groups[i], key: std.get(rank, groups[i].title, std.length(order) + i) }
+    for i in std.range(0, std.length(groups) - 1)
+  ];
+  [entry.group for entry in std.sort(keyed, function(entry) entry.key)];
+
+local neighborGroups(obj) =
+  orderGroups(childGroups(obj) + linksGroups(obj), std.get(std.get(obj, 'list', {}), 'groupOrder', []));
 
 local safeGet(obj, path) =
   std.foldl(
