@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.21.0](https://github.com/marcbran/arcourse/compare/v0.20.0...v0.21.0) (2026-10-19)
+
+
+### Features
+
+* computed columns ([#142](https://github.com/marcbran/arcourse/issues/142)) ([3315aaf](https://github.com/marcbran/arcourse/commit/3315aaf548e8d9216694ae95b11897e684ca85b6))
+* k8s group links ([#143](https://github.com/marcbran/arcourse/issues/143)) ([e7faaa8](https://github.com/marcbran/arcourse/commit/e7faaa88e43c9253cfc63b8b0f310c8bb6ff6d62))
+
+
+### Bug Fixes
+
+* disable column links ([#138](https://github.com/marcbran/arcourse/issues/138)) ([c2c295e](https://github.com/marcbran/arcourse/commit/c2c295e54f622a27ed551a27f411d582c7b314bf))
+
 ## [0.20.0](https://github.com/marcbran/arcourse/compare/v0.19.0...v0.20.0) (2026-10-09)
 
 
