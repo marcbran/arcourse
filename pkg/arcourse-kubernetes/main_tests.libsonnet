@@ -8,9 +8,10 @@ local manifestLiteral(expr) =
 
 local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
 
-local nodes(groups, globalLinkSpecs=[]) =
+local nodes(groups, globalLinkSpecs=[], groupNodes=true) =
   unwrap(arcourseKubernetes.graph {
     manifest: false,
+    groupNodes: groupNodes,
     globalLinkSpecs: globalLinkSpecs,
     data+: { groups: groups },
   }._view.jsonnet).elements;
@@ -206,6 +207,68 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
           ['kubernetes', '$context', 'acme.io', 'widgets'],
           ['kubernetes', '$context', '$namespace', 'acme.io', 'widgets'],
         ],
+      },
+    },
+    {
+      name: 'groupNodes false omits the empty group scaffold nodes and keeps the resource nodes',
+      input:: function()
+        local resource = { name: 'widgets', kind: 'Widget', namespaced: true, verbs: ['list'], version: 'v1' };
+        local entries = nodes([{ group: 'acme.io', resources: [resource] }], groupNodes=false);
+        { paths: [nodePath(e) for e in entries[2:]] },
+      expected: {
+        paths: [
+          ['kubernetes', '$context', 'acme.io', 'widgets'],
+          ['kubernetes', '$context', '$namespace', 'acme.io', 'widgets'],
+        ],
+      },
+    },
+    {
+      name: 'the context node gets the list column count and the namespaces detail node is stacked with the same columns',
+      input:: function()
+        local namespaces = { name: 'namespaces', kind: 'Namespace', namespaced: false, verbs: ['get'], version: 'v1' };
+        local entriesWith(listColumns) =
+          unwrap(arcourseKubernetes.graph {
+            manifest: false,
+            listColumns: listColumns,
+            data+: { groups: [{ group: '', resources: [namespaces] }] },
+          }._view.jsonnet).elements;
+        local entry(entries, path) = [e for e in entries if nodePath(e) == path][0];
+        local columns(body) = field(field(body, 'list'), 'columns').originalString;
+        local summary(listColumns) =
+          local entries = entriesWith(listColumns);
+          local detail = nodeBody(entry(entries, ['kubernetes', '$context', '$namespace']));
+          {
+            context: columns(entry(entries, ['kubernetes', '$context']).expr.elements[1].expr),
+            detailStacked: field(field(detail, 'resource'), 'stacked').__kind__,
+            detailColumns: columns(detail),
+          };
+        { default: summary(4), overridden: summary(3) },
+      expected: {
+        default: { context: '4', detailStacked: 'LiteralBoolean', detailColumns: '4' },
+        overridden: { context: '3', detailStacked: 'LiteralBoolean', detailColumns: '3' },
+      },
+    },
+    {
+      name: 'without group nodes the context node lists the groups without dots, then the k8s.io domain tree, then the other domain trees',
+      input:: function()
+        local widgets = { name: 'widgets', kind: 'Widget', namespaced: false, verbs: ['list'], version: 'v1' };
+        local groups = ['traefik.io', 'hub.traefik.io', 'apps', 'networking.k8s.io', 'cilium.io', 'flowcontrol.apiserver.k8s.io', 'scheduling.k8s.io'];
+        local entriesWith(groupNodes) =
+          unwrap(arcourseKubernetes.graph {
+            manifest: false,
+            groupNodes: groupNodes,
+            data+: { groups: [{ group: g, resources: [widgets] } for g in groups] },
+          }._view.jsonnet).elements;
+        local contextList(groupNodes) =
+          local ctx = [e for e in entriesWith(groupNodes) if nodePath(e) == ['kubernetes', '$context']][0];
+          field(ctx.expr.elements[1].expr, 'list');
+        {
+          withoutGroupNodes: [e.expr.value for e in field(contextList(false), 'groupOrder').elements],
+          withGroupNodes: fieldNames(contextList(true)),
+        },
+      expected: {
+        withoutGroupNodes: ['apps', 'flowcontrol.apiserver.k8s.io', 'networking.k8s.io', 'scheduling.k8s.io', 'cilium.io', 'traefik.io', 'hub.traefik.io'],
+        withGroupNodes: ['columns'],
       },
     },
     {

@@ -136,3 +136,57 @@ func BenchmarkQueryPodsTable(b *testing.B) {
 		}
 	}
 }
+
+func benchGroupedGraph(groups int, resources int, groupNodes bool) string {
+	return fmt.Sprintf(`
+local a = import 'arcourse-ui/main.libsonnet';
+local groups = %d;
+local resources = %d;
+local groupNodes = %t;
+
+[
+  [[['kubernetes', '$context'], {}]] +
+  (if groupNodes then [[['kubernetes', '$context', 'group' + std.toString(g)], {}] for g in std.range(1, groups)] else []) +
+  [
+    [['kubernetes', '$context', 'group' + std.toString(g), 'resource' + std.toString(r)], a.list.node { kind: 'Resource' }]
+    for g in std.range(1, groups)
+    for r in std.range(1, resources)
+  ],
+  a.default.view,
+]
+`, groups, resources, groupNodes)
+}
+
+func BenchmarkQueryGroupedContext(b *testing.B) {
+	formats := []pkg.Format{pkg.FormatJSON, pkg.FormatHTML}
+	paths := map[string]string{
+		"context":  "root/kubernetes/context/demo",
+		"resource": "root/kubernetes/context/demo/group1/resource1",
+	}
+
+	for _, groups := range []int{25, 100} {
+		for _, groupNodes := range []bool{true, false} {
+			evaluateDir := b.TempDir()
+			err := os.WriteFile(filepath.Join(evaluateDir, "root.jsonnet"), []byte(benchGroupedGraph(groups, 5, groupNodes)), 0o600)
+			if err != nil {
+				b.Fatal(err)
+			}
+			facade := newBenchFacade(b, evaluateDir, true)
+
+			for _, page := range []string{"context", "resource"} {
+				for _, format := range formats {
+					b.Run(fmt.Sprintf("groups=%d/groupNodes=%t/page=%s/format=%s", groups, groupNodes, page, format), func(b *testing.B) {
+						ctx := context.Background()
+						b.ResetTimer()
+						for i := 0; i < b.N; i++ {
+							_, err := facade.Query(ctx, pkg.NewQueryPath(paths[page]), nil, format, pkg.Origin{})
+							if err != nil {
+								b.Fatal(err)
+							}
+						}
+					})
+				}
+			}
+		}
+	}
+}

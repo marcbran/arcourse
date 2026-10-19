@@ -7,9 +7,12 @@ local telemetry = import '../arcourse-telemetry/main.libsonnet';
     base:: ['telemetry', 'kubernetes'],
     vars:: ['context'],
     labels:: ['cluster'],
-    entityBase:: ['kubernetes'],
+    entityPath:: ['kubernetes', '$context'],
     listExpr:: 'count by (%(groupBy)s) (kube_pod_info{%(matchers)s})' % self,
-    logs:: { expr:: '{cluster="%(context)s"}' % self },
+    logs:: {
+      all: { expr:: '{cluster="%(context)s"}' % self },
+      errors: { expr:: '{cluster="%(context)s"} | detected_level=~"error|critical|fatal"' % self },
+    },
     drillDowns:: {},
   },
 
@@ -17,9 +20,12 @@ local telemetry = import '../arcourse-telemetry/main.libsonnet';
     base:: ['telemetry', 'kubernetes'],
     vars:: ['context', 'namespace'],
     labels:: ['cluster', 'namespace'],
-    entityBase:: ['kubernetes'],
+    entityPath:: ['kubernetes', '$context', '$namespace'],
     listExpr:: 'count by (%(groupBy)s) (kube_pod_info{%(matchers)s})' % self,
-    logs:: { expr:: '{cluster="%(context)s", namespace="%(namespace)s"}' % self },
+    logs:: {
+      all: { expr:: '{cluster="%(context)s", namespace="%(namespace)s"}' % self },
+      errors: { expr:: '{cluster="%(context)s", namespace="%(namespace)s"} | detected_level=~"error|critical|fatal"' % self },
+    },
     drillDowns:: {},
   },
 
@@ -27,9 +33,12 @@ local telemetry = import '../arcourse-telemetry/main.libsonnet';
     base:: ['telemetry', 'kubernetes'],
     vars:: ['context', 'namespace', 'pod'],
     labels:: ['cluster', 'namespace', 'pod'],
-    entityBase:: ['kubernetes'],
+    entityPath:: ['kubernetes', '$context', '$namespace', '$pod'],
     listExpr:: 'kube_pod_info{%(matchers)s}' % self,
-    logs:: { expr:: '{cluster="%(context)s", namespace="%(namespace)s"} | pod="%(pod)s"' % self },
+    logs:: {
+      all: { expr:: '{cluster="%(context)s", namespace="%(namespace)s"} | pod="%(pod)s"' % self },
+      errors: { expr:: '{cluster="%(context)s", namespace="%(namespace)s"} | pod="%(pod)s" | detected_level=~"error|critical|fatal"' % self },
+    },
     drillDowns:: {
       phase: $.a.promql.stateTimeline.chart {
         expr:: 'sum by (%(groupBy)s, phase) (kube_pod_status_phase{%(matchers)s}) > 0' % self,
@@ -57,7 +66,10 @@ local telemetry = import '../arcourse-telemetry/main.libsonnet';
     vars:: ['context', 'namespace', 'pod', 'container'],
     labels:: ['cluster', 'namespace', 'pod', 'container'],
     listExpr:: 'container_memory_working_set_bytes{%(matchers)s}' % self,
-    logs:: { expr:: '{cluster="%(context)s", namespace="%(namespace)s", container="%(container)s"} | pod="%(pod)s"' % self },
+    logs:: {
+      all: { expr:: '{cluster="%(context)s", namespace="%(namespace)s", container="%(container)s"} | pod="%(pod)s"' % self },
+      errors: { expr:: '{cluster="%(context)s", namespace="%(namespace)s", container="%(container)s"} | pod="%(pod)s" | detected_level=~"error|critical|fatal"' % self },
+    },
     drillDowns:: {
       restarts: $.a.promql.line.chart {
         expr::
@@ -81,6 +93,7 @@ local telemetry = import '../arcourse-telemetry/main.libsonnet';
   pvc:: {
     base:: ['telemetry', 'kubernetes'],
     vars:: ['context', 'namespace', 'pvc'],
+    entityPath:: ['kubernetes', '$context', '$namespace', '$persistentvolumeclaim'],
     labels:: ['cluster', 'namespace', 'persistentvolumeclaim'],
     titles:: ['Context', 'Namespace', 'PVC'],
     listExpr:: 'kubelet_volume_stats_capacity_bytes{%(matchers)s}' % self,
@@ -99,6 +112,7 @@ local telemetry = import '../arcourse-telemetry/main.libsonnet';
   deployment:: {
     base:: ['telemetry', 'kubernetes'],
     vars:: ['context', 'namespace', 'deployment'],
+    entityPath:: ['kubernetes', '$context', '$namespace', 'apps', '$deployment'],
     labels:: ['cluster', 'namespace', 'deployment'],
     listExpr:: 'kube_deployment_spec_replicas{%(matchers)s}' % self,
     drillDowns:: {
@@ -117,7 +131,7 @@ local telemetry = import '../arcourse-telemetry/main.libsonnet';
     base:: ['telemetry', 'kubernetes'],
     vars:: ['context', 'node'],
     labels:: ['cluster', 'node'],
-    entityBase:: ['kubernetes'],
+    entityPath:: ['kubernetes', '$context', '$node'],
     listExpr:: 'count by (%(groupBy)s) (kube_node_info{%(matchers)s})' % self,
     drillDowns:: {
       conditions: $.a.promql.line.chart {

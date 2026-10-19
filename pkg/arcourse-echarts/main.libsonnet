@@ -24,6 +24,10 @@ local linkPaths(links) = {
   if std.isObject(links[k]) && std.objectHasAll(links[k], '_queryPath')
 };
 
+local panelLinkPaths(node) =
+  if node.type == 'panel' then node { chart: node.chart { links: linkPaths(node.chart.links) } }
+  else node { children: [panelLinkPaths(child) for child in node.children] };
+
 local chartView = baseView {
   _view+:: {
     fragment:
@@ -43,7 +47,7 @@ local dashboardView = baseView {
     fragment:
       c.panel {
         child:: c.dashboard {
-          layout:: $.tree,
+          layout:: panelLinkPaths($.tree),
           height:: std.get($, 'height', '600px'),
         },
       },

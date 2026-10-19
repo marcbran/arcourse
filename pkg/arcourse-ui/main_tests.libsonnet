@@ -275,17 +275,43 @@ local a = import './main.libsonnet';
       ],
     },
     {
-      name: 'a non-node child recurses to render each reachable node as a slash-labeled link',
+      name: 'a non-node child renders as a titled group of its reachable nodes, deeper nodes slash-labeled within the group, empty ones omitted',
       input:: function()
         local node = a.list.node {
           arcourse: { _node: true, _queryPath: '/root/arcourse' },
-          kubernetes: { contexts: { _node: true, _queryPath: '/root/kubernetes/contexts' } },
+          kubernetes: {
+            contexts: { _node: true, _queryPath: '/root/kubernetes/contexts' },
+            nested: { deep: { _node: true, _queryPath: '/root/kubernetes/nested/deep' } },
+          },
           form3: {},
         };
-        [{ link: i.link, text: i.text } for i in node._view.fragment.items],
+        {
+          items: [{ link: i.link, text: i.text } for i in node._view.fragment.items],
+          groups: [{ title: g.title, items: [{ link: i.link, text: i.text } for i in g.items] } for g in node._view.fragment.groups],
+        },
+      expected: {
+        items: [{ link: '/root/arcourse', text: 'arcourse' }],
+        groups: [{
+          title: 'kubernetes',
+          items: [
+            { link: '/root/kubernetes/contexts', text: 'contexts' },
+            { link: '/root/kubernetes/nested/deep', text: 'nested/deep' },
+          ],
+        }],
+      },
+    },
+    {
+      name: 'a node reachable through a links group is not repeated in a child group',
+      input:: function()
+        local deployments = { _node: true, _queryPath: '/root/apps/deployments' };
+        local node = a.list.node {
+          apps: { deployments: deployments, statefulsets: { _node: true, _queryPath: '/root/apps/statefulsets' } },
+          links: { curated: { deployments: deployments } },
+        };
+        [{ title: g.title, items: [i.text for i in g.items] } for g in node._view.fragment.groups],
       expected: [
-        { link: '/root/arcourse', text: 'arcourse' },
-        { link: '/root/kubernetes/contexts', text: 'kubernetes/contexts' },
+        { title: 'curated', items: ['deployments'] },
+        { title: 'apps', items: ['statefulsets'] },
       ],
     },
     {
@@ -299,6 +325,61 @@ local a = import './main.libsonnet';
         };
         [{ link: i.link, text: i.text } for i in node._view.fragment.items],
       expected: [],
+    },
+    {
+      name: 'list.columns splits the cards in order into that many columns balanced by line count',
+      input:: function()
+        local link(name) = { _node: true, _queryPath: '/root/' + name };
+        local node = a.list.node {
+          list:: { columns: 2 },
+          core: link('core'),
+          a: { x1: link('a/x1'), x2: link('a/x2'), x3: link('a/x3') },
+          b: { y1: link('b/y1') },
+          c: { z1: link('c/z1'), z2: link('c/z2') },
+        };
+        local aside = node._view.fragment.html[1];
+        local cardTitle(nav) = if std.get(nav.children[0], 'element', null) == 'strong' then nav.children[0].children[0] else 'items';
+        {
+          class: aside.attributes.class,
+          columns: [[cardTitle(nav) for nav in column.children] for column in aside.children],
+        },
+      expected: {
+        class: 'list columns',
+        columns: [['items', 'a'], ['b', 'c']],
+      },
+    },
+    {
+      name: 'list.groupOrder sorts the group cards by their position in it and keeps unlisted groups after them in their original order',
+      input:: function()
+        local link(name) = { _node: true, _queryPath: '/root/' + name };
+        local node = a.list.node {
+          list:: { groupOrder: ['traefik.io', 'apps', 'missing'] },
+          'apps': { deployments: link('apps/deployments') },
+          'hub.traefik.io': { aiservices: link('hub.traefik.io/aiservices') },
+          'cilium.io': { ciliumnodes: link('cilium.io/ciliumnodes') },
+          'traefik.io': { middlewares: link('traefik.io/middlewares') },
+        };
+        [group.title for group in node._view.fragment.groups],
+      expected: ['traefik.io', 'apps', 'cilium.io', 'hub.traefik.io'],
+    },
+    {
+      name: 'a.resource.node keeps links beside the content by default and puts the content first when resource.stacked is set',
+      input:: function()
+        local base = a.resource.node {
+          data: { id: 'x' },
+          child: { _node: true, _queryPath: '/root/x/child' },
+        };
+        local layout(node) =
+          local div = node._view.fragment.html[1];
+          { class: div.attributes.class, first: div.children[0].html[1].attributes.class };
+        {
+          default: layout(base),
+          stacked: layout(base { resource:: { stacked: true } }),
+        },
+      expected: {
+        default: { class: 'resource', first: 'list' },
+        stacked: { class: 'resource stacked', first: 'yaml card' },
+      },
     },
     {
       name: 'a.resource.node without linkSpecs exposes an empty links object',

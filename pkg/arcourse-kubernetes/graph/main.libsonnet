@@ -57,7 +57,30 @@ local ownerReferenceLinkSpec = {
   ],
 };
 
-local generate(resources, group, links=[], globalLinkSpecs=[]) =
+local groupOrder(groups) =
+  local dots(group) = std.length(std.findSubstr('.', group));
+  local category(group) =
+    if dots(group) == 0 then 0
+    else if std.endsWith(group, '.k8s.io') then 1
+    else 2;
+  std.sort(groups, function(group) [category(group)] + std.reverse(std.split(group, '.')));
+
+local listViewField(columns, order) =
+  local le(indent) = j.Fodder.LineEnd(0, indent);
+  local columnsField = j.Field('columns', j.Number(std.toString(columns)));
+  j.Field(
+    'list',
+    if std.length(order) == 0 then j.Object([columnsField])
+    else j.Object([
+      field { fodder: [le(6)] }
+      for field in [
+        columnsField,
+        j.Field('groupOrder', j.Array([j.String(group).fodder(le(8)) for group in order]).closeFodder(le(6))),
+      ]
+    ]).closeFodder(le(4))
+  ) { Hide: 0 };
+
+local generate(resources, group, links=[], globalLinkSpecs=[], groupNodes=true, listColumns=4, order=[]) =
   local le(indent=0) = j.Fodder.LineEnd(0, indent);
   local prettyArray(elements, indent=0) =
     j.Array([elem.fodder(le(indent + 2)) for elem in elements]).closeFodder(le(indent));
@@ -218,9 +241,10 @@ local generate(resources, group, links=[], globalLinkSpecs=[]) =
     j.Field('data', expr) { Hide: if hidden then 0 else 1 };
   local linkSpecEntry(spec) =
     prettyObject([objectField(field, compactLiteral(spec[field])) for field in ['at', 'keys', 'value']], 6);
-  local dataObject(expr, linkSpecs=[]) = prettyObject(
+  local dataObject(expr, linkSpecs=[], viewFields=[]) = prettyObject(
     [dataField(expr)] +
-    (if std.length(linkSpecs) > 0 then [j.Field('linkSpecs', prettyArray([linkSpecEntry(s) for s in linkSpecs], 4)) { Hide: 0 }] else []),
+    (if std.length(linkSpecs) > 0 then [j.Field('linkSpecs', prettyArray([linkSpecEntry(s) for s in linkSpecs], 4)) { Hide: 0 }] else []) +
+    viewFields,
     2
   );
   local listObject(dataExpr, linkSpecs, columnsExpr=null) = prettyObject(
@@ -289,11 +313,16 @@ local generate(resources, group, links=[], globalLinkSpecs=[]) =
       listObject(data, linkSpecs, columnsExpr)
     );
 
+  local namespaceViewFields(resource) =
+    if group == '' && resource.name == 'namespaces' then [
+      j.Field('resource', compactLiteral({ stacked: true })) { Hide: 0 },
+      listViewField(listColumns, order),
+    ] else [];
   local clusterDetail(resource) =
     node(
       ['kubernetes', '$context'] + resourcePrefix + ['$' + itemVar(resource)],
       nodeView('resource'),
-      dataObject(k8sNeatGet(clusterDetailPath(resource)), globalLinkSpecs + linksAt(clusterDetailPathStr(resource)))
+      dataObject(k8sNeatGet(clusterDetailPath(resource)), globalLinkSpecs + linksAt(clusterDetailPathStr(resource)), namespaceViewFields(resource))
     );
 
   local resourceNodes(resource) =
@@ -305,9 +334,9 @@ local generate(resources, group, links=[], globalLinkSpecs=[]) =
       (if hasVerb(resource, 'get') then [clusterDetail(resource)] else []);
 
   local hasNamespacedResources = std.length([r for r in resources if r.namespaced]) > 0;
-  local groupContextNodes = if group != '' then [emptyNode(['kubernetes', '$context', group])] else [];
+  local groupContextNodes = if groupNodes && group != '' then [emptyNode(['kubernetes', '$context', group])] else [];
   local groupNamespaceNodes =
-    if group != '' && hasNamespacedResources
+    if groupNodes && group != '' && hasNamespacedResources
     then [emptyNode(['kubernetes', '$context', '$namespace', group])]
     else [];
 
@@ -315,7 +344,8 @@ local generate(resources, group, links=[], globalLinkSpecs=[]) =
   groupNamespaceNodes +
   std.flattenArrays([resourceNodes(r) for r in resources]);
 
-local generateAll(groups, manifest=true, globalLinkSpecs=[]) =
+local generateAll(groups, manifest=true, globalLinkSpecs=[], groupNodes=true, listColumns=4) =
+  local order = if groupNodes then [] else groupOrder(std.set([g.group for g in groups if g.group != '']));
   local le(indent=0) = j.Fodder.LineEnd(0, indent);
   local prettyArray(elements, indent=0) =
     j.Array([elem.fodder(le(indent + 2)) for elem in elements]).closeFodder(le(indent));
@@ -346,11 +376,11 @@ local generateAll(groups, manifest=true, globalLinkSpecs=[]) =
   ]);
   local contextNode = j.Array([
     j.Array([j.String('kubernetes'), j.String('$context')]),
-    j.Object(),
+    prettyObject([listViewField(listColumns, order)], 2),
   ]);
 
   local allRouteNodes = [contextsNode, contextNode] + std.flattenArrays([
-    generate(g.resources, g.group, std.get(g, 'links', []), globalLinkSpecs)
+    generate(g.resources, g.group, std.get(g, 'links', []), globalLinkSpecs, groupNodes, listColumns, order)
     for g in groups
   ]);
   local binds = [
@@ -524,6 +554,8 @@ local groupsFromSpecs(specs, columns, links) =
 {
   _record: false,
   manifest:: true,
+  groupNodes:: true,
+  listColumns:: 4,
   contexts:: [],
   specs:: {},
   globalLinkSpecs:: [namespaceLinkSpec, ownerReferenceLinkSpec],
@@ -537,6 +569,6 @@ local groupsFromSpecs(specs, columns, links) =
       ),
     },
   _view:: {
-    jsonnet: generateAll($.data.groups, $.manifest, $.globalLinkSpecs),
+    jsonnet: generateAll($.data.groups, $.manifest, $.globalLinkSpecs, $.groupNodes, $.listColumns),
   },
 }
