@@ -8,10 +8,10 @@ local manifestLiteral(expr) =
 
 local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
 
-local nodes(groups, globalLinkSpecs=[], groupNodes=true) =
+local nodes(groups, globalLinkSpecs=[], collapsedGroups=[]) =
   unwrap(arcourseKubernetes.graph {
     manifest: false,
-    groupNodes: groupNodes,
+    collapsedGroups: collapsedGroups,
     globalLinkSpecs: globalLinkSpecs,
     data+: { groups: groups },
   }._view.jsonnet).elements;
@@ -22,6 +22,28 @@ local nodeBody(entry) = entry.expr.elements[1].expr.right;
 local nodeKind(entry) = [nodeView(entry).id, nodeView(entry).target.id, nodeView(entry).target.target.id];
 local fieldNames(body) = [f.id for f in body.fields];
 local field(body, name) = [f for f in body.fields if f.id == name][0].expr2;
+local listLiteral(body) =
+  local fieldName(f) = if f.id != null then f.id else f.expr1.value;
+  local literal(expr) =
+    if expr.__kind__ == 'LiteralNumber' then expr.originalString
+    else if expr.__kind__ == 'Object' then { [fieldName(f)]: literal(f.expr2) for f in expr.fields }
+    else manifestLiteral(expr);
+  literal([f for f in body.fields if f.id == 'list'][0].expr2);
+local groupLists(groups, favoriteGroups=[], collapsedGroups=[], namespacedGroups=[], remainingGroupsTitle='remaining groups') =
+  local namespaces = { name: 'namespaces', kind: 'Namespace', namespaced: false, verbs: ['get'], version: 'v1' };
+  local widgets(group) = { name: 'widgets', kind: 'Widget', namespaced: std.member(namespacedGroups, group), verbs: ['list'], version: 'v1' };
+  local entries = unwrap(arcourseKubernetes.graph {
+    manifest: false,
+    favoriteGroups: favoriteGroups,
+    collapsedGroups: collapsedGroups,
+    remainingGroupsTitle: remainingGroupsTitle,
+    data+: { groups: [{ group: '', resources: [namespaces] }] + [{ group: g, resources: [widgets(g)] } for g in groups] },
+  }._view.jsonnet).elements;
+  local body(path) = [nodeBody(e) for e in entries if nodePath(e) == path][0];
+  {
+    context: listLiteral(entries[1].expr.elements[1].expr),
+    namespace: listLiteral(body(['kubernetes', '$context', '$namespace'])),
+  };
 local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.target.target.target.id];
 
 {
@@ -195,10 +217,10 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
       },
     },
     {
-      name: 'a non-empty group inserts empty scaffold nodes for the group context and (when namespaced resources exist) the group namespace',
+      name: 'a collapsed group inserts empty scaffold nodes for the group context and (when namespaced resources exist) the group namespace',
       input:: function()
         local resource = { name: 'widgets', kind: 'Widget', namespaced: true, verbs: ['list'], version: 'v1' };
-        local entries = nodes([{ group: 'acme.io', resources: [resource] }]);
+        local entries = nodes([{ group: 'acme.io', resources: [resource] }], collapsedGroups=['acme.io']);
         { paths: [nodePath(e) for e in entries[2:]] },
       expected: {
         paths: [
@@ -210,10 +232,10 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
       },
     },
     {
-      name: 'groupNodes false omits the empty group scaffold nodes and keeps the resource nodes',
+      name: 'an expanded group omits the empty group scaffold nodes and keeps the resource nodes',
       input:: function()
         local resource = { name: 'widgets', kind: 'Widget', namespaced: true, verbs: ['list'], version: 'v1' };
-        local entries = nodes([{ group: 'acme.io', resources: [resource] }], groupNodes=false);
+        local entries = nodes([{ group: 'acme.io', resources: [resource] }]);
         { paths: [nodePath(e) for e in entries[2:]] },
       expected: {
         paths: [
@@ -249,26 +271,86 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
       },
     },
     {
-      name: 'without group nodes the context node lists the groups without dots, then the k8s.io domain tree, then the other domain trees',
+      name: 'by default the context node lists the groups without dots, then the domain trees, all expanded',
       input:: function()
-        local widgets = { name: 'widgets', kind: 'Widget', namespaced: false, verbs: ['list'], version: 'v1' };
-        local groups = ['traefik.io', 'hub.traefik.io', 'apps', 'networking.k8s.io', 'cilium.io', 'flowcontrol.apiserver.k8s.io', 'scheduling.k8s.io'];
-        local entriesWith(groupNodes) =
-          unwrap(arcourseKubernetes.graph {
-            manifest: false,
-            groupNodes: groupNodes,
-            data+: { groups: [{ group: g, resources: [widgets] } for g in groups] },
-          }._view.jsonnet).elements;
-        local contextList(groupNodes) =
-          local ctx = [e for e in entriesWith(groupNodes) if nodePath(e) == ['kubernetes', '$context']][0];
-          field(ctx.expr.elements[1].expr, 'list');
+        local lists = groupLists(['traefik.io', 'hub.traefik.io', 'apps', 'networking.k8s.io', 'cilium.io', 'flowcontrol.apiserver.k8s.io', 'scheduling.k8s.io']);
+        lists.context,
+      expected: {
+        columns: '4',
+        groupOrder: ['apps', 'cilium.io', 'flowcontrol.apiserver.k8s.io', 'networking.k8s.io', 'scheduling.k8s.io', 'traefik.io', 'hub.traefik.io'],
+      },
+    },
+    {
+      name: 'favoriteGroups rank each group by its most specific matching favorite and keep the default order within a rank',
+      input:: function()
+        local lists = groupLists(
+          ['apps', 'batch', 'networking.k8s.io', 'storage.k8s.io', 'coordination.k8s.io', 'cert-manager.io', 'acme.cert-manager.io', 'cilium.io'],
+          favoriteGroups=['k8s.io', 'cert-manager.io', 'networking.k8s.io', 'batch'],
+        );
+        lists.context.groupOrder,
+      expected: ['coordination.k8s.io', 'storage.k8s.io', 'cert-manager.io', 'acme.cert-manager.io', 'networking.k8s.io', 'batch', 'apps', 'cilium.io'],
+    },
+    {
+      name: 'collapsedGroups move groups into a remaining groups node group placed after the expanded groups',
+      input:: function()
+        local lists = groupLists(['apps', 'networking.k8s.io', 'storage.k8s.io', 'cilium.io'], collapsedGroups=['k8s.io', 'cilium.io']);
+        lists.context,
+      expected: {
+        columns: '4',
+        groupOrder: ['apps', 'remaining groups'],
+        nodeGroups: { 'remaining groups': ['cilium.io', 'networking.k8s.io', 'storage.k8s.io'] },
+      },
+    },
+    {
+      name: 'the more specific of the matching favorite and collapsed patterns wins and a tie goes to the favorite',
+      input:: function()
+        local collapsed(favoriteGroups, collapsedGroups) =
+          groupLists(['networking.k8s.io', 'storage.k8s.io'], favoriteGroups, collapsedGroups).context.nodeGroups['remaining groups'];
         {
-          withoutGroupNodes: [e.expr.value for e in field(contextList(false), 'groupOrder').elements],
-          withGroupNodes: fieldNames(contextList(true)),
+          favoriteSubdomain: collapsed(['networking.k8s.io'], ['k8s.io']),
+          collapsedSubdomain: collapsed(['k8s.io'], ['networking.k8s.io']),
+          tie: std.get(groupLists(['networking.k8s.io'], ['k8s.io'], ['k8s.io']).context, 'nodeGroups', null),
         },
       expected: {
-        withoutGroupNodes: ['apps', 'flowcontrol.apiserver.k8s.io', 'networking.k8s.io', 'scheduling.k8s.io', 'cilium.io', 'traefik.io', 'hub.traefik.io'],
-        withGroupNodes: ['columns'],
+        favoriteSubdomain: ['storage.k8s.io'],
+        collapsedSubdomain: ['networking.k8s.io'],
+        tie: null,
+      },
+    },
+    {
+      name: 'a *.domain pattern matches only the subdomains and is more specific than the domain but less than an exact subdomain',
+      input:: function()
+        local lists = groupLists(
+          ['cert-manager.io', 'acme.cert-manager.io', 'other.cert-manager.io', 'external-secrets.io', 'generators.external-secrets.io'],
+          favoriteGroups=['cert-manager.io', 'external-secrets.io', 'other.cert-manager.io'],
+          collapsedGroups=['*.cert-manager.io', '*.external-secrets.io'],
+        );
+        lists.context,
+      expected: {
+        columns: '4',
+        groupOrder: ['cert-manager.io', 'external-secrets.io', 'other.cert-manager.io', 'remaining groups'],
+        nodeGroups: { 'remaining groups': ['acme.cert-manager.io', 'generators.external-secrets.io'] },
+      },
+    },
+    {
+      name: 'the * collapsed pattern collapses every group except the favorites',
+      input:: function()
+        local lists = groupLists(['apps', 'batch', 'cilium.io'], favoriteGroups=['batch'], collapsedGroups=['*']);
+        lists.context,
+      expected: {
+        columns: '4',
+        groupOrder: ['batch', 'remaining groups'],
+        nodeGroups: { 'remaining groups': ['apps', 'cilium.io'] },
+      },
+    },
+    {
+      name: 'the namespace detail node only lists collapsed groups with namespaced resources and remainingGroupsTitle renames the node group',
+      input:: function()
+        local lists = groupLists(['apps', 'cilium.io'], collapsedGroups=['*'], namespacedGroups=['apps'], remainingGroupsTitle='more');
+        { context: lists.context.nodeGroups, namespace: lists.namespace.nodeGroups },
+      expected: {
+        context: { more: ['apps', 'cilium.io'] },
+        namespace: { more: ['apps'] },
       },
     },
     {
@@ -313,7 +395,6 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
         { paths: [nodePath(e) for e in entries[2:]] },
       expected: {
         paths: [
-          ['kubernetes', '$context', 'acme.io'],
           ['kubernetes', '$context', 'acme.io', 'widgets'],
           ['kubernetes', '$context', 'acme.io', '$widget'],
         ],

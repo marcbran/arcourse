@@ -24,11 +24,17 @@ p.pkg({
     Root package. `contexts` are the configured kubeconfig context(s), `columns` and
     `links` (both keyed by group version) override the defaults per resource, and
     `manifest` (default `true`) controls whether `_view.jsonnet` is rendered as a
-    string or returned as an AST. `groupNodes` (default `true`) generates an empty node
-    per API group under the context and namespace; with `false` the group segment is a
-    plain object, so the context and namespace views link each group's resources
-    directly, ordered as groups without dots, then `*.k8s.io` groups, then the rest,
-    each as a domain tree so a subdomain follows its parent domain. `listColumns` (default `4`) is the number of columns the context node and
+    string or returned as an AST. Each API group is shown on the context and namespace
+    views as a card linking its resources directly. Groups are ordered as groups without
+    dots, then the rest as a domain tree so a subdomain follows its parent domain. `favoriteGroups` (default `[]`) is a list of domain
+    patterns shown first: a pattern matches the group itself and its subdomains, `*.domain`
+    matches only the subdomains and `*` matches every group; each group ranks at the
+    position of its most specific matching favorite. `collapsedGroups`
+    (default `[]`) is a list of domain patterns whose groups get
+    an empty node instead of a card; their links are listed in one card titled
+    `remainingGroupsTitle` (default `'remaining groups'`) after the other cards. When a
+    group matches both lists, the more specific pattern wins and a tie goes to the favorite.
+    `listColumns` (default `4`) is the number of columns the context node and
     the namespace detail node lay out their links in; the namespace detail node also
     shows its YAML above the links.
   |||),

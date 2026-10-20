@@ -363,6 +363,32 @@ local a = import './main.libsonnet';
       expected: ['traefik.io', 'apps', 'cilium.io', 'hub.traefik.io'],
     },
     {
+      name: 'list.nodeGroups moves the listed node neighbors out of the items into a group card in the listed order, sorted by list.groupOrder',
+      input:: function()
+        local link(name) = { _node: true, _queryPath: '/root/' + name };
+        local node = a.list.node {
+          list:: {
+            groupOrder: ['apps', 'remaining groups'],
+            nodeGroups: { 'remaining groups': ['traefik.io', 'cilium.io', 'missing'] },
+          },
+          pods: link('pods'),
+          'cilium.io': link('cilium.io'),
+          'traefik.io': link('traefik.io'),
+          apps: { deployments: link('apps/deployments') },
+        };
+        {
+          items: [item.text for item in node._view.fragment.items],
+          groups: [{ title: group.title, items: [item.text for item in group.items] } for group in node._view.fragment.groups],
+        },
+      expected: {
+        items: ['pods'],
+        groups: [
+          { title: 'apps', items: ['deployments'] },
+          { title: 'remaining groups', items: ['traefik.io', 'cilium.io'] },
+        ],
+      },
+    },
+    {
       name: 'a.resource.node keeps links beside the content by default and puts the content first when resource.stacked is set',
       input:: function()
         local base = a.resource.node {
