@@ -54,13 +54,37 @@ local neighborKeys(obj) = [
   if !std.member(['data', '_view', 'links'], k) && std.substr(k, 0, 1) != '_' && std.type(obj[k]) == 'object'
 ];
 
+local nodeGroupsSpec(obj) = std.get(std.get(obj, 'list', {}), 'nodeGroups', {});
+
+local nodeGroupedKeys(obj) =
+  local spec = nodeGroupsSpec(obj);
+  std.set(std.flattenArrays([spec[title] for title in std.objectFields(spec)]));
+
 local neighborItems(obj) =
   local curated = curatedLinks(obj);
+  local grouped = nodeGroupedKeys(obj);
   [
     { link: obj[k]._queryPath, text: k }
     for k in neighborKeys(obj)
-    if isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated)
+    if isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated) && !std.setMember(k, grouped)
   ] + linksItems(obj);
+
+local nodeGroups(obj) =
+  local spec = nodeGroupsSpec(obj);
+  local curated = curatedLinks(obj);
+  [
+    group
+    for title in std.objectFields(spec)
+    for group in [{
+      title: title,
+      items: [
+        { link: obj[k]._queryPath, text: k }
+        for k in spec[title]
+        if std.objectHas(obj, k) && isNode(obj[k]) && !std.setMember(obj[k]._queryPath, curated)
+      ],
+    }]
+    if std.length(group.items) > 0
+  ];
 
 local childGroups(obj) =
   local curated = curatedLinks(obj);
@@ -81,7 +105,7 @@ local orderGroups(groups, order) =
   [entry.group for entry in std.sort(keyed, function(entry) entry.key)];
 
 local neighborGroups(obj) =
-  linksGroups(obj) + orderGroups(childGroups(obj), std.get(std.get(obj, 'list', {}), 'groupOrder', []));
+  linksGroups(obj) + orderGroups(childGroups(obj) + nodeGroups(obj), std.get(std.get(obj, 'list', {}), 'groupOrder', []));
 
 local safeGet(obj, path) =
   std.foldl(

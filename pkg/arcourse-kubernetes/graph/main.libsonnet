@@ -57,30 +57,60 @@ local ownerReferenceLinkSpec = {
   ],
 };
 
-local groupOrder(groups) =
-  local dots(group) = std.length(std.findSubstr('.', group));
-  local category(group) =
-    if dots(group) == 0 then 0
-    else if std.endsWith(group, '.k8s.io') then 1
-    else 2;
-  std.sort(groups, function(group) [category(group)] + std.reverse(std.split(group, '.')));
+local isSubdomainPattern(pattern) = std.startsWith(pattern, '*.');
 
-local listViewField(columns, order) =
+local matchesGroup(pattern, group) =
+  if pattern == '*' then true
+  else if isSubdomainPattern(pattern) then std.endsWith(group, pattern[1:])
+  else group == pattern || std.endsWith(group, '.' + pattern);
+
+local patternSpecificity(pattern) =
+  if pattern == '*' then 0
+  else if isSubdomainPattern(pattern) then std.length(std.split(pattern[2:], '.')) + 0.5
+  else std.length(std.split(pattern, '.'));
+
+local bestMatch(patterns, group) =
+  local matches = [
+    { index: i, specificity: patternSpecificity(patterns[i]) }
+    for i in std.range(0, std.length(patterns) - 1)
+    if matchesGroup(patterns[i], group)
+  ];
+  if std.length(matches) == 0 then null
+  else std.sort(matches, function(m) [-m.specificity, m.index])[0];
+
+local groupLayout(groups, favorites, collapsed) =
+  local category(group) = if std.length(std.findSubstr('.', group)) == 0 then 0 else 1;
+  local favoriteRank(group) =
+    local m = bestMatch(favorites, group);
+    if m == null then std.length(favorites) else m.index;
+  local isCollapsed(group) =
+    local c = bestMatch(collapsed, group);
+    local f = bestMatch(favorites, group);
+    c != null && (f == null || c.specificity > f.specificity);
+  local ordered = std.sort(groups, function(group) [favoriteRank(group), category(group)] + std.reverse(std.split(group, '.')));
+  {
+    expanded: [g for g in ordered if !isCollapsed(g)],
+    collapsed: [g for g in ordered if isCollapsed(g)],
+  };
+
+local listViewField(columns, layout, remainingTitle) =
   local le(indent) = j.Fodder.LineEnd(0, indent);
-  local columnsField = j.Field('columns', j.Number(std.toString(columns)));
+  local stringArray(values) = j.Array([j.String(v).fodder(le(8)) for v in values]).closeFodder(le(6));
+  local hasCollapsed = std.length(layout.collapsed) > 0;
+  local order = layout.expanded + (if hasCollapsed then [remainingTitle] else []);
+  local fields =
+    [j.Field('columns', j.Number(std.toString(columns)))] +
+    (if std.length(order) > 0 then [j.Field('groupOrder', stringArray(order))] else []) +
+    (if hasCollapsed then [j.Field('nodeGroups', j.Object([
+       j.Field(j.String(remainingTitle), j.Array([j.String(g).fodder(le(10)) for g in layout.collapsed]).closeFodder(le(8))) { fodder: [le(8)] },
+     ]).closeFodder(le(6)))] else []);
   j.Field(
     'list',
-    if std.length(order) == 0 then j.Object([columnsField])
-    else j.Object([
-      field { fodder: [le(6)] }
-      for field in [
-        columnsField,
-        j.Field('groupOrder', j.Array([j.String(group).fodder(le(8)) for group in order]).closeFodder(le(6))),
-      ]
-    ]).closeFodder(le(4))
+    if std.length(fields) == 1 then j.Object(fields)
+    else j.Object([field { fodder: [le(6)] } for field in fields]).closeFodder(le(4))
   ) { Hide: 0 };
 
-local generate(resources, group, links=[], globalLinkSpecs=[], groupNodes=true, listColumns=4, order=[]) =
+local generate(resources, group, links=[], globalLinkSpecs=[], collapsed=false, namespaceListField=null) =
   local le(indent=0) = j.Fodder.LineEnd(0, indent);
   local prettyArray(elements, indent=0) =
     j.Array([elem.fodder(le(indent + 2)) for elem in elements]).closeFodder(le(indent));
@@ -316,7 +346,7 @@ local generate(resources, group, links=[], globalLinkSpecs=[], groupNodes=true, 
   local namespaceViewFields(resource) =
     if group == '' && resource.name == 'namespaces' then [
       j.Field('resource', compactLiteral({ stacked: true })) { Hide: 0 },
-      listViewField(listColumns, order),
+      namespaceListField,
     ] else [];
   local clusterDetail(resource) =
     node(
@@ -334,9 +364,9 @@ local generate(resources, group, links=[], globalLinkSpecs=[], groupNodes=true, 
       (if hasVerb(resource, 'get') then [clusterDetail(resource)] else []);
 
   local hasNamespacedResources = std.length([r for r in resources if r.namespaced]) > 0;
-  local groupContextNodes = if groupNodes && group != '' then [emptyNode(['kubernetes', '$context', group])] else [];
+  local groupContextNodes = if collapsed && group != '' then [emptyNode(['kubernetes', '$context', group])] else [];
   local groupNamespaceNodes =
-    if groupNodes && group != '' && hasNamespacedResources
+    if collapsed && group != '' && hasNamespacedResources
     then [emptyNode(['kubernetes', '$context', '$namespace', group])]
     else [];
 
@@ -344,8 +374,11 @@ local generate(resources, group, links=[], globalLinkSpecs=[], groupNodes=true, 
   groupNamespaceNodes +
   std.flattenArrays([resourceNodes(r) for r in resources]);
 
-local generateAll(groups, manifest=true, globalLinkSpecs=[], groupNodes=true, listColumns=4) =
-  local order = if groupNodes then [] else groupOrder(std.set([g.group for g in groups if g.group != '']));
+local generateAll(groups, manifest=true, globalLinkSpecs=[], listColumns=4, favoriteGroups=[], collapsedGroups=[], remainingGroupsTitle='remaining groups') =
+  local layout = groupLayout(std.set([g.group for g in groups if g.group != '']), favoriteGroups, collapsedGroups);
+  local namespacedGroups = std.set([g.group for g in groups if std.length([r for r in g.resources if r.namespaced]) > 0]);
+  local namespaceLayout = layout { collapsed: [g for g in super.collapsed if std.setMember(g, namespacedGroups)] };
+  local namespaceListField = listViewField(listColumns, namespaceLayout, remainingGroupsTitle);
   local le(indent=0) = j.Fodder.LineEnd(0, indent);
   local prettyArray(elements, indent=0) =
     j.Array([elem.fodder(le(indent + 2)) for elem in elements]).closeFodder(le(indent));
@@ -376,11 +409,11 @@ local generateAll(groups, manifest=true, globalLinkSpecs=[], groupNodes=true, li
   ]);
   local contextNode = j.Array([
     j.Array([j.String('kubernetes'), j.String('$context')]),
-    prettyObject([listViewField(listColumns, order)], 2),
+    prettyObject([listViewField(listColumns, layout, remainingGroupsTitle)], 2),
   ]);
 
   local allRouteNodes = [contextsNode, contextNode] + std.flattenArrays([
-    generate(g.resources, g.group, std.get(g, 'links', []), globalLinkSpecs, groupNodes, listColumns, order)
+    generate(g.resources, g.group, std.get(g, 'links', []), globalLinkSpecs, std.member(layout.collapsed, g.group), namespaceListField)
     for g in groups
   ]);
   local binds = [
@@ -554,7 +587,9 @@ local groupsFromSpecs(specs, columns, links) =
 {
   _record: false,
   manifest:: true,
-  groupNodes:: true,
+  favoriteGroups:: [],
+  collapsedGroups:: [],
+  remainingGroupsTitle:: 'remaining groups',
   listColumns:: 4,
   contexts:: [],
   specs:: {},
@@ -569,6 +604,6 @@ local groupsFromSpecs(specs, columns, links) =
       ),
     },
   _view:: {
-    jsonnet: generateAll($.data.groups, $.manifest, $.globalLinkSpecs, $.groupNodes, $.listColumns),
+    jsonnet: generateAll($.data.groups, $.manifest, $.globalLinkSpecs, $.listColumns, $.favoriteGroups, $.collapsedGroups, $.remainingGroupsTitle),
   },
 }
