@@ -8,8 +8,9 @@ p.pkg({
   target: 'arcourse-kubernetes',
   external: ['root'],
   plugins: [
-    p.plugin.github('marcbran/jsonnet-plugin-kubernetes', 'v0.1.0'),
-    p.plugin.github('marcbran/jsonnet-plugin-jsonnet', 'v0.3.0'),
+    p.plugin.github('marcbran/jsonnet-plugin-kubernetes', 'v0.9.0'),
+    p.plugin.github('marcbran/jsonnet-plugin-jsonnet', 'v0.4.0'),
+    p.plugin.github('marcbran/jsonnet-plugin-time', 'v0.3.1'),
   ],
 }, |||
   Generates an arcourse graph for browsing Kubernetes resources via the raw REST API.

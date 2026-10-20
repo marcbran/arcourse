@@ -1,6 +1,7 @@
 local a = import '../../arcourse-ui/main.libsonnet';
 local coreLib = import 'core.libsonnet';
 local kubernetes = import '../kubernetes/main.libsonnet';
+local time = import '../time/main.libsonnet';
 local root = import 'root';
 
 local podSelectorTable = a.table.node + coreLib.podTableNode {
@@ -28,10 +29,21 @@ local restartNode = a.action.node {
   _summary: 'Restart %s/%s in %s' % [$.resource, $.resourceName, $.namespace],
   _action: {
     plugin: 'kubernetes',
-    name: 'restart',
+    name: 'patch',
     data: {
       ctx: $.context,
       path: std.format('/apis/apps/v1/namespaces/%s/%s/%s', [std.toString($.namespace), $.resource, $.resourceName]),
+      patch: {
+        spec: {
+          template: {
+            metadata: {
+              annotations: {
+                'kubectl.kubernetes.io/restartedAt': time.format(time.now(), '2006-01-02T15:04:05Z07:00'),
+              },
+            },
+          },
+        },
+      },
     },
     redirect: $.redirectTo,
   },
@@ -47,17 +59,17 @@ local nodeList = [
   [['kubernetes', '$context', '$namespace', 'apps', '$daemonset', 'pods'], podSelectorTable {
     selector: kubernetes.neat.get($.context, std.format('/apis/apps/v1/namespaces/%s/daemonsets/%s', [std.toString($.namespace), std.toString($.daemonset)])).spec.selector.matchLabels,
   }],
-  [['kubernetes', '$context', '$namespace', 'apps', '$deployment', 'restart'], restartNode {
+  [['kubernetes', '$context', '$namespace', 'apps', '$deployment', 'action', 'restart'], restartNode {
     resource:: 'deployments',
     resourceName:: $.deployment,
     redirectTo:: root.kubernetes.context($.context).namespace($.namespace).apps.deployment($.deployment).pods,
   }],
-  [['kubernetes', '$context', '$namespace', 'apps', '$statefulset', 'restart'], restartNode {
+  [['kubernetes', '$context', '$namespace', 'apps', '$statefulset', 'action', 'restart'], restartNode {
     resource:: 'statefulsets',
     resourceName:: $.statefulset,
     redirectTo:: root.kubernetes.context($.context).namespace($.namespace).apps.statefulset($.statefulset).pods,
   }],
-  [['kubernetes', '$context', '$namespace', 'apps', '$daemonset', 'restart'], restartNode {
+  [['kubernetes', '$context', '$namespace', 'apps', '$daemonset', 'action', 'restart'], restartNode {
     resource:: 'daemonsets',
     resourceName:: $.daemonset,
     redirectTo:: root.kubernetes.context($.context).namespace($.namespace).apps.daemonset($.daemonset).pods,
