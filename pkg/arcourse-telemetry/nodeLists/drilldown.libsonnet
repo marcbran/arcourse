@@ -6,6 +6,7 @@ function(c)
     local labels = std.get(params, 'labels', vars);
     local titles = std.get(params, 'titles', [c.capitalize(v) for v in vars]);
     local metric = params.metric;
+    local hidden = std.get(params, 'hidden', []);
     local n = std.length(vars);
 
     local pathSuffixes = [
@@ -15,9 +16,13 @@ function(c)
 
     local accs = c.accs(labels, vars);
 
+    local isHidden(i) = i > 0 && std.member(hidden, vars[i - 1]);
+
     local levelInputs = [
       local idx = if i == n then n - 1 else i;
       {
+        isHidden: isHidden(i),
+        linksNext: i < n && !isHidden(i + 1),
         isLeaf: i == n,
         label: labels[idx],
         var: vars[idx],
@@ -43,7 +48,7 @@ function(c)
           {
             expr: ctx.expr % $,
             legendFormat: if std.objectHasAll(params, 'legend') then ctx.legend else '{{%s}}' % ctx.groupBy,
-            link:: if li.isLeaf then null else function(series)
+            link:: if !li.linksNext then null else function(series)
               c.chainFields(
                 c.chain(rootNode, [[v, $[v]] for v in li.ancestorVars] + [[li.var, series[li.label]]]),
                 li.nextPathSuffix
@@ -52,4 +57,5 @@ function(c)
         ],
       }]
       for li in levelInputs
+      if !li.isHidden
     ]
