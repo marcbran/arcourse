@@ -16,13 +16,14 @@ function(c)
 
     local accs = c.accs(labels, vars);
 
-    local isHidden(i) = i > 0 && std.member(hidden, vars[i - 1]);
+    local placement(i) = if i == 0 then 'root' else vars[i - 1];
 
     local levelInputs = [
       local idx = if i == n then n - 1 else i;
       {
-        isHidden: isHidden(i),
-        linksNext: i < n && !isHidden(i + 1),
+        placement: placement(i),
+        isHidden: std.member(hidden, placement(i)),
+        linksNext: i < n && !std.member(hidden, placement(i + 1)),
         isLeaf: i == n,
         label: labels[idx],
         var: vars[idx],
@@ -41,7 +42,7 @@ function(c)
         matchers:: li.matchers,
         titleGroupBy:: if li.isLeaf then '' else 'by %s ' % li.title,
       };
-      local override = std.get(std.get(ctx, 'levels', {}), ctx.groupBy, {});
+      local override = std.get(std.get(ctx, 'levels', {}), li.placement, {});
       [li.path, ctx + override {
         title:: ctx.title,
         queries: [

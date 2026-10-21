@@ -55,6 +55,7 @@ local telemetry = import '../arcourse-telemetry/main.libsonnet';
           Unknown: '#7a7a7a',
         },
         levels:: {
+          namespace: self.pod,
           pod: { rowBy:: '{{pod}}', labelBy:: '{{phase}}', tooltip:: '{{pod}} · {{phase}} · {{from}} – {{to}}' },
         },
       },
