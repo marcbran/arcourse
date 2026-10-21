@@ -55,6 +55,12 @@ local telemetry = import '../arcourse-telemetry/main.libsonnet';
           Unknown: '#7a7a7a',
         },
         levels:: {
+          local notRunning = {
+            expr:: 'sum by (%(groupBy)s, phase) (kube_pod_status_phase{%(matchers)s, phase!="Running"}) > 0' % self,
+            title:: 'Non-running Pod Phase %(titleGroupBy)s' % self,
+          },
+          root: notRunning,
+          context: notRunning,
           namespace: self.pod,
           pod: { rowBy:: '{{pod}}', labelBy:: '{{phase}}', tooltip:: '{{pod}} · {{phase}} · {{from}} – {{to}}' },
         },
