@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.22.0](https://github.com/marcbran/arcourse/compare/v0.21.0...v0.22.0) (2026-10-21)
+
+
+### Features
+
+* drilldown improvements ([#148](https://github.com/marcbran/arcourse/issues/148)) ([a1b8d6a](https://github.com/marcbran/arcourse/commit/a1b8d6a065e0519f1b309b13a041e3d315ca377b))
+* mark k8s groups as favorite or collapsed ([#147](https://github.com/marcbran/arcourse/issues/147)) ([1fc890d](https://github.com/marcbran/arcourse/commit/1fc890d6b2bbfe6dd6ecd7a221f6ab60eeffaec3))
+
+
+### Bug Fixes
+
+* use patch for restart ([#146](https://github.com/marcbran/arcourse/issues/146)) ([9ca371c](https://github.com/marcbran/arcourse/commit/9ca371c0848f77bb9dda8f56e40d621cd7a40858))
+* yaml multiline strings ([#144](https://github.com/marcbran/arcourse/issues/144)) ([792b25f](https://github.com/marcbran/arcourse/commit/792b25f3bcf31a2d8fe7c4805d1c7ecb29dcc2ba))
+
 ## [0.21.0](https://github.com/marcbran/arcourse/compare/v0.20.0...v0.21.0) (2026-10-19)
 
 
