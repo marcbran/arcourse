@@ -238,3 +238,64 @@ func BenchmarkQueryParamRefs(b *testing.B) {
 		}
 	}
 }
+
+func benchSpecializedGraph(children int) string {
+	return fmt.Sprintf(`
+local a = import 'arcourse-ui/main.libsonnet';
+local root = import 'root';
+local children = %d;
+
+[
+  [
+    [['kubernetes', '$context'], {}],
+    [['kubernetes', '$context', 'base'], a.list.node {
+      _paramSpecs: [
+        { name: 'page', type: 'number', default: 1 },
+        { name: 'filter', type: 'string', default: null },
+      ],
+      _summary: 'base',
+      kind: std.get($._params, 'filter', 'all'),
+    }],
+  ] +
+  [
+    [['kubernetes', '$context', 'base', 'special' + std.toString(i)], root.kubernetes.context('demo').base {
+      _params+: { filter: 'special' + std.toString(i) },
+    }]
+    for i in std.range(1, children)
+  ],
+  a.default.view,
+]
+`, children)
+}
+
+func BenchmarkQuerySpecialized(b *testing.B) {
+	formats := []pkg.Format{pkg.FormatJSON, pkg.FormatHTML}
+	paths := map[string]string{
+		"base":    "root/kubernetes/context/demo/base",
+		"special": "root/kubernetes/context/demo/base/special1",
+	}
+
+	for _, children := range []int{100, 500} {
+		evaluateDir := b.TempDir()
+		err := os.WriteFile(filepath.Join(evaluateDir, "root.jsonnet"), []byte(benchSpecializedGraph(children)), 0o600)
+		if err != nil {
+			b.Fatal(err)
+		}
+		facade := newBenchFacade(b, evaluateDir, true)
+
+		for _, page := range []string{"base", "special"} {
+			for _, format := range formats {
+				b.Run(fmt.Sprintf("children=%d/page=%s/format=%s", children, page, format), func(b *testing.B) {
+					ctx := context.Background()
+					b.ResetTimer()
+					for i := 0; i < b.N; i++ {
+						_, err := facade.Query(ctx, pkg.NewQueryPath(paths[page]), nil, format, pkg.Origin{})
+						if err != nil {
+							b.Fatal(err)
+						}
+					}
+				})
+			}
+		}
+	}
+}

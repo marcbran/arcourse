@@ -66,6 +66,14 @@ func (s *Stage) the_output_is(expected string) *Stage {
 	return s
 }
 
+func (s *Stage) the_output_field_is(field string, expected string) *Stage {
+	var doc map[string]json.RawMessage
+	err := json.Unmarshal([]byte(s.LastOutput), &doc)
+	require.NoError(s.t, err)
+	assert.JSONEq(s.t, expected, string(doc[field]))
+	return s
+}
+
 func withoutEvaluationID(out string) string {
 	var doc map[string]any
 	err := json.Unmarshal([]byte(out), &doc)

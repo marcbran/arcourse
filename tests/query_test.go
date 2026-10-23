@@ -388,3 +388,62 @@ func TestQueryPathNotFoundAsHTML(t *testing.T) {
 	then.
 		the_error_contains("nonexistent")
 }
+
+func TestQuerySpecializedNode(t *testing.T) {
+	graph := `
+local root = import 'root';
+[[
+  [['users', 'me'], {
+    local n = self,
+    _paramSpecs: [{ name: 'include', type: 'string', default: null }],
+    data: { id: 'U1', include: std.get(n._params, 'include', null) },
+  }],
+  [['incidents'], {
+    local n = self,
+    _paramSpecs: [
+      { name: 'status', type: 'string', default: null },
+      { name: 'user', type: 'string', default: null },
+    ],
+    data: { status: std.get(n._params, 'status', null), user: std.get(n._params, 'user', null) },
+  }],
+  [['incidents', 'triggered'], root.incidents {
+    _params+: { status: 'triggered', user: root.users.me.data.id },
+  }],
+]]
+`
+	tcs := []struct {
+		name     string
+		path     string
+		expected string
+	}{
+		{
+			name:     "node-level params apply without request params",
+			path:     "root/incidents/triggered",
+			expected: `{"status":"triggered","user":"U1"}`,
+		},
+		{
+			name:     "request params override node-level params",
+			path:     "root/incidents/triggered?status=acknowledged",
+			expected: `{"status":"acknowledged","user":"U1"}`,
+		},
+		{
+			name:     "base node keeps its own defaults",
+			path:     "root/incidents",
+			expected: `{"status":null,"user":null}`,
+		},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.name, func(t *testing.T) {
+			given, when, then := scenario(t)
+
+			given.
+				a_node_graph(graph)
+
+			when.
+				a_path_is_queried(tc.path)
+
+			then.
+				the_output_field_is("data", tc.expected)
+		})
+	}
+}
