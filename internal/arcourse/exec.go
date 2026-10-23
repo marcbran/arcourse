@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/marcbran/arcourse/internal/course"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
@@ -18,6 +19,19 @@ type Command struct {
 	Name     string         `json:"name"`
 	Data     map[string]any `json:"data"`
 	Redirect *nodeRef       `json:"redirect"`
+	Issues   []issue        `json:"issues"`
+}
+
+type issue struct {
+	Param   string `json:"param"`
+	Message string `json:"message"`
+}
+
+func (i issue) String() string {
+	if i.Param == "" {
+		return i.Message
+	}
+	return i.Param + ": " + i.Message
 }
 
 type nodeRef struct {
@@ -108,6 +122,19 @@ func decodeCommand(body string, path pkg.QueryPath) (Command, error) {
 	err = json.Unmarshal(raw, &command)
 	if err != nil {
 		return Command{}, err
+	}
+	if command.Issues != nil {
+		if command.Plugin != "" || command.Name != "" {
+			return Command{}, fmt.Errorf("%w: %s: action has both issues and a command", pkg.ErrActionInvalid, path)
+		}
+		if len(command.Issues) == 0 {
+			return Command{}, fmt.Errorf("%w: %s", pkg.ErrActionInvalid, path)
+		}
+		messages := make([]string, len(command.Issues))
+		for i, issue := range command.Issues {
+			messages[i] = issue.String()
+		}
+		return Command{}, fmt.Errorf("%w: %s: %s", pkg.ErrActionInvalid, path, strings.Join(messages, "; "))
 	}
 	if command.Plugin == "" || command.Name == "" {
 		return Command{}, fmt.Errorf("%w: %s: plugin and name are required", pkg.ErrActionNotFound, path)

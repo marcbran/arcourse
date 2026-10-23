@@ -14,6 +14,7 @@ var (
 	ErrQueryNotRecorded   = errors.New("query not recorded")
 	ErrContentNotRecorded = errors.New("query has no json content recorded")
 	ErrActionNotFound     = errors.New("node has no action")
+	ErrActionInvalid      = errors.New("action is invalid")
 	ErrAlreadyExecuted    = errors.New("query already executed")
 	ErrEmptyRemark        = errors.New("remark text is empty")
 	ErrShapeNotSupported  = errors.New("compiling a root shape requires immediateGraph or compiledGraph mode (root.jsonnet must be a node-spec list, not a finished value)")

@@ -172,6 +172,53 @@ local truncateNode = import './truncate_node.libsonnet';
       },
     },
     {
+      name: 'summary of a reference sees default params',
+      input:: {
+        _node: 'resource',
+        child: {
+          _node: 'facet',
+          _paramSpecs: [
+            { name: 'page', type: 'number', default: 1 },
+            { name: 'filter', type: 'string', default: null },
+            { name: 'size', type: 'number' },
+          ],
+          _summary: std.manifestJsonMinified(self._params),
+        },
+      },
+      expected: {
+        _node: 'resource',
+        child: {
+          _node: 'facet',
+          _paramSpecs: [
+            { name: 'page', type: 'number', default: 1 },
+            { name: 'filter', type: 'string', default: null },
+            { name: 'size', type: 'number' },
+          ],
+          _summary: '{"page":1}',
+        },
+      },
+    },
+    {
+      name: 'summary of a reference keeps params it already has',
+      input:: {
+        _node: 'resource',
+        child: {
+          _node: 'facet',
+          _paramSpecs: [{ name: 'page', type: 'number', default: 1 }],
+          _params:: { page: 3 },
+          _summary: 'page %d' % self._params.page,
+        },
+      },
+      expected: {
+        _node: 'resource',
+        child: {
+          _node: 'facet',
+          _paramSpecs: [{ name: 'page', type: 'number', default: 1 }],
+          _summary: 'page 3',
+        },
+      },
+    },
+    {
       name: 'summary absent',
       input:: {
         _node: 'resource',

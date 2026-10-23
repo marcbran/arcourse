@@ -49,6 +49,34 @@ local restartNode = a.action.node {
   },
 };
 
+local scaleNode = a.action.node {
+  resource:: error 'scaleNode requires a resource',
+  resourceName:: error 'scaleNode requires a resourceName',
+  redirectTo:: error 'scaleNode requires a redirectTo',
+  local path = std.format('/apis/apps/v1/namespaces/%s/%s/%s', [std.toString($.namespace), $.resource, $.resourceName]),
+  local replicas = std.get($._params, 'replicas', null),
+  _paramSpecs: [{ name: 'replicas', type: 'number', default: null }],
+  _paramInitialValues:: {
+    replicas: std.get(kubernetes.neat.get($.context, path).spec, 'replicas', 1),
+  },
+  _summary:
+    if replicas == null then 'Scale %s/%s in %s' % [$.resource, $.resourceName, $.namespace]
+    else 'Scale %s/%s in %s to %s replicas' % [$.resource, $.resourceName, $.namespace, std.toString(replicas)],
+  _action:
+    if replicas == null then { issues: [{ param: 'replicas', message: 'is required' }] }
+    else if replicas < 0 || std.floor(replicas) != replicas then { issues: [{ param: 'replicas', message: 'must be a whole number of at least 0' }] }
+    else {
+      plugin: 'kubernetes',
+      name: 'patch',
+      data: {
+        ctx: $.context,
+        path: path,
+        patch: { spec: { replicas: replicas } },
+      },
+      redirect: $.redirectTo,
+    },
+};
+
 local nodeList = [
   [['kubernetes', '$context', '$namespace', 'apps', '$deployment', 'pods'], podSelectorTable {
     selector: kubernetes.neat.get($.context, std.format('/apis/apps/v1/namespaces/%s/deployments/%s', [std.toString($.namespace), std.toString($.deployment)])).spec.selector.matchLabels,
@@ -65,6 +93,16 @@ local nodeList = [
     redirectTo:: root.kubernetes.context($.context).namespace($.namespace).apps.deployment($.deployment).pods,
   }],
   [['kubernetes', '$context', '$namespace', 'apps', '$statefulset', 'action', 'restart'], restartNode {
+    resource:: 'statefulsets',
+    resourceName:: $.statefulset,
+    redirectTo:: root.kubernetes.context($.context).namespace($.namespace).apps.statefulset($.statefulset).pods,
+  }],
+  [['kubernetes', '$context', '$namespace', 'apps', '$deployment', 'action', 'scale'], scaleNode {
+    resource:: 'deployments',
+    resourceName:: $.deployment,
+    redirectTo:: root.kubernetes.context($.context).namespace($.namespace).apps.deployment($.deployment).pods,
+  }],
+  [['kubernetes', '$context', '$namespace', 'apps', '$statefulset', 'action', 'scale'], scaleNode {
     resource:: 'statefulsets',
     resourceName:: $.statefulset,
     redirectTo:: root.kubernetes.context($.context).namespace($.namespace).apps.statefulset($.statefulset).pods,

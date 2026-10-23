@@ -190,3 +190,51 @@ func BenchmarkQueryGroupedContext(b *testing.B) {
 		}
 	}
 }
+
+func benchParamRefsGraph(children int) string {
+	return fmt.Sprintf(`
+local a = import 'arcourse-ui/main.libsonnet';
+local children = %d;
+
+[
+  [[['kubernetes', '$context'], {}]] +
+  [
+    [['kubernetes', '$context', 'child' + std.toString(i)], a.list.node {
+      _paramSpecs: [
+        { name: 'page', type: 'number', default: 1 },
+        { name: 'filter', type: 'string', default: null },
+      ],
+      _summary: 'child',
+    }]
+    for i in std.range(1, children)
+  ],
+  a.default.view,
+]
+`, children)
+}
+
+func BenchmarkQueryParamRefs(b *testing.B) {
+	formats := []pkg.Format{pkg.FormatJSON, pkg.FormatHTML}
+
+	for _, children := range []int{100, 500} {
+		evaluateDir := b.TempDir()
+		err := os.WriteFile(filepath.Join(evaluateDir, "root.jsonnet"), []byte(benchParamRefsGraph(children)), 0o600)
+		if err != nil {
+			b.Fatal(err)
+		}
+		facade := newBenchFacade(b, evaluateDir, true)
+
+		for _, format := range formats {
+			b.Run(fmt.Sprintf("children=%d/format=%s", children, format), func(b *testing.B) {
+				ctx := context.Background()
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					_, err := facade.Query(ctx, pkg.NewQueryPath("root/kubernetes/context/demo"), nil, format, pkg.Origin{})
+					if err != nil {
+						b.Fatal(err)
+					}
+				}
+			})
+		}
+	}
+}

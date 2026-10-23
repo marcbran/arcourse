@@ -49,7 +49,7 @@ local coerceRawValue(spec, raw, label='parameter value') =
 
 local resolveParam(spec, params) =
   local name = spec.name;
-  if std.objectHas(params, name) then
+  if std.objectHas(params, name) && params[name] != '' then
     coerceRawValue(spec, params[name])
   else if std.objectHas(spec, 'default') then
     spec.default

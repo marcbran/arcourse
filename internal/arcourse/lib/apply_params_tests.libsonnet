@@ -143,6 +143,42 @@ local nodeWithParams(params, extra={}) = {
       },
     },
     {
+      name: 'empty number param falls back to default',
+      input:: {
+        node: nodeWithParams([{ name: 'page', type: 'number', default: 1 }]),
+        params: { page: '' },
+      },
+      expected: {
+        _node: true,
+        _paramSpecs: [{ name: 'page', type: 'number', default: 1 }],
+        _params: { page: 1 },
+      },
+    },
+    {
+      name: 'empty param with a null default is omitted from _params',
+      input:: {
+        node: nodeWithParams([{ name: 'replicas', type: 'number', default: null }]),
+        params: { replicas: '' },
+      },
+      expected: {
+        _node: true,
+        _paramSpecs: [{ name: 'replicas', type: 'number', default: null }],
+        _params: {},
+      },
+    },
+    {
+      name: 'empty string param is treated as absent',
+      input:: {
+        node: nodeWithParams([{ name: 'filter', type: 'string', default: 'all' }]),
+        params: { filter: '' },
+      },
+      expected: {
+        _node: true,
+        _paramSpecs: [{ name: 'filter', type: 'string', default: 'all' }],
+        _params: { filter: 'all' },
+      },
+    },
+    {
       name: 'required param provided',
       input:: {
         node: nodeWithParams([{ name: 'pageSize', type: 'number' }]),
