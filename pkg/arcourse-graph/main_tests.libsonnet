@@ -56,10 +56,9 @@ local nodeTests = {
             { name: 'columns', type: 'array', items: { type: 'array', items: 'string' }, default: [] },
             { name: 'filter', type: 'string' },
           ],
-          _params: { from: 'now-6h', to: 'now', columns: [['k8s', 'pod']], filter: 'a b' },
         },
       },
-      output(input):: node(input)._queryPath,
+      output(input):: (node(input) { _params: { from: 'now-6h', to: 'now', columns: [['k8s', 'pod']], filter: 'a b' } })._queryPath,
       expected: '/root/logs?columns=%5B%5B%22k8s%22%2C%22pod%22%5D%5D&filter=a%20b&from=now-6h',
     },
     {
@@ -85,6 +84,43 @@ local nodeTests = {
       },
       output(input):: (node(input) { _params+: { page: 3 } })._queryPath,
       expected: '/root/items?page=3',
+    },
+    {
+      name: 'params default to spec defaults without being visible',
+      input:: {
+        path: ['items'],
+        body: {
+          _paramSpecs: [
+            { name: 'page', type: 'number', default: 1 },
+            { name: 'filter', type: 'string', default: null },
+            { name: 'id', type: 'string' },
+          ],
+        },
+      },
+      output(input)::
+        local result = node(input);
+        { params: result._params, visible: std.objectHas(result, '_params') },
+      expected: { params: { page: 1 }, visible: false },
+    },
+    {
+      name: 'node without param specs has empty params',
+      input:: { path: ['demo'] },
+      output(input):: node(input)._params,
+      expected: {},
+    },
+    {
+      name: 'params set in a body layer count as defaults for the query path',
+      input:: {
+        path: ['items'],
+        body: [
+          { _paramSpecs: [{ name: 'page', type: 'number', default: 1 }, { name: 'filter', type: 'string', default: null }] },
+          { _params+: { filter: 'active' } },
+        ],
+      },
+      output(input)::
+        local result = node(input);
+        { params: result._params, queryPath: result._queryPath, extended: (result { _params+: { page: 2 } })._queryPath },
+      expected: { params: { page: 1, filter: 'active' }, queryPath: '/root/items', extended: '/root/items?page=2' },
     },
     {
       name: 'omitting body yields synthetic-fields-only node',
@@ -333,6 +369,36 @@ local graphTests = {
           b: 'y',
           from: 'b',
         },
+      },
+    },
+    {
+      name: 'specializing an existing node takes the new path and keeps inherited fields',
+      input:: {
+        nodeSpecs: [
+          [['incidents'], {
+            local n = self,
+            _paramSpecs: [{ name: 'status', type: 'string', default: null }],
+            data: { status: std.get(n._params, 'status', null) },
+          }],
+          [['incidents', 'triggered'], specialRoot.incidents { _params+: { status: 'triggered' } }],
+        ],
+      },
+      local specialRoot = graph(self.input),
+      output(input)::
+        local triggered = graph(input).incidents.triggered;
+        {
+          evalPath: triggered._evalPath,
+          queryPath: triggered._queryPath,
+          pathTemplate: triggered._pathTemplate,
+          data: triggered.data,
+          baseData: graph(input).incidents.data,
+        },
+      expected: {
+        evalPath: 'root.incidents.triggered',
+        queryPath: '/root/incidents/triggered',
+        pathTemplate: ['incidents', 'triggered'],
+        data: { status: 'triggered' },
+        baseData: { status: null },
       },
     },
     {

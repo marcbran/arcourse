@@ -18,31 +18,40 @@ local urlPathSegments(node, path) =
     path
   );
 
-local nonDefaultParams(node) =
-  local params = if std.objectHasAll(node, '_params') then node._params else {};
-  local specs = if std.objectHasAll(node, '_paramSpecs') then node._paramSpecs else [];
-  local defaults = { [spec.name]: spec.default for spec in specs if std.objectHas(spec, 'default') };
-  {
-    [k]: params[k]
-    for k in std.objectFields(params)
-    if !std.objectHas(defaults, k) || defaults[k] != params[k]
-  };
+local specDefaults(specs) = {
+  [spec.name]: spec.default
+  for spec in specs
+  if std.objectHas(spec, 'default') && spec.default != null
+};
 
-local mergeLayers(layers) =
-  std.foldl(function(acc, l) acc + l, layers, {});
+local nonDefaultParams(node) =
+  local params = node._params;
+  if std.length(params) == 0 then {}
+  else
+    local defaults = node._defaultParams;
+    {
+      [k]: params[k]
+      for k in std.objectFields(params)
+      if !std.objectHas(defaults, k) || defaults[k] != params[k]
+    };
+
+local mergeLayers(base, layers) =
+  std.foldl(function(acc, l) acc + l, layers, base);
 
 local node(path, body={}) =
   local layers = if std.isArray(body) then body else [body];
   local vars = std.map(varNameOf, std.filter(isVar, path));
-  { [var]: error 'variable %s is required' % var for var in vars } +
+  local base = { _params:: specDefaults(std.get(self, '_paramSpecs', [])) };
+  local requiredVars = { [var]: error 'variable %s is required' % var for var in vars };
+  mergeLayers(if std.length(vars) == 0 then base else requiredVars + base, layers) +
   {
     _node: true,
     _vars:: vars,
     _pathTemplate:: path,
+    _defaultParams:: super._params,
     _evalPath:: resolvePath(self, path),
     _queryPath:: local n = self; url({ path: urlPathSegments(n, path), params: nonDefaultParams(n) }),
-  } +
-  mergeLayers(layers);
+  };
 
 local toLayers(nodeSpecs) =
   std.flatMap(

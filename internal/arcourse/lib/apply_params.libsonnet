@@ -47,10 +47,12 @@ local coerceRawValue(spec, raw, label='parameter value') =
     else
       coerceScalar(spec.type, value);
 
-local resolveParam(spec, params) =
+local resolveParam(spec, params, nodeParams) =
   local name = spec.name;
   if std.objectHas(params, name) && params[name] != '' then
     coerceRawValue(spec, params[name])
+  else if std.objectHas(nodeParams, name) then
+    nodeParams[name]
   else if std.objectHas(spec, 'default') then
     spec.default
   else
@@ -67,6 +69,7 @@ function(node, params)
       node
   else
     local specsByName = specByName(specs);
+    local nodeParams = std.get(node, '_params', {});
     local validated = std.foldl(
       function(acc, key)
         if std.objectHas(specsByName, key) then acc
@@ -75,7 +78,7 @@ function(node, params)
       {},
     );
     local resolvedAll = {
-      [spec.name]: resolveParam(spec, params)
+      [spec.name]: resolveParam(spec, params, nodeParams)
       for spec in specs
     };
     local resolved = {
@@ -83,4 +86,4 @@ function(node, params)
       for k in std.objectFields(resolvedAll)
       if resolvedAll[k] != null
     };
-    node + validated + { _params: resolved }
+    node + validated + { _params::: resolved }

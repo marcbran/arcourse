@@ -208,5 +208,35 @@ local nodeWithParams(params, extra={}) = {
         _params: { page: 1, pageSize: 50 },
       },
     },
+    {
+      name: 'node-level params act as defaults',
+      input:: {
+        node: nodeWithParams([
+          { name: 'status', type: 'string', default: null },
+          { name: 'id', type: 'string' },
+        ], { _params:: { status: 'triggered', id: 'U1' } }),
+        params: {},
+      },
+      expected: {
+        _node: true,
+        _paramSpecs: [
+          { name: 'status', type: 'string', default: null },
+          { name: 'id', type: 'string' },
+        ],
+        _params: { status: 'triggered', id: 'U1' },
+      },
+    },
+    {
+      name: 'request params override node-level params',
+      input:: {
+        node: nodeWithParams([{ name: 'status', type: 'string', default: null }], { _params:: { status: 'triggered' } }),
+        params: { status: 'resolved' },
+      },
+      expected: {
+        _node: true,
+        _paramSpecs: [{ name: 'status', type: 'string', default: null }],
+        _params: { status: 'resolved' },
+      },
+    },
   ],
 }
