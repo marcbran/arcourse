@@ -6,6 +6,7 @@ local pageStyle = |||
   :root {
     color-scheme: light dark;
     --primary-color: light-dark(#0451a5, #569cd6);
+    --error-color: light-dark(#c62828, #f48771);
     --on-background-color: light-dark(
       color-mix(in srgb, var(--primary-color) 12%, black),
       color-mix(in srgb, var(--primary-color) 12%, white)

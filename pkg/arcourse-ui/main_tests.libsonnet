@@ -1,5 +1,16 @@
 local a = import './main.libsonnet';
 
+local resolveHtml(v) =
+  if std.isArray(v) then
+    std.flattenArrays([
+      local r = resolveHtml(x);
+      if std.isArray(r) then r else [r]
+      for x in v
+    ])
+  else if std.isObject(v) && std.objectHas(v, 'html') && !std.objectHas(v, 'element') then resolveHtml(v.html)
+  else if std.isObject(v) && std.objectHas(v, 'children') then v + { children: resolveHtml(v.children) }
+  else v;
+
 {
   output(input):: input(),
   tests: [
@@ -405,6 +416,150 @@ local a = import './main.libsonnet';
       expected: {
         default: { class: 'resource', first: 'list' },
         stacked: { class: 'resource stacked', first: 'yaml card' },
+      },
+    },
+    {
+      name: 'action without params renders only the apply form and no script',
+      input:: function()
+        local c = import './components/main.libsonnet';
+        local t = c.action {
+          evaluationId:: 'e1',
+          summary:: 'Restart',
+          action:: { plugin: 'test', name: 'echo', data: {} },
+        };
+        local card = resolveHtml(t.html)[std.length(resolveHtml(t.html)) - 1];
+        local buttons = card.children[std.length(card.children) - 1];
+        {
+          htmlCount: std.length(resolveHtml(t.html)),
+          element: card.element,
+          summary: card.children[0].children[0],
+          buttons: [b.attributes.class for b in buttons.children],
+          evaluationId: buttons.children[0].children[0].attributes.value,
+        },
+      expected: {
+        htmlCount: 2,
+        element: 'action-card',
+        summary: 'Restart',
+        buttons: ['apply'],
+        evaluationId: 'e1',
+      },
+    },
+    {
+      name: 'action with a missing param renders a hint, a plan button and no apply form',
+      input:: function()
+        local c = import './components/main.libsonnet';
+        local t = c.action {
+          evaluationId:: 'e1',
+          paramSpecs:: [{ name: 'replicas', type: 'number', default: null }],
+          params:: {},
+          action:: { issues: [{ param: 'replicas', message: 'is required' }] },
+        };
+        local card = resolveHtml(t.html)[2];
+        local form = card.children[0];
+        local buttons = card.children[1];
+        {
+          hasScript: resolveHtml(t.html)[1].element == 'script',
+          formId: form.attributes.id,
+          formMethod: form.attributes.method,
+          input: form.children[0].children[1].attributes,
+          issue: { class: form.children[1].attributes.class, text: form.children[1].children[0] },
+          buttons: [b.children[0] for b in buttons.children],
+          planTarget: buttons.children[0].attributes.form,
+        },
+      expected: {
+        hasScript: true,
+        formId: 'action-params',
+        formMethod: 'get',
+        input: { type: 'number', step: 'any', name: 'replicas', value: null },
+        issue: { class: 'issue hint', text: 'is required' },
+        buttons: ['Plan'],
+        planTarget: 'action-params',
+      },
+    },
+    {
+      name: 'action with an invalid present param renders an error and no apply form',
+      input:: function()
+        local c = import './components/main.libsonnet';
+        local t = c.action {
+          evaluationId:: 'e1',
+          paramSpecs:: [{ name: 'replicas', type: 'number', default: null }],
+          params:: { replicas: -1 },
+          action:: { issues: [{ param: 'replicas', message: 'must be at least 0' }] },
+        };
+        local form = resolveHtml(t.html)[2].children[0];
+        {
+          value: form.children[0].children[1].attributes.value,
+          issueClass: form.children[1].attributes.class,
+          buttonCount: std.length(resolveHtml(t.html)[2].children[1].children),
+        },
+      expected: { value: '-1', issueClass: 'issue', buttonCount: 1 },
+    },
+    {
+      name: 'action with a bound param prefills the input and renders plan and apply',
+      input:: function()
+        local c = import './components/main.libsonnet';
+        local t = c.action {
+          evaluationId:: 'e2',
+          paramSpecs:: [{ name: 'replicas', type: 'number', default: null }],
+          params:: { replicas: 3 },
+          action:: { plugin: 'kubernetes', name: 'patch', data: {} },
+        };
+        local card = resolveHtml(t.html)[2];
+        local buttons = card.children[1];
+        {
+          value: card.children[0].children[0].children[1].attributes.value,
+          plan: buttons.children[0].children[0],
+          applyClass: buttons.children[1].attributes.class,
+          evaluationId: buttons.children[1].children[0].attributes.value,
+        },
+      expected: { value: '3', plan: 'Plan', applyClass: 'apply', evaluationId: 'e2' },
+    },
+    {
+      name: 'action renders form-level issues and issues for unknown params above the form',
+      input:: function()
+        local c = import './components/main.libsonnet';
+        local t = c.action {
+          evaluationId:: 'e1',
+          paramSpecs:: [{ name: 'replicas', type: 'number', default: null }],
+          params:: { replicas: 3 },
+          action:: { issues: [{ message: 'deployment is paused' }, { param: 'other', message: 'is wrong' }] },
+        };
+        local card = resolveHtml(t.html)[2];
+        [{ class: p.attributes.class, text: p.children[0] } for p in card.children[0:2]],
+      expected: [
+        { class: 'issue', text: 'deployment is paused' },
+        { class: 'issue', text: 'other: is wrong' },
+      ],
+    },
+    {
+      name: 'action renders booleans as a select, strings as text and other types as hidden json',
+      input:: function()
+        local c = import './components/main.libsonnet';
+        local t = c.action {
+          evaluationId:: 'e1',
+          paramSpecs:: [
+            { name: 'force', type: 'boolean', default: false },
+            { name: 'reason', type: 'string', default: null },
+            { name: 'tags', type: 'array', items: 'string', default: null },
+          ],
+          params:: { force: false, tags: ['a'] },
+          action:: { plugin: 'test', name: 'echo', data: {} },
+        };
+        local form = resolveHtml(t.html)[2].children[0];
+        local select = form.children[0].children[1];
+        {
+          options: [{ value: o.attributes.value, selected: o.attributes.selected } for o in select.children],
+          text: form.children[1].children[1].attributes,
+          hidden: form.children[2].attributes,
+        },
+      expected: {
+        options: [
+          { value: '', selected: false },
+          { value: 'true', selected: false },
+          { value: 'false', selected: true },
+        ],
+        text: { type: 'text', name: 'reason', value: null },
+        hidden: { type: 'hidden', name: 'tags', value: '["a"]' },
       },
     },
     {
