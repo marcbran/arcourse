@@ -80,6 +80,43 @@ func TestExecFailsWhenTheNodeHasNoAction(t *testing.T) {
 		no_execution_is_recorded_for_the_query()
 }
 
+func TestExecFailsWhenTheActionHasIssues(t *testing.T) {
+	given, when, then := plugin_scenario(t)
+
+	given.
+		a_graph_root(`{
+			_node: "resource",
+			_action: { issues: [{ param: "replicas", message: "is required" }, { message: "deployment is paused" }] },
+		}`)
+
+	when.
+		a_path_is_queried_with_format("root", pkg.FormatJSON).and().
+		the_action_recorded_for_the_query_is_executed()
+
+	then.
+		the_error_contains("action is invalid").and().
+		the_error_contains("replicas: is required; deployment is paused").and().
+		no_execution_is_recorded_for_the_query()
+}
+
+func TestExecFailsWhenTheActionHasIssuesAndACommand(t *testing.T) {
+	given, when, then := plugin_scenario(t)
+
+	given.
+		a_graph_root(`{
+			_node: "resource",
+			_action: { plugin: "test", name: "echo", data: {}, issues: [{ message: "nope" }] },
+		}`)
+
+	when.
+		a_path_is_queried_with_format("root", pkg.FormatJSON).and().
+		the_action_recorded_for_the_query_is_executed()
+
+	then.
+		the_error_contains("action has both issues and a command").and().
+		no_execution_is_recorded_for_the_query()
+}
+
 func TestExecFailsWhenTheQueryIsUnknown(t *testing.T) {
 	given, when, then := plugin_scenario(t)
 
