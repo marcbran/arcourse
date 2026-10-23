@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.23.0](https://github.com/marcbran/arcourse/compare/v0.22.0...v0.23.0) (2026-10-23)
+
+
+### Features
+
+* action params ([#150](https://github.com/marcbran/arcourse/issues/150)) ([88ba223](https://github.com/marcbran/arcourse/commit/88ba22354f4c65a6b9fa5ebbc7dc551b93a46d91))
+* enable node reuse ([#152](https://github.com/marcbran/arcourse/issues/152)) ([00c79bc](https://github.com/marcbran/arcourse/commit/00c79bc5702d3b918c59644e2cb562dc4aced709))
+
 ## [0.22.0](https://github.com/marcbran/arcourse/compare/v0.21.0...v0.22.0) (2026-10-21)
 
 
