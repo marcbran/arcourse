@@ -477,6 +477,44 @@ local resolveHtml(v) =
       },
     },
     {
+      name: 'action with an initial value prefills the input and hides the required hint',
+      input:: function()
+        local c = import './components/main.libsonnet';
+        local t = c.action {
+          evaluationId:: 'e1',
+          paramSpecs:: [{ name: 'replicas', type: 'number', default: null }],
+          params:: {},
+          initialValues:: { replicas: 2 },
+          action:: { issues: [{ param: 'replicas', message: 'is required' }] },
+        };
+        local card = resolveHtml(t.html)[2];
+        local form = card.children[0];
+        {
+          value: form.children[0].children[1].attributes.value,
+          formChildren: std.length(form.children),
+          buttons: [b.children[0] for b in card.children[1].children],
+        },
+      expected: { value: '2', formChildren: 1, buttons: ['Plan'] },
+    },
+    {
+      name: 'action with a bound param ignores the initial value',
+      input:: function()
+        local c = import './components/main.libsonnet';
+        local t = c.action {
+          evaluationId:: 'e1',
+          paramSpecs:: [{ name: 'replicas', type: 'number', default: null }],
+          params:: { replicas: -1 },
+          initialValues:: { replicas: 2 },
+          action:: { issues: [{ param: 'replicas', message: 'must be at least 0' }] },
+        };
+        local form = resolveHtml(t.html)[2].children[0];
+        {
+          value: form.children[0].children[1].attributes.value,
+          issueClass: form.children[1].attributes.class,
+        },
+      expected: { value: '-1', issueClass: 'issue' },
+    },
+    {
       name: 'action with an invalid present param renders an error and no apply form',
       input:: function()
         local c = import './components/main.libsonnet';

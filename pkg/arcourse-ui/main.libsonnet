@@ -224,6 +224,7 @@ local actionView = baseView {
       summary:: std.get($, '_summary', ''),
       paramSpecs:: std.get($, '_paramSpecs', []),
       params:: std.get($, '_params', {}),
+      initialValues:: std.get($, '_paramInitialValues', {}),
       action:: std.get($, '_action', null),
     },
   },

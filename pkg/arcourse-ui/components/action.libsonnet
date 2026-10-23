@@ -161,10 +161,12 @@ local field = {
   local c = self,
   spec:: error 'field requires a spec',
   params:: {},
+  initialValues:: {},
   issues:: [],
   local name = c.spec.name,
   local present = std.objectHas(c.params, name),
-  local value = if present then c.params[name] else null,
+  local initial = std.objectHas(c.initialValues, name),
+  local value = if present then c.params[name] else if initial then c.initialValues[name] else null,
   html:
     if std.objectHas(controls, c.spec.type) then [{
       element: 'label',
@@ -175,6 +177,7 @@ local field = {
     }] + [
       issue { message:: i.message, hint:: !present }
       for i in c.issues
+      if present || !initial
     ]
     else hiddenControl { name:: name, value:: value },
 };
@@ -183,6 +186,7 @@ local paramsForm = {
   local c = self,
   paramSpecs:: [],
   params:: {},
+  initialValues:: {},
   issues:: [],
   html: {
     element: 'form',
@@ -191,6 +195,7 @@ local paramsForm = {
       field {
         spec:: spec,
         params:: c.params,
+        initialValues:: c.initialValues,
         issues:: [i for i in c.issues if std.get(i, 'param', null) == spec.name],
       }
       for spec in c.paramSpecs
@@ -227,6 +232,7 @@ local applyForm = {
   label:: 'Apply',
   paramSpecs:: [],
   params:: {},
+  initialValues:: {},
   action:: null,
   local hasParams = std.length(c.paramSpecs) > 0,
   local issues = if c.action != null && std.objectHas(c.action, 'issues') then c.action.issues else [],
@@ -245,7 +251,7 @@ local applyForm = {
           issue { message:: if std.objectHas(i, 'param') then '%s: %s' % [i.param, i.message] else i.message }
           for i in formIssues
         ] +
-        (if hasParams then [paramsForm { paramSpecs:: c.paramSpecs, params:: c.params, issues:: issues }] else []) +
+        (if hasParams then [paramsForm { paramSpecs:: c.paramSpecs, params:: c.params, initialValues:: c.initialValues, issues:: issues }] else []) +
         [{
           element: 'div',
           attributes: { class: 'buttons' },

@@ -56,6 +56,9 @@ local scaleNode = a.action.node {
   local path = std.format('/apis/apps/v1/namespaces/%s/%s/%s', [std.toString($.namespace), $.resource, $.resourceName]),
   local replicas = std.get($._params, 'replicas', null),
   _paramSpecs: [{ name: 'replicas', type: 'number', default: null }],
+  _paramInitialValues:: {
+    replicas: std.get(kubernetes.neat.get($.context, path).spec, 'replicas', 1),
+  },
   _summary:
     if replicas == null then 'Scale %s/%s in %s' % [$.resource, $.resourceName, $.namespace]
     else 'Scale %s/%s in %s to %s replicas' % [$.resource, $.resourceName, $.namespace, std.toString(replicas)],
