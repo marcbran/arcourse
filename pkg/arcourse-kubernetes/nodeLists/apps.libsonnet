@@ -54,7 +54,7 @@ local scaleNode = a.action.node {
   resourceName:: error 'scaleNode requires a resourceName',
   redirectTo:: error 'scaleNode requires a redirectTo',
   local path = std.format('/apis/apps/v1/namespaces/%s/%s/%s', [std.toString($.namespace), $.resource, $.resourceName]),
-  local replicas = std.get(std.get($, '_params', {}), 'replicas', null),
+  local replicas = std.get($._params, 'replicas', null),
   currentReplicas:: std.get(kubernetes.neat.get($.context, path).spec, 'replicas', 1),
   _paramSpecs: [{ name: 'replicas', type: 'number', default: null }],
   _summary:
