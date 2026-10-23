@@ -55,11 +55,10 @@ local scaleNode = a.action.node {
   redirectTo:: error 'scaleNode requires a redirectTo',
   local path = std.format('/apis/apps/v1/namespaces/%s/%s/%s', [std.toString($.namespace), $.resource, $.resourceName]),
   local replicas = std.get($._params, 'replicas', null),
-  currentReplicas:: std.get(kubernetes.neat.get($.context, path).spec, 'replicas', 1),
   _paramSpecs: [{ name: 'replicas', type: 'number', default: null }],
   _summary:
-    if replicas == null then 'Scale %s/%s in %s (currently %d replicas)' % [$.resource, $.resourceName, $.namespace, $.currentReplicas]
-    else 'Scale %s/%s in %s from %d to %s replicas' % [$.resource, $.resourceName, $.namespace, $.currentReplicas, std.toString(replicas)],
+    if replicas == null then 'Scale %s/%s in %s' % [$.resource, $.resourceName, $.namespace]
+    else 'Scale %s/%s in %s to %s replicas' % [$.resource, $.resourceName, $.namespace, std.toString(replicas)],
   _action:
     if replicas == null then { issues: [{ param: 'replicas', message: 'is required' }] }
     else if replicas < 0 || std.floor(replicas) != replicas then { issues: [{ param: 'replicas', message: 'must be a whole number of at least 0' }] }
