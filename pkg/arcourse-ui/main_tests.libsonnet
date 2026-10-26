@@ -400,6 +400,30 @@ local resolveHtml(v) =
       },
     },
     {
+      name: 'list.hiddenItems drops the listed items of a card keyed by card title, the untitled card at the empty key, and drops cards left empty',
+      input:: function()
+        local link(name) = { _node: true, _queryPath: '/root/' + name };
+        local node = a.list.node {
+          list:: { hiddenItems: { '': ['services'], apps: ['replicasets'], metrics: ['pods/phase'], batch: ['jobs'] } },
+          pods: link('pods'),
+          services: link('services'),
+          apps: { deployments: link('apps/deployments'), replicasets: link('apps/replicasets') },
+          metrics: { pods: { cpu: link('metrics/pods/cpu'), phase: link('metrics/pods/phase') } },
+          batch: { jobs: link('batch/jobs') },
+        };
+        {
+          items: [item.text for item in node._view.fragment.items],
+          groups: [{ title: group.title, items: [item.text for item in group.items] } for group in node._view.fragment.groups],
+        },
+      expected: {
+        items: ['pods'],
+        groups: [
+          { title: 'apps', items: ['deployments'] },
+          { title: 'metrics', items: ['pods/cpu'] },
+        ],
+      },
+    },
+    {
       name: 'a.resource.node keeps links beside the content by default and puts the content first when resource.stacked is set',
       input:: function()
         local base = a.resource.node {

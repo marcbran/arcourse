@@ -29,7 +29,7 @@ local listLiteral(body) =
     else if expr.__kind__ == 'Object' then { [fieldName(f)]: literal(f.expr2) for f in expr.fields }
     else manifestLiteral(expr);
   literal([f for f in body.fields if f.id == 'list'][0].expr2);
-local groupLists(groups, favoriteGroups=[], collapsedGroups=[], namespacedGroups=[], remainingGroupsTitle='remaining groups') =
+local groupLists(groups, favoriteGroups=[], collapsedGroups=[], namespacedGroups=[], remainingGroupsTitle='remaining groups', hiddenResources={}) =
   local namespaces = { name: 'namespaces', kind: 'Namespace', namespaced: false, verbs: ['get'], version: 'v1' };
   local widgets(group) = { name: 'widgets', kind: 'Widget', namespaced: std.member(namespacedGroups, group), verbs: ['list'], version: 'v1' };
   local entries = unwrap(arcourseKubernetes.graph {
@@ -37,12 +37,14 @@ local groupLists(groups, favoriteGroups=[], collapsedGroups=[], namespacedGroups
     favoriteGroups: favoriteGroups,
     collapsedGroups: collapsedGroups,
     remainingGroupsTitle: remainingGroupsTitle,
+    hiddenResources: hiddenResources,
     data+: { groups: [{ group: '', resources: [namespaces] }] + [{ group: g, resources: [widgets(g)] } for g in groups] },
   }._view.jsonnet).elements;
   local body(path) = [nodeBody(e) for e in entries if nodePath(e) == path][0];
   {
     context: listLiteral(entries[1].expr.elements[1].expr),
     namespace: listLiteral(body(['kubernetes', '$context', '$namespace'])),
+    node(path):: listLiteral([e.expr.elements[1].expr for e in entries if nodePath(e) == path][0]),
   };
 local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.target.target.target.id];
 
@@ -351,6 +353,29 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
       expected: {
         context: { more: ['apps', 'cilium.io'] },
         namespace: { more: ['apps'] },
+      },
+    },
+    {
+      name: 'hiddenResources keyed by group become the hidden list items of the context and namespace nodes and of the collapsed group nodes',
+      input:: function()
+        local lists = groupLists(
+          ['apps', 'cilium.io'],
+          collapsedGroups=['cilium.io'],
+          namespacedGroups=['cilium.io'],
+          hiddenResources={ '': ['podtemplates'], apps: ['controllerrevisions'], 'cilium.io': ['widgets'] },
+        );
+        {
+          context: lists.context.hiddenItems,
+          namespace: lists.namespace.hiddenItems,
+          collapsedContext: lists.node(['kubernetes', '$context', 'cilium.io']),
+          collapsedNamespace: lists.node(['kubernetes', '$context', '$namespace', 'cilium.io']),
+        },
+      expected: {
+        local hidden = { '': ['podtemplates'], apps: ['controllerrevisions'], 'cilium.io': ['widgets'] },
+        context: hidden,
+        namespace: hidden,
+        collapsedContext: { hiddenItems: { '': ['widgets'] } },
+        collapsedNamespace: { hiddenItems: { '': ['widgets'] } },
       },
     },
     {

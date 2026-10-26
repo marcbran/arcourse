@@ -34,6 +34,9 @@ p.pkg({
     an empty node instead of a card; their links are listed in one card titled
     `remainingGroupsTitle` (default `'remaining groups'`) after the other cards. When a
     group matches both lists, the more specific pattern wins and a tie goes to the favorite.
+    `hiddenResources` (default `{}`) maps an API group (`''` for core) to resource names
+    left out of its card and, for a collapsed group, out of its node's links; the
+    resources' nodes still exist.
     `listColumns` (default `4`) is the number of columns the context node and
     the namespace detail node lay out their links in; the namespace detail node also
     shows its YAML above the links.
