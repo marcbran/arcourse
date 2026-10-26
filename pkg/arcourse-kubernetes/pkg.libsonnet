@@ -37,7 +37,10 @@ p.pkg({
     left out of its card; the resources' nodes still exist.
     `listColumns` (default `4`) is the number of columns the context node and
     the namespace detail node lay out their links in; the namespace detail node also
-    shows its YAML above the links.
+    shows its YAML above the links. `namespaces` (default `{}`) maps a namespace name to
+    overrides of `favoriteGroups`, `hiddenGroups`, `hiddenResources` and `listColumns` for
+    that namespace's detail node; each set field replaces the top-level one, the rest
+    fall back to it, and the context node always uses the top-level settings.
   |||),
   core: p.desc(|||
     Hand-written core layers on top of the generated graph. `nodeList` adds the pod

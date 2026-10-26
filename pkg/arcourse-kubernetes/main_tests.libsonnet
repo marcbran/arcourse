@@ -24,20 +24,24 @@ local fieldNames(body) = [f.id for f in body.fields];
 local field(body, name) = [f for f in body.fields if f.id == name][0].expr2;
 local listLiteral(body) =
   local fieldName(f) = if f.id != null then f.id else f.expr1.value;
+  local memberName(expr) = (if expr.target.__kind__ == 'Dollar' then '$' else expr.target.id) + '.' + expr.id;
   local literal(expr) =
     if expr.__kind__ == 'LiteralNumber' then expr.originalString
     else if expr.__kind__ == 'Object' then { [fieldName(f)]: literal(f.expr2) for f in expr.fields }
+    else if expr.__kind__ == 'Index' then memberName(expr)
+    else if expr.__kind__ == 'Apply' then { [memberName(expr.target)]: [literal(arg.expr) for arg in expr.arguments.positional] }
     else manifestLiteral(expr);
   literal([f for f in body.fields if f.id == 'list'][0].expr2);
-local groupLists(groups, favoriteGroups=[], hiddenGroups=[], hiddenResources={}) =
-  local namespaces = { name: 'namespaces', kind: 'Namespace', namespaced: false, verbs: ['get'], version: 'v1' };
+local groupLists(groups, favoriteGroups=[], hiddenGroups=[], hiddenResources={}, namespaces={}) =
+  local namespaceResource = { name: 'namespaces', kind: 'Namespace', namespaced: false, verbs: ['get'], version: 'v1' };
   local widgets = { name: 'widgets', kind: 'Widget', namespaced: false, verbs: ['list'], version: 'v1' };
   local entries = unwrap(arcourseKubernetes.graph {
     manifest: false,
     favoriteGroups: favoriteGroups,
     hiddenResources: hiddenResources,
     hiddenGroups: hiddenGroups,
-    data+: { groups: [{ group: '', resources: [namespaces] }] + [{ group: g, resources: [widgets] } for g in groups] },
+    namespaces: namespaces,
+    data+: { groups: [{ group: '', resources: [namespaceResource] }] + [{ group: g, resources: [widgets] } for g in groups] },
   }._view.jsonnet).elements;
   local body(path) = [nodeBody(e) for e in entries if nodePath(e) == path][0];
   {
@@ -341,6 +345,40 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
         local hidden = { '': ['podtemplates'], apps: ['controllerrevisions'] },
         context: hidden,
         namespace: hidden,
+      },
+    },
+    {
+      name: 'namespaces overrides replace single settings per namespace on the namespace node, which picks its list by $.namespace, while the context node keeps the defaults',
+      input:: function()
+        local lists = groupLists(
+          ['apps', 'batch', 'cilium.io'],
+          favoriteGroups=['batch'],
+          hiddenGroups=['cilium.io'],
+          hiddenResources={ '': ['podtemplates'] },
+          namespaces={
+            monitoring: { favoriteGroups:: ['cilium.io'], hiddenGroups:: [] },
+            'cert-manager': { listColumns:: 2, hiddenResources:: {} },
+          },
+        );
+        lists,
+      expected: {
+        local default = {
+          columns: '4',
+          groupOrder: ['batch', 'apps'],
+          hiddenGroups: ['cilium.io'],
+          hiddenItems: { '': ['podtemplates'] },
+        },
+        context: default,
+        namespace: {
+          'std.get': [
+            {
+              'cert-manager': { columns: '2', groupOrder: ['batch', 'apps'], hiddenGroups: ['cilium.io'] },
+              monitoring: { columns: '4', groupOrder: ['cilium.io', 'apps', 'batch'], hiddenItems: { '': ['podtemplates'] } },
+            },
+            '$.namespace',
+            default,
+          ],
+        },
       },
     },
     {
