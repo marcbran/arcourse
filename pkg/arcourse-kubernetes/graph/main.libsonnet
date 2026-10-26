@@ -78,67 +78,83 @@ local bestMatch(patterns, group) =
   if std.length(matches) == 0 then null
   else std.sort(matches, function(m) [-m.specificity, m.index])[0];
 
-local groupLayout(groups, favorites, collapsed) =
+local groupLayout(groups, favorites, hidden) =
   local category(group) = if std.length(std.findSubstr('.', group)) == 0 then 0 else 1;
   local favoriteRank(group) =
     local m = bestMatch(favorites, group);
     if m == null then std.length(favorites) else m.index;
-  local isCollapsed(group) =
-    local c = bestMatch(collapsed, group);
+  local isHidden(group) =
+    local h = bestMatch(hidden, group);
     local f = bestMatch(favorites, group);
-    c != null && (f == null || c.specificity > f.specificity);
+    h != null && (f == null || h.specificity > f.specificity);
   local ordered = std.sort(groups, function(group) [favoriteRank(group), category(group)] + std.reverse(std.split(group, '.')));
   {
-    expanded: [g for g in ordered if !isCollapsed(g)],
-    collapsed: [g for g in ordered if isCollapsed(g)],
+    expanded: [g for g in ordered if !isHidden(g)],
+    hidden: [g for g in ordered if isHidden(g)],
   };
 
-local listViewField(columns, layout, remainingTitle) =
-  local le(indent) = j.Fodder.LineEnd(0, indent);
-  local stringArray(values) = j.Array([j.String(v).fodder(le(8)) for v in values]).closeFodder(le(6));
-  local hasCollapsed = std.length(layout.collapsed) > 0;
-  local order = layout.expanded + (if hasCollapsed then [remainingTitle] else []);
+local listObject(settings, groupNames, indent) =
+  local le(n) = j.Fodder.LineEnd(0, n);
+  local layout = groupLayout(groupNames, settings.favoriteGroups, settings.hiddenGroups);
+  local stringArray(values, i) = j.Array([j.String(v).fodder(le(i + 2)) for v in values]).closeFodder(le(i));
+  local hiddenItems = settings.hiddenResources;
   local fields =
-    [j.Field('columns', j.Number(std.toString(columns)))] +
-    (if std.length(order) > 0 then [j.Field('groupOrder', stringArray(order))] else []) +
-    (if hasCollapsed then [j.Field('nodeGroups', j.Object([
-       j.Field(j.String(remainingTitle), j.Array([j.String(g).fodder(le(10)) for g in layout.collapsed]).closeFodder(le(8))) { fodder: [le(8)] },
-     ]).closeFodder(le(6)))] else []);
-  j.Field(
-    'list',
-    if std.length(fields) == 1 then j.Object(fields)
-    else j.Object([field { fodder: [le(6)] } for field in fields]).closeFodder(le(4))
-  ) { Hide: 0 };
+    [j.Field('columns', j.Number(std.toString(settings.listColumns)))] +
+    (if std.length(layout.expanded) > 0 then [j.Field('groupOrder', stringArray(layout.expanded, indent + 2))] else []) +
+    (if std.length(layout.hidden) > 0 then [j.Field('hiddenGroups', stringArray(layout.hidden, indent + 2))] else []) +
+    (if std.length(hiddenItems) > 0 then [j.Field('hiddenItems', j.Object([
+       j.Field(j.String(title), stringArray(hiddenItems[title], indent + 4)) { fodder: [le(indent + 4)] }
+       for title in std.objectFields(hiddenItems)
+     ]).closeFodder(le(indent + 2)))] else []);
+  if std.length(fields) == 1 then j.Object(fields)
+  else j.Object([field { fodder: [le(indent + 2)] } for field in fields]).closeFodder(le(indent));
 
-local generate(resources, group, links=[], globalLinkSpecs=[], collapsed=false, namespaceListField=null) =
+local namespaceListObject(settings, namespaces, groupNames) =
+  local le(n) = j.Fodder.LineEnd(0, n);
+  local defaultObject = listObject(settings, groupNames, 4);
+  if std.length(namespaces) == 0 then defaultObject
+  else j.Std.get(
+    j.Object([
+      j.Field(j.String(namespace), listObject(settings + namespaces[namespace], groupNames, 6)) { fodder: [le(6)] }
+      for namespace in std.objectFields(namespaces)
+    ]).closeFodder(le(4)),
+    j.Member(j.Dollar, 'namespace'),
+  ).default(defaultObject);
+
+local listField(expr) = j.Field('list', expr) { Hide: 0 };
+
+local isAsciiLetter(c) = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+local isAsciiDigit(c) = c >= '0' && c <= '9';
+local isJsonnetIdent(s) =
+  if std.length(s) == 0 then false
+  else
+    local len = std.length(s);
+    local identStart(c) = c == '_' || isAsciiLetter(c);
+    local identPart(c) = identStart(c) || isAsciiDigit(c);
+    local check(i) =
+      if i >= len then true
+      else if i == 0 then identStart(s[i]) && check(i + 1)
+      else identPart(s[i]) && check(i + 1);
+    check(0);
+local jsonnetKeywords = [
+  'assert', 'else', 'error', 'false', 'for', 'function', 'if',
+  'import', 'importstr', 'in', 'local', 'null', 'self', 'super',
+  'tailstrict', 'then', 'true',
+];
+local isJsonnetKeyword(s) = std.member(jsonnetKeywords, s);
+local isUnquotedFieldName(s) = isJsonnetIdent(s) && !isJsonnetKeyword(s);
+local access(expr, name) =
+  if isUnquotedFieldName(name) then j.Member(expr, name) else j.Index(expr, j.String(name));
+
+local objectField(name, expr) =
+  if isUnquotedFieldName(name) then j.Field(name, expr) else j.Field(j.String(name), expr);
+
+local generate(resources, group, links=[], globalLinkSpecs=[], namespaceListField=null) =
   local le(indent=0) = j.Fodder.LineEnd(0, indent);
   local prettyArray(elements, indent=0) =
     j.Array([elem.fodder(le(indent + 2)) for elem in elements]).closeFodder(le(indent));
   local prettyObject(fields, indent=0) =
     j.Object([field { fodder: [le(indent + 2)] } for field in fields]).closeFodder(le(indent));
-
-  local isAsciiLetter(c) = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
-  local isAsciiDigit(c) = c >= '0' && c <= '9';
-  local isJsonnetIdent(s) =
-    if std.length(s) == 0 then false
-    else
-      local len = std.length(s);
-      local identStart(c) = c == '_' || isAsciiLetter(c);
-      local identPart(c) = identStart(c) || isAsciiDigit(c);
-      local check(i) =
-        if i >= len then true
-        else if i == 0 then identStart(s[i]) && check(i + 1)
-        else identPart(s[i]) && check(i + 1);
-      check(0);
-  local jsonnetKeywords = [
-    'assert', 'else', 'error', 'false', 'for', 'function', 'if',
-    'import', 'importstr', 'in', 'local', 'null', 'self', 'super',
-    'tailstrict', 'then', 'true',
-  ];
-  local isJsonnetKeyword(s) = std.member(jsonnetKeywords, s);
-  local isUnquotedFieldName(s) = isJsonnetIdent(s) && !isJsonnetKeyword(s);
-  local access(expr, name) =
-    if isUnquotedFieldName(name) then j.Member(expr, name) else j.Index(expr, j.String(name));
 
   local contains(xs, x) = std.length([y for y in xs if y == x]) > 0;
   local hasVerb(resource, verb) = contains(resourceVerbs(resource), verb);
@@ -252,9 +268,6 @@ local generate(resources, group, links=[], globalLinkSpecs=[], collapsed=false, 
     local candidates = [l { value: rewriteLinkValue(l.value) } for l in links if l.sourcePath == path];
     [l for l in candidates if l.value != null];
 
-  local objectField(name, expr) =
-    if isUnquotedFieldName(name) then j.Field(name, expr) else j.Field(j.String(name), expr);
-
   local compactLiteral(value) =
     if value == null then j.Null
     else if std.type(value) == 'string' then j.String(value)
@@ -288,7 +301,6 @@ local generate(resources, group, links=[], globalLinkSpecs=[], collapsed=false, 
   local nodeView(name) = member(member(var('a'), name), 'node');
   local nodePath(path) = j.Array([j.String(p) for p in path]);
   local node(path, viewExpr, body) = j.Array([nodePath(path), j.Add(viewExpr, body)]);
-  local emptyNode(path) = j.Array([nodePath(path), j.Object()]);
 
   local columnLiteral(col) = compactLiteral({ label: col.label, path: col.path });
   local resourceColumns(resource) =
@@ -363,22 +375,14 @@ local generate(resources, group, links=[], globalLinkSpecs=[], collapsed=false, 
       (if hasVerb(resource, 'list') then [clusterList(resource)] else []) +
       (if hasVerb(resource, 'get') then [clusterDetail(resource)] else []);
 
-  local hasNamespacedResources = std.length([r for r in resources if r.namespaced]) > 0;
-  local groupContextNodes = if collapsed && group != '' then [emptyNode(['kubernetes', '$context', group])] else [];
-  local groupNamespaceNodes =
-    if collapsed && group != '' && hasNamespacedResources
-    then [emptyNode(['kubernetes', '$context', '$namespace', group])]
-    else [];
+  {
+    nodes: std.flattenArrays([resourceNodes(r) for r in resources]),
+    contextRoutes: [route(r) for r in resources if hasVerb(r, 'list')],
+    namespaceRoutes: [route(r) for r in resources if r.namespaced && hasVerb(r, 'list')],
+  };
 
-  groupContextNodes +
-  groupNamespaceNodes +
-  std.flattenArrays([resourceNodes(r) for r in resources]);
-
-local generateAll(groups, manifest=true, globalLinkSpecs=[], listColumns=4, favoriteGroups=[], collapsedGroups=[], remainingGroupsTitle='remaining groups') =
-  local layout = groupLayout(std.set([g.group for g in groups if g.group != '']), favoriteGroups, collapsedGroups);
-  local namespacedGroups = std.set([g.group for g in groups if std.length([r for r in g.resources if r.namespaced]) > 0]);
-  local namespaceLayout = layout { collapsed: [g for g in super.collapsed if std.setMember(g, namespacedGroups)] };
-  local namespaceListField = listViewField(listColumns, namespaceLayout, remainingGroupsTitle);
+local generateAll(groups, manifest, globalLinkSpecs, settings, namespaces) =
+  local groupNames = std.set([g.group for g in groups if g.group != '']);
   local le(indent=0) = j.Fodder.LineEnd(0, indent);
   local prettyArray(elements, indent=0) =
     j.Array([elem.fodder(le(indent + 2)) for elem in elements]).closeFodder(le(indent));
@@ -409,13 +413,43 @@ local generateAll(groups, manifest=true, globalLinkSpecs=[], listColumns=4, favo
   ]);
   local contextNode = j.Array([
     j.Array([j.String('kubernetes'), j.String('$context')]),
-    prettyObject([listViewField(listColumns, layout, remainingGroupsTitle)], 2),
+    prettyObject([listField(listObject(settings, groupNames, 4))], 2),
   ]);
 
-  local allRouteNodes = [contextsNode, contextNode] + std.flattenArrays([
-    generate(g.resources, g.group, std.get(g, 'links', []), globalLinkSpecs, std.member(layout.collapsed, g.group), namespaceListField)
+  local results = [
+    { group: g.group, result: generate(g.resources, g.group, std.get(g, 'links', []), globalLinkSpecs, listField(namespaceListObject(settings, namespaces, groupNames))) }
     for g in groups
-  ]);
+  ];
+  local contextScope = call(member(member(var('root'), 'kubernetes'), 'context'), [member(j.Dollar, 'context')]);
+  local apiResourcesNode(path, scopeExpr, routesField) =
+    local scope = var('scope');
+    local routesOf(group) = std.flattenArrays([r.result[routesField] for r in results if r.group == group]);
+    local groupLinks(group) = prettyObject([objectField(route, access(access(scope, group), route)) for route in routesOf(group)], 6);
+    j.Array([
+      j.Array([j.String(p) for p in path]),
+      j.Add(
+        member(member(var('a'), 'list'), 'node'),
+        prettyObject([
+          j.FieldLocal('scope', scopeExpr),
+          listField(listObject(settings { hiddenGroups: [], hiddenResources: {} }, groupNames, 4)),
+          j.Field('links', prettyObject(
+            [objectField(route, access(scope, route)) for route in routesOf('')] +
+            [objectField(group, groupLinks(group)) for group in groupNames if std.length(routesOf(group)) > 0],
+            4
+          )),
+        ], 2)
+      ),
+    ]);
+  local apiResourcesNodes = [
+    apiResourcesNode(['kubernetes', '$context', 'apiResources'], contextScope, 'contextRoutes'),
+    apiResourcesNode(
+      ['kubernetes', '$context', '$namespace', 'apiResources'],
+      call(member(contextScope, 'namespace'), [member(j.Dollar, 'namespace')]),
+      'namespaceRoutes'
+    ),
+  ];
+
+  local allRouteNodes = [contextsNode, contextNode] + std.flattenArrays([r.result.nodes for r in results]) + apiResourcesNodes;
   local binds = [
     j.LocalBind('base', j.Import('arcourse-ui/main.libsonnet')),
     j.LocalBind('a', j.Add(var('base'), j.parseJsonnet(fieldListMixin))),
@@ -588,9 +622,10 @@ local groupsFromSpecs(specs, columns, links) =
   _record: false,
   manifest:: true,
   favoriteGroups:: [],
-  collapsedGroups:: [],
-  remainingGroupsTitle:: 'remaining groups',
+  hiddenGroups:: [],
+  hiddenResources:: {},
   listColumns:: 4,
+  namespaces:: {},
   contexts:: [],
   specs:: {},
   globalLinkSpecs:: [namespaceLinkSpec, ownerReferenceLinkSpec],
@@ -604,6 +639,11 @@ local groupsFromSpecs(specs, columns, links) =
       ),
     },
   _view:: {
-    jsonnet: generateAll($.data.groups, $.manifest, $.globalLinkSpecs, $.listColumns, $.favoriteGroups, $.collapsedGroups, $.remainingGroupsTitle),
+    jsonnet: generateAll($.data.groups, $.manifest, $.globalLinkSpecs, {
+      listColumns: $.listColumns,
+      favoriteGroups: $.favoriteGroups,
+      hiddenGroups: $.hiddenGroups,
+      hiddenResources: $.hiddenResources,
+    }, $.namespaces),
   },
 }

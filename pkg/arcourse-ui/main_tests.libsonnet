@@ -360,7 +360,7 @@ local resolveHtml(v) =
       },
     },
     {
-      name: 'list.groupOrder sorts the group cards by their position in it and keeps unlisted groups after them in their original order',
+      name: 'list.groupOrder sorts the group cards, links groups included, by their position in it and keeps unlisted groups after them in their original order',
       input:: function()
         local link(name) = { _node: true, _queryPath: '/root/' + name };
         local node = a.list.node {
@@ -369,9 +369,27 @@ local resolveHtml(v) =
           'hub.traefik.io': { aiservices: link('hub.traefik.io/aiservices') },
           'cilium.io': { ciliumnodes: link('cilium.io/ciliumnodes') },
           'traefik.io': { middlewares: link('traefik.io/middlewares') },
+          links: { metrics: { cpu: link('metrics/cpu') }, logs: { all: link('logs/all') } },
         };
         [group.title for group in node._view.fragment.groups],
-      expected: ['traefik.io', 'apps', 'cilium.io', 'hub.traefik.io'],
+      expected: ['traefik.io', 'apps', 'logs', 'metrics', 'cilium.io', 'hub.traefik.io'],
+    },
+    {
+      name: 'list.hiddenGroups drops the group cards with the listed titles, links groups included',
+      input:: function()
+        local link(name) = { _node: true, _queryPath: '/root/' + name };
+        local node = a.list.node {
+          list:: { hiddenGroups: ['cilium.io', 'logs', 'missing'] },
+          pods: link('pods'),
+          apps: { deployments: link('apps/deployments') },
+          'cilium.io': { ciliumnodes: link('cilium.io/ciliumnodes') },
+          links: { logs: { all: link('logs/all') } },
+        };
+        {
+          items: [item.text for item in node._view.fragment.items],
+          groups: [group.title for group in node._view.fragment.groups],
+        },
+      expected: { items: ['pods'], groups: ['apps'] },
     },
     {
       name: 'list.nodeGroups moves the listed node neighbors out of the items into a group card in the listed order, sorted by list.groupOrder',
@@ -396,6 +414,30 @@ local resolveHtml(v) =
         groups: [
           { title: 'apps', items: ['deployments'] },
           { title: 'remaining groups', items: ['traefik.io', 'cilium.io'] },
+        ],
+      },
+    },
+    {
+      name: 'list.hiddenItems drops the listed items of a card keyed by card title, the untitled card at the empty key, and drops cards left empty',
+      input:: function()
+        local link(name) = { _node: true, _queryPath: '/root/' + name };
+        local node = a.list.node {
+          list:: { hiddenItems: { '': ['services'], apps: ['replicasets'], metrics: ['pods/phase'], batch: ['jobs'] } },
+          pods: link('pods'),
+          services: link('services'),
+          apps: { deployments: link('apps/deployments'), replicasets: link('apps/replicasets') },
+          metrics: { pods: { cpu: link('metrics/pods/cpu'), phase: link('metrics/pods/phase') } },
+          batch: { jobs: link('batch/jobs') },
+        };
+        {
+          items: [item.text for item in node._view.fragment.items],
+          groups: [{ title: group.title, items: [item.text for item in group.items] } for group in node._view.fragment.groups],
+        },
+      expected: {
+        items: ['pods'],
+        groups: [
+          { title: 'apps', items: ['deployments'] },
+          { title: 'metrics', items: ['pods/cpu'] },
         ],
       },
     },
