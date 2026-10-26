@@ -34,6 +34,9 @@ p.pkg({
     an empty node instead of a card; their links are listed in one card titled
     `remainingGroupsTitle` (default `'remaining groups'`) after the other cards. When a
     group matches both lists, the more specific pattern wins and a tie goes to the favorite.
+    `hiddenGroups` (default `[]`) takes the same patterns for groups left out of the cards
+    and of `remainingGroupsTitle` entirely; their nodes still exist. Across all three lists
+    the most specific pattern wins, a tie going to favorite, then collapsed, then hidden.
     `hiddenResources` (default `{}`) maps an API group (`''` for core) to resource names
     left out of its card and, for a collapsed group, out of its node's links; the
     resources' nodes still exist.

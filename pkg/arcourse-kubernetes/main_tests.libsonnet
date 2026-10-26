@@ -29,7 +29,7 @@ local listLiteral(body) =
     else if expr.__kind__ == 'Object' then { [fieldName(f)]: literal(f.expr2) for f in expr.fields }
     else manifestLiteral(expr);
   literal([f for f in body.fields if f.id == 'list'][0].expr2);
-local groupLists(groups, favoriteGroups=[], collapsedGroups=[], namespacedGroups=[], remainingGroupsTitle='remaining groups', hiddenResources={}) =
+local groupLists(groups, favoriteGroups=[], collapsedGroups=[], namespacedGroups=[], remainingGroupsTitle='remaining groups', hiddenResources={}, hiddenGroups=[]) =
   local namespaces = { name: 'namespaces', kind: 'Namespace', namespaced: false, verbs: ['get'], version: 'v1' };
   local widgets(group) = { name: 'widgets', kind: 'Widget', namespaced: std.member(namespacedGroups, group), verbs: ['list'], version: 'v1' };
   local entries = unwrap(arcourseKubernetes.graph {
@@ -38,6 +38,7 @@ local groupLists(groups, favoriteGroups=[], collapsedGroups=[], namespacedGroups
     collapsedGroups: collapsedGroups,
     remainingGroupsTitle: remainingGroupsTitle,
     hiddenResources: hiddenResources,
+    hiddenGroups: hiddenGroups,
     data+: { groups: [{ group: '', resources: [namespaces] }] + [{ group: g, resources: [widgets(g)] } for g in groups] },
   }._view.jsonnet).elements;
   local body(path) = [nodeBody(e) for e in entries if nodePath(e) == path][0];
@@ -45,6 +46,7 @@ local groupLists(groups, favoriteGroups=[], collapsedGroups=[], namespacedGroups
     context: listLiteral(entries[1].expr.elements[1].expr),
     namespace: listLiteral(body(['kubernetes', '$context', '$namespace'])),
     node(path):: listLiteral([e.expr.elements[1].expr for e in entries if nodePath(e) == path][0]),
+    paths:: [nodePath(e) for e in entries],
   };
 local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.target.target.target.id];
 
@@ -376,6 +378,33 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
         namespace: hidden,
         collapsedContext: { hiddenItems: { '': ['widgets'] } },
         collapsedNamespace: { hiddenItems: { '': ['widgets'] } },
+      },
+    },
+    {
+      name: 'hiddenGroups get an empty group node but are left out of the cards and remaining groups, and the most specific pattern wins with ties going to favorite then collapsed',
+      input:: function()
+        local lists = groupLists(
+          ['apps', 'cilium.io', 'metallb.io', 'storage.k8s.io', 'networking.k8s.io'],
+          favoriteGroups=['apps', 'networking.k8s.io'],
+          collapsedGroups=['*', 'storage.k8s.io'],
+          namespacedGroups=['cilium.io'],
+          hiddenResources={ '': ['podtemplates'] },
+          hiddenGroups=['cilium.io', 'metallb.io', 'k8s.io', 'apps'],
+        );
+        {
+          context: lists.context,
+          namespaceHidden: lists.namespace.hiddenItems,
+          hiddenNodes: [std.member(lists.paths, path) for path in [['kubernetes', '$context', 'cilium.io'], ['kubernetes', '$context', '$namespace', 'cilium.io']]],
+        },
+      expected: {
+        context: {
+          columns: '4',
+          groupOrder: ['apps', 'networking.k8s.io', 'remaining groups'],
+          nodeGroups: { 'remaining groups': ['storage.k8s.io'] },
+          hiddenItems: { '': ['podtemplates', 'cilium.io', 'metallb.io'] },
+        },
+        namespaceHidden: { '': ['podtemplates', 'cilium.io'] },
+        hiddenNodes: [true, true],
       },
     },
     {
