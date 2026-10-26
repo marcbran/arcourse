@@ -40,7 +40,10 @@ p.pkg({
     shows its YAML above the links. `namespaces` (default `{}`) maps a namespace name to
     overrides of `favoriteGroups`, `hiddenGroups`, `hiddenResources` and `listColumns` for
     that namespace's detail node; each set field replaces the top-level one, the rest
-    fall back to it, and the context node always uses the top-level settings.
+    fall back to it, and the context node always uses the top-level settings. Both the
+    context and the namespace node get an `apiResources` child linking every listable
+    resource of their scope as cards per API group, ordered by `favoriteGroups` and laid
+    out in `listColumns`, but ignoring `hiddenGroups` and `hiddenResources`.
   |||),
   core: p.desc(|||
     Hand-written core layers on top of the generated graph. `nodeList` adds the pod

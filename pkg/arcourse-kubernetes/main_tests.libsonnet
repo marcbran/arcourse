@@ -8,15 +8,17 @@ local manifestLiteral(expr) =
 
 local unwrap(node) = if node.__kind__ == 'Local' then unwrap(node.body) else node;
 
+local nodePath(entry) = [part.expr.value for part in entry.expr.elements[0].expr.elements];
+local isApiResources(entry) = nodePath(entry)[std.length(nodePath(entry)) - 1] == 'apiResources';
+local resourceEntries(graph) = [e for e in unwrap(graph._view.jsonnet).elements if !isApiResources(e)];
+
 local nodes(groups, globalLinkSpecs=[], hiddenGroups=[]) =
-  unwrap(arcourseKubernetes.graph {
+  resourceEntries(arcourseKubernetes.graph {
     manifest: false,
     hiddenGroups: hiddenGroups,
     globalLinkSpecs: globalLinkSpecs,
     data+: { groups: groups },
-  }._view.jsonnet).elements;
-
-local nodePath(entry) = [part.expr.value for part in entry.expr.elements[0].expr.elements];
+  });
 local nodeView(entry) = entry.expr.elements[1].expr.left;
 local nodeBody(entry) = entry.expr.elements[1].expr.right;
 local nodeKind(entry) = [nodeView(entry).id, nodeView(entry).target.id, nodeView(entry).target.target.id];
@@ -382,6 +384,66 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
       },
     },
     {
+      name: 'the context and namespace apiResources nodes link every listable resource of their scope grouped by API group, ignoring hiddenGroups and hiddenResources',
+      input:: function()
+        local resource(name, kind, namespaced) = { name: name, kind: kind, namespaced: namespaced, verbs: ['list', 'get'], version: 'v1' };
+        local entries = unwrap(arcourseKubernetes.graph {
+          manifest: false,
+          favoriteGroups: ['acme.io'],
+          hiddenGroups: ['apps'],
+          hiddenResources: { '': ['pods'] },
+          data+: { groups: [
+            { group: '', resources: [resource('pods', 'Pod', true), resource('nodes', 'Node', false)] },
+            { group: 'apps', resources: [resource('deployments', 'Deployment', true)] },
+            { group: 'acme.io', resources: [resource('widgets', 'Widget', false)] },
+          ] },
+        }._view.jsonnet).elements;
+        local code(expr) =
+          if expr.__kind__ == 'Var' then expr.id
+          else if expr.__kind__ == 'Dollar' then '$'
+          else if expr.__kind__ == 'Apply' then code(expr.target) + '(' + std.join(', ', [code(arg.expr) for arg in expr.arguments.positional]) + ')'
+          else if std.objectHas(expr, 'id') then code(expr.target) + '.' + expr.id
+          else code(expr.target) + "['" + expr.index.value + "']";
+        local fieldName(f) = if f.id != null then f.id else f.expr1.value;
+        local links(expr) = { [fieldName(f)]: if f.expr2.__kind__ == 'Object' then links(f.expr2) else code(f.expr2) for f in expr.fields };
+        local apiResources(path) =
+          local entry = [e for e in entries if nodePath(e) == path][0];
+          local body = nodeBody(entry);
+          {
+            view: nodeKind(entry),
+            scope: code([f for f in body.fields if f.kind == 4][0].expr2),
+            list: listLiteral(body),
+            links: links(field(body, 'links')),
+          };
+        {
+          context: apiResources(['kubernetes', '$context', 'apiResources']),
+          namespace: apiResources(['kubernetes', '$context', '$namespace', 'apiResources']),
+        },
+      expected: {
+        local list = { columns: '4', groupOrder: ['acme.io', 'apps'] },
+        context: {
+          view: ['node', 'list', 'a'],
+          scope: 'root.kubernetes.context($.context)',
+          list: list,
+          links: {
+            pods: 'scope.pods',
+            nodes: 'scope.nodes',
+            'acme.io': { widgets: "scope['acme.io'].widgets" },
+            apps: { deployments: 'scope.apps.deployments' },
+          },
+        },
+        namespace: {
+          view: ['node', 'list', 'a'],
+          scope: 'root.kubernetes.context($.context).namespace($.namespace)',
+          list: list,
+          links: {
+            pods: 'scope.pods',
+            apps: { deployments: 'scope.apps.deployments' },
+          },
+        },
+      },
+    },
+    {
       name: 'a bundled specs.json entry for a core resource derives a namespaced resource with list and get verbs from its OpenAPI paths',
       input:: function()
         local spec = {
@@ -390,11 +452,11 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
             '/api/v1/namespaces/{namespace}/widgets/{name}': { get: {} },
           },
         };
-        local entries = unwrap(arcourseKubernetes.graph {
+        local entries = resourceEntries(arcourseKubernetes.graph {
           manifest: false,
           contexts: [],
           specs: { 'api/v1': spec },
-        }._view.jsonnet).elements;
+        });
         {
           paths: [nodePath(e) for e in entries[2:]],
         },
@@ -415,11 +477,11 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
             '/apis/acme.io/v1/widgets/{name}': { get: {} },
           },
         };
-        local entries = unwrap(arcourseKubernetes.graph {
+        local entries = resourceEntries(arcourseKubernetes.graph {
           manifest: false,
           contexts: [],
           specs: { 'apis/acme.io/v1': spec },
-        }._view.jsonnet).elements;
+        });
         { paths: [nodePath(e) for e in entries[2:]] },
       expected: {
         paths: [

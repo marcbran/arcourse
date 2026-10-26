@@ -123,35 +123,38 @@ local namespaceListObject(settings, namespaces, groupNames) =
 
 local listField(expr) = j.Field('list', expr) { Hide: 0 };
 
+local isAsciiLetter(c) = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+local isAsciiDigit(c) = c >= '0' && c <= '9';
+local isJsonnetIdent(s) =
+  if std.length(s) == 0 then false
+  else
+    local len = std.length(s);
+    local identStart(c) = c == '_' || isAsciiLetter(c);
+    local identPart(c) = identStart(c) || isAsciiDigit(c);
+    local check(i) =
+      if i >= len then true
+      else if i == 0 then identStart(s[i]) && check(i + 1)
+      else identPart(s[i]) && check(i + 1);
+    check(0);
+local jsonnetKeywords = [
+  'assert', 'else', 'error', 'false', 'for', 'function', 'if',
+  'import', 'importstr', 'in', 'local', 'null', 'self', 'super',
+  'tailstrict', 'then', 'true',
+];
+local isJsonnetKeyword(s) = std.member(jsonnetKeywords, s);
+local isUnquotedFieldName(s) = isJsonnetIdent(s) && !isJsonnetKeyword(s);
+local access(expr, name) =
+  if isUnquotedFieldName(name) then j.Member(expr, name) else j.Index(expr, j.String(name));
+
+local objectField(name, expr) =
+  if isUnquotedFieldName(name) then j.Field(name, expr) else j.Field(j.String(name), expr);
+
 local generate(resources, group, links=[], globalLinkSpecs=[], namespaceListField=null) =
   local le(indent=0) = j.Fodder.LineEnd(0, indent);
   local prettyArray(elements, indent=0) =
     j.Array([elem.fodder(le(indent + 2)) for elem in elements]).closeFodder(le(indent));
   local prettyObject(fields, indent=0) =
     j.Object([field { fodder: [le(indent + 2)] } for field in fields]).closeFodder(le(indent));
-
-  local isAsciiLetter(c) = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
-  local isAsciiDigit(c) = c >= '0' && c <= '9';
-  local isJsonnetIdent(s) =
-    if std.length(s) == 0 then false
-    else
-      local len = std.length(s);
-      local identStart(c) = c == '_' || isAsciiLetter(c);
-      local identPart(c) = identStart(c) || isAsciiDigit(c);
-      local check(i) =
-        if i >= len then true
-        else if i == 0 then identStart(s[i]) && check(i + 1)
-        else identPart(s[i]) && check(i + 1);
-      check(0);
-  local jsonnetKeywords = [
-    'assert', 'else', 'error', 'false', 'for', 'function', 'if',
-    'import', 'importstr', 'in', 'local', 'null', 'self', 'super',
-    'tailstrict', 'then', 'true',
-  ];
-  local isJsonnetKeyword(s) = std.member(jsonnetKeywords, s);
-  local isUnquotedFieldName(s) = isJsonnetIdent(s) && !isJsonnetKeyword(s);
-  local access(expr, name) =
-    if isUnquotedFieldName(name) then j.Member(expr, name) else j.Index(expr, j.String(name));
 
   local contains(xs, x) = std.length([y for y in xs if y == x]) > 0;
   local hasVerb(resource, verb) = contains(resourceVerbs(resource), verb);
@@ -265,9 +268,6 @@ local generate(resources, group, links=[], globalLinkSpecs=[], namespaceListFiel
     local candidates = [l { value: rewriteLinkValue(l.value) } for l in links if l.sourcePath == path];
     [l for l in candidates if l.value != null];
 
-  local objectField(name, expr) =
-    if isUnquotedFieldName(name) then j.Field(name, expr) else j.Field(j.String(name), expr);
-
   local compactLiteral(value) =
     if value == null then j.Null
     else if std.type(value) == 'string' then j.String(value)
@@ -375,7 +375,11 @@ local generate(resources, group, links=[], globalLinkSpecs=[], namespaceListFiel
       (if hasVerb(resource, 'list') then [clusterList(resource)] else []) +
       (if hasVerb(resource, 'get') then [clusterDetail(resource)] else []);
 
-  std.flattenArrays([resourceNodes(r) for r in resources]);
+  {
+    nodes: std.flattenArrays([resourceNodes(r) for r in resources]),
+    contextRoutes: [route(r) for r in resources if hasVerb(r, 'list')],
+    namespaceRoutes: [route(r) for r in resources if r.namespaced && hasVerb(r, 'list')],
+  };
 
 local generateAll(groups, manifest, globalLinkSpecs, settings, namespaces) =
   local groupNames = std.set([g.group for g in groups if g.group != '']);
@@ -412,10 +416,40 @@ local generateAll(groups, manifest, globalLinkSpecs, settings, namespaces) =
     prettyObject([listField(listObject(settings, groupNames, 4))], 2),
   ]);
 
-  local allRouteNodes = [contextsNode, contextNode] + std.flattenArrays([
-    generate(g.resources, g.group, std.get(g, 'links', []), globalLinkSpecs, listField(namespaceListObject(settings, namespaces, groupNames)))
+  local results = [
+    { group: g.group, result: generate(g.resources, g.group, std.get(g, 'links', []), globalLinkSpecs, listField(namespaceListObject(settings, namespaces, groupNames))) }
     for g in groups
-  ]);
+  ];
+  local contextScope = call(member(member(var('root'), 'kubernetes'), 'context'), [member(j.Dollar, 'context')]);
+  local apiResourcesNode(path, scopeExpr, routesField) =
+    local scope = var('scope');
+    local routesOf(group) = std.flattenArrays([r.result[routesField] for r in results if r.group == group]);
+    local groupLinks(group) = prettyObject([objectField(route, access(access(scope, group), route)) for route in routesOf(group)], 6);
+    j.Array([
+      j.Array([j.String(p) for p in path]),
+      j.Add(
+        member(member(var('a'), 'list'), 'node'),
+        prettyObject([
+          j.FieldLocal('scope', scopeExpr),
+          listField(listObject(settings { hiddenGroups: [], hiddenResources: {} }, groupNames, 4)),
+          j.Field('links', prettyObject(
+            [objectField(route, access(scope, route)) for route in routesOf('')] +
+            [objectField(group, groupLinks(group)) for group in groupNames if std.length(routesOf(group)) > 0],
+            4
+          )),
+        ], 2)
+      ),
+    ]);
+  local apiResourcesNodes = [
+    apiResourcesNode(['kubernetes', '$context', 'apiResources'], contextScope, 'contextRoutes'),
+    apiResourcesNode(
+      ['kubernetes', '$context', '$namespace', 'apiResources'],
+      call(member(contextScope, 'namespace'), [member(j.Dollar, 'namespace')]),
+      'namespaceRoutes'
+    ),
+  ];
+
+  local allRouteNodes = [contextsNode, contextNode] + std.flattenArrays([r.result.nodes for r in results]) + apiResourcesNodes;
   local binds = [
     j.LocalBind('base', j.Import('arcourse-ui/main.libsonnet')),
     j.LocalBind('a', j.Add(var('base'), j.parseJsonnet(fieldListMixin))),
