@@ -360,7 +360,7 @@ local resolveHtml(v) =
       },
     },
     {
-      name: 'list.groupOrder sorts the group cards by their position in it and keeps unlisted groups after them in their original order',
+      name: 'list.groupOrder sorts the group cards, links groups included, by their position in it and keeps unlisted groups after them in their original order',
       input:: function()
         local link(name) = { _node: true, _queryPath: '/root/' + name };
         local node = a.list.node {
@@ -369,9 +369,10 @@ local resolveHtml(v) =
           'hub.traefik.io': { aiservices: link('hub.traefik.io/aiservices') },
           'cilium.io': { ciliumnodes: link('cilium.io/ciliumnodes') },
           'traefik.io': { middlewares: link('traefik.io/middlewares') },
+          links: { metrics: { cpu: link('metrics/cpu') }, logs: { all: link('logs/all') } },
         };
         [group.title for group in node._view.fragment.groups],
-      expected: ['traefik.io', 'apps', 'cilium.io', 'hub.traefik.io'],
+      expected: ['traefik.io', 'apps', 'logs', 'metrics', 'cilium.io', 'hub.traefik.io'],
     },
     {
       name: 'list.nodeGroups moves the listed node neighbors out of the items into a group card in the listed order, sorted by list.groupOrder',
