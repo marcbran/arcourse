@@ -5,7 +5,7 @@ go 1.26.2
 require (
 	github.com/google/go-jsonnet v0.22.0
 	github.com/marcbran/arcourse v0.0.0
-	github.com/marcbran/jpoet v0.25.0
+	github.com/marcbran/jpoet v0.26.0
 )
 
 require (
@@ -23,7 +23,7 @@ require (
 	github.com/spf13/cobra v1.10.2 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
-	golang.org/x/crypto v0.55.0 // indirect
+	golang.org/x/crypto v0.56.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
