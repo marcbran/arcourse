@@ -375,6 +375,23 @@ local resolveHtml(v) =
       expected: ['traefik.io', 'apps', 'logs', 'metrics', 'cilium.io', 'hub.traefik.io'],
     },
     {
+      name: 'list.hiddenGroups drops the group cards with the listed titles, links groups included',
+      input:: function()
+        local link(name) = { _node: true, _queryPath: '/root/' + name };
+        local node = a.list.node {
+          list:: { hiddenGroups: ['cilium.io', 'logs', 'missing'] },
+          pods: link('pods'),
+          apps: { deployments: link('apps/deployments') },
+          'cilium.io': { ciliumnodes: link('cilium.io/ciliumnodes') },
+          links: { logs: { all: link('logs/all') } },
+        };
+        {
+          items: [item.text for item in node._view.fragment.items],
+          groups: [group.title for group in node._view.fragment.groups],
+        },
+      expected: { items: ['pods'], groups: ['apps'] },
+    },
+    {
       name: 'list.nodeGroups moves the listed node neighbors out of the items into a group card in the listed order, sorted by list.groupOrder',
       input:: function()
         local link(name) = { _node: true, _queryPath: '/root/' + name };

@@ -103,20 +103,18 @@ local hiddenItemsField(hiddenItems) =
 local listViewField(columns, layout, hiddenResources={}) =
   local le(indent) = j.Fodder.LineEnd(0, indent);
   local stringArray(values) = j.Array([j.String(v).fodder(le(8)) for v in values]).closeFodder(le(6));
-  local hiddenItems =
-    hiddenResources +
-    (if std.length(layout.hidden) > 0 then { '': std.get(hiddenResources, '', []) + layout.hidden } else {});
   local fields =
     [j.Field('columns', j.Number(std.toString(columns)))] +
     (if std.length(layout.expanded) > 0 then [j.Field('groupOrder', stringArray(layout.expanded))] else []) +
-    (if std.length(hiddenItems) > 0 then [hiddenItemsField(hiddenItems)] else []);
+    (if std.length(layout.hidden) > 0 then [j.Field('hiddenGroups', stringArray(layout.hidden))] else []) +
+    (if std.length(hiddenResources) > 0 then [hiddenItemsField(hiddenResources)] else []);
   j.Field(
     'list',
     if std.length(fields) == 1 then j.Object(fields)
     else j.Object([field { fodder: [le(6)] } for field in fields]).closeFodder(le(4))
   ) { Hide: 0 };
 
-local generate(resources, group, links=[], globalLinkSpecs=[], hidden=false, namespaceListField=null, hiddenResources={}) =
+local generate(resources, group, links=[], globalLinkSpecs=[], namespaceListField=null) =
   local le(indent=0) = j.Fodder.LineEnd(0, indent);
   local prettyArray(elements, indent=0) =
     j.Array([elem.fodder(le(indent + 2)) for elem in elements]).closeFodder(le(indent));
@@ -294,7 +292,6 @@ local generate(resources, group, links=[], globalLinkSpecs=[], hidden=false, nam
   local nodeView(name) = member(member(var('a'), name), 'node');
   local nodePath(path) = j.Array([j.String(p) for p in path]);
   local node(path, viewExpr, body) = j.Array([nodePath(path), j.Add(viewExpr, body)]);
-  local emptyNode(path) = j.Array([nodePath(path), j.Object()]);
 
   local columnLiteral(col) = compactLiteral({ label: col.label, path: col.path });
   local resourceColumns(resource) =
@@ -369,27 +366,11 @@ local generate(resources, group, links=[], globalLinkSpecs=[], hidden=false, nam
       (if hasVerb(resource, 'list') then [clusterList(resource)] else []) +
       (if hasVerb(resource, 'get') then [clusterDetail(resource)] else []);
 
-  local hasNamespacedResources = std.length([r for r in resources if r.namespaced]) > 0;
-  local groupNode(path) =
-    if !std.objectHas(hiddenResources, group) then emptyNode(path)
-    else j.Array([nodePath(path), prettyObject([
-      j.Field('list', prettyObject([hiddenItemsField({ '': hiddenResources[group] }) { fodder: [le(4)] }], 2)) { Hide: 0 },
-    ])]);
-  local groupContextNodes = if hidden && group != '' then [groupNode(['kubernetes', '$context', group])] else [];
-  local groupNamespaceNodes =
-    if hidden && group != '' && hasNamespacedResources
-    then [groupNode(['kubernetes', '$context', '$namespace', group])]
-    else [];
-
-  groupContextNodes +
-  groupNamespaceNodes +
   std.flattenArrays([resourceNodes(r) for r in resources]);
 
 local generateAll(groups, manifest=true, globalLinkSpecs=[], listColumns=4, favoriteGroups=[], hiddenGroups=[], hiddenResources={}) =
   local layout = groupLayout(std.set([g.group for g in groups if g.group != '']), favoriteGroups, hiddenGroups);
-  local namespacedGroups = std.set([g.group for g in groups if std.length([r for r in g.resources if r.namespaced]) > 0]);
-  local namespaceLayout = layout { hidden: [g for g in super.hidden if std.setMember(g, namespacedGroups)] };
-  local namespaceListField = listViewField(listColumns, namespaceLayout, hiddenResources);
+  local listField = listViewField(listColumns, layout, hiddenResources);
   local le(indent=0) = j.Fodder.LineEnd(0, indent);
   local prettyArray(elements, indent=0) =
     j.Array([elem.fodder(le(indent + 2)) for elem in elements]).closeFodder(le(indent));
@@ -420,11 +401,11 @@ local generateAll(groups, manifest=true, globalLinkSpecs=[], listColumns=4, favo
   ]);
   local contextNode = j.Array([
     j.Array([j.String('kubernetes'), j.String('$context')]),
-    prettyObject([listViewField(listColumns, layout, hiddenResources)], 2),
+    prettyObject([listField], 2),
   ]);
 
   local allRouteNodes = [contextsNode, contextNode] + std.flattenArrays([
-    generate(g.resources, g.group, std.get(g, 'links', []), globalLinkSpecs, std.member(layout.hidden, g.group), namespaceListField, hiddenResources)
+    generate(g.resources, g.group, std.get(g, 'links', []), globalLinkSpecs, listField)
     for g in groups
   ]);
   local binds = [

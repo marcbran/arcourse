@@ -29,22 +29,20 @@ local listLiteral(body) =
     else if expr.__kind__ == 'Object' then { [fieldName(f)]: literal(f.expr2) for f in expr.fields }
     else manifestLiteral(expr);
   literal([f for f in body.fields if f.id == 'list'][0].expr2);
-local groupLists(groups, favoriteGroups=[], hiddenGroups=[], namespacedGroups=[], hiddenResources={}) =
+local groupLists(groups, favoriteGroups=[], hiddenGroups=[], hiddenResources={}) =
   local namespaces = { name: 'namespaces', kind: 'Namespace', namespaced: false, verbs: ['get'], version: 'v1' };
-  local widgets(group) = { name: 'widgets', kind: 'Widget', namespaced: std.member(namespacedGroups, group), verbs: ['list'], version: 'v1' };
+  local widgets = { name: 'widgets', kind: 'Widget', namespaced: false, verbs: ['list'], version: 'v1' };
   local entries = unwrap(arcourseKubernetes.graph {
     manifest: false,
     favoriteGroups: favoriteGroups,
     hiddenResources: hiddenResources,
     hiddenGroups: hiddenGroups,
-    data+: { groups: [{ group: '', resources: [namespaces] }] + [{ group: g, resources: [widgets(g)] } for g in groups] },
+    data+: { groups: [{ group: '', resources: [namespaces] }] + [{ group: g, resources: [widgets] } for g in groups] },
   }._view.jsonnet).elements;
   local body(path) = [nodeBody(e) for e in entries if nodePath(e) == path][0];
   {
     context: listLiteral(entries[1].expr.elements[1].expr),
     namespace: listLiteral(body(['kubernetes', '$context', '$namespace'])),
-    node(path):: listLiteral([e.expr.elements[1].expr for e in entries if nodePath(e) == path][0]),
-    paths:: [nodePath(e) for e in entries],
   };
 local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.target.target.target.id];
 
@@ -219,25 +217,10 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
       },
     },
     {
-      name: 'a hidden group inserts empty scaffold nodes for the group context and (when namespaced resources exist) the group namespace',
+      name: 'a group gets no group node of its own, only its resource nodes, also when it is hidden',
       input:: function()
         local resource = { name: 'widgets', kind: 'Widget', namespaced: true, verbs: ['list'], version: 'v1' };
         local entries = nodes([{ group: 'acme.io', resources: [resource] }], hiddenGroups=['acme.io']);
-        { paths: [nodePath(e) for e in entries[2:]] },
-      expected: {
-        paths: [
-          ['kubernetes', '$context', 'acme.io'],
-          ['kubernetes', '$context', '$namespace', 'acme.io'],
-          ['kubernetes', '$context', 'acme.io', 'widgets'],
-          ['kubernetes', '$context', '$namespace', 'acme.io', 'widgets'],
-        ],
-      },
-    },
-    {
-      name: 'an expanded group omits the empty group scaffold nodes and keeps the resource nodes',
-      input:: function()
-        local resource = { name: 'widgets', kind: 'Widget', namespaced: true, verbs: ['list'], version: 'v1' };
-        local entries = nodes([{ group: 'acme.io', resources: [resource] }]);
         { paths: [nodePath(e) for e in entries[2:]] },
       expected: {
         paths: [
@@ -293,29 +276,33 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
       expected: ['coordination.k8s.io', 'storage.k8s.io', 'cert-manager.io', 'acme.cert-manager.io', 'networking.k8s.io', 'batch', 'apps', 'cilium.io'],
     },
     {
-      name: 'hiddenGroups leave groups out of the group order and add them to the hidden items of the untitled card',
+      name: 'hiddenGroups leave groups out of the group order and list them as hidden groups on the context and namespace nodes',
       input:: function()
         local lists = groupLists(['apps', 'networking.k8s.io', 'storage.k8s.io', 'cilium.io'], hiddenGroups=['k8s.io', 'cilium.io']);
-        lists.context,
+        { context: lists.context, namespace: lists.namespace },
       expected: {
-        columns: '4',
-        groupOrder: ['apps'],
-        hiddenItems: { '': ['cilium.io', 'networking.k8s.io', 'storage.k8s.io'] },
+        local list = {
+          columns: '4',
+          groupOrder: ['apps'],
+          hiddenGroups: ['cilium.io', 'networking.k8s.io', 'storage.k8s.io'],
+        },
+        context: list,
+        namespace: list,
       },
     },
     {
       name: 'the more specific of the matching favorite and hidden patterns wins and a tie goes to the favorite',
       input:: function()
         local hidden(favoriteGroups, hiddenGroups) =
-          std.get(groupLists(['networking.k8s.io', 'storage.k8s.io'], favoriteGroups, hiddenGroups=hiddenGroups).context, 'hiddenItems', null);
+          std.get(groupLists(['networking.k8s.io', 'storage.k8s.io'], favoriteGroups, hiddenGroups=hiddenGroups).context, 'hiddenGroups', null);
         {
           favoriteSubdomain: hidden(['networking.k8s.io'], ['k8s.io']),
           hiddenSubdomain: hidden(['k8s.io'], ['networking.k8s.io']),
           tie: hidden(['k8s.io'], ['k8s.io']),
         },
       expected: {
-        favoriteSubdomain: { '': ['storage.k8s.io'] },
-        hiddenSubdomain: { '': ['networking.k8s.io'] },
+        favoriteSubdomain: ['storage.k8s.io'],
+        hiddenSubdomain: ['networking.k8s.io'],
         tie: null,
       },
     },
@@ -331,7 +318,7 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
       expected: {
         columns: '4',
         groupOrder: ['cert-manager.io', 'external-secrets.io', 'other.cert-manager.io'],
-        hiddenItems: { '': ['acme.cert-manager.io', 'generators.external-secrets.io'] },
+        hiddenGroups: ['acme.cert-manager.io', 'generators.external-secrets.io'],
       },
     },
     {
@@ -342,53 +329,18 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
       expected: {
         columns: '4',
         groupOrder: ['batch'],
-        hiddenItems: { '': ['apps', 'cilium.io'] },
+        hiddenGroups: ['apps', 'cilium.io'],
       },
     },
     {
-      name: 'hidden groups get empty group nodes and the namespace detail node only hides the ones with namespaced resources',
+      name: 'hiddenResources keyed by group become the hidden list items of the context and namespace nodes',
       input:: function()
-        local lists = groupLists(['apps', 'cilium.io'], hiddenGroups=['*'], namespacedGroups=['apps'], hiddenResources={ '': ['podtemplates'] });
-        {
-          context: lists.context.hiddenItems,
-          namespace: lists.namespace.hiddenItems,
-          groupNodes: [
-            std.member(lists.paths, path)
-            for path in [
-              ['kubernetes', '$context', 'apps'],
-              ['kubernetes', '$context', '$namespace', 'apps'],
-              ['kubernetes', '$context', 'cilium.io'],
-              ['kubernetes', '$context', '$namespace', 'cilium.io'],
-            ]
-          ],
-        },
+        local lists = groupLists(['apps'], hiddenResources={ '': ['podtemplates'], apps: ['controllerrevisions'] });
+        { context: lists.context.hiddenItems, namespace: lists.namespace.hiddenItems },
       expected: {
-        context: { '': ['podtemplates', 'apps', 'cilium.io'] },
-        namespace: { '': ['podtemplates', 'apps'] },
-        groupNodes: [true, true, true, false],
-      },
-    },
-    {
-      name: 'hiddenResources keyed by group become the hidden list items of the context and namespace nodes and of the hidden group nodes',
-      input:: function()
-        local lists = groupLists(
-          ['apps', 'cilium.io'],
-          hiddenGroups=['cilium.io'],
-          namespacedGroups=['cilium.io'],
-          hiddenResources={ apps: ['controllerrevisions'], 'cilium.io': ['widgets'] },
-        );
-        {
-          context: lists.context.hiddenItems,
-          namespace: lists.namespace.hiddenItems,
-          hiddenContext: lists.node(['kubernetes', '$context', 'cilium.io']),
-          hiddenNamespace: lists.node(['kubernetes', '$context', '$namespace', 'cilium.io']),
-        },
-      expected: {
-        local hidden = { '': ['cilium.io'], apps: ['controllerrevisions'], 'cilium.io': ['widgets'] },
+        local hidden = { '': ['podtemplates'], apps: ['controllerrevisions'] },
         context: hidden,
         namespace: hidden,
-        hiddenContext: { hiddenItems: { '': ['widgets'] } },
-        hiddenNamespace: { hiddenItems: { '': ['widgets'] } },
       },
     },
     {

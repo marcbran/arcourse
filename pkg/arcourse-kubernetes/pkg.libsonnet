@@ -30,12 +30,11 @@ p.pkg({
     patterns shown first: a pattern matches the group itself and its subdomains, `*.domain`
     matches only the subdomains and `*` matches every group; each group ranks at the
     position of its most specific matching favorite. `hiddenGroups` (default `[]`) takes
-    the same patterns for groups left out of the cards entirely; they get an empty group
-    node so their nodes stay reachable. When a group matches both lists, the more specific
-    pattern wins and a tie goes to the favorite.
+    the same patterns for groups whose cards are left out; their resources' nodes still
+    exist. When a group matches both lists, the more specific pattern wins and a tie goes
+    to the favorite.
     `hiddenResources` (default `{}`) maps an API group (`''` for core) to resource names
-    left out of its card and, for a hidden group, out of its node's links; the
-    resources' nodes still exist.
+    left out of its card; the resources' nodes still exist.
     `listColumns` (default `4`) is the number of columns the context node and
     the namespace detail node lay out their links in; the namespace detail node also
     shows its YAML above the links.
