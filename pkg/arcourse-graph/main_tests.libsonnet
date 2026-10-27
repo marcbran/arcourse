@@ -37,13 +37,13 @@ local nodeTests = {
       },
     },
     {
-      name: 'query path percent-encodes variable values',
+      name: 'query path escapes variable values like url.PathEscape',
       input:: {
         path: ['kubernetes', '$context', 'pods'],
         body: { context: 'arn:aws:eks/prod cluster' },
       },
       output(input):: node(input)._queryPath,
-      expected: '/root/kubernetes/context/arn%3Aaws%3Aeks%2Fprod%20cluster/pods',
+      expected: '/root/kubernetes/context/arn:aws:eks%2Fprod%20cluster/pods',
     },
     {
       name: 'query path includes params that differ from their defaults',
@@ -53,13 +53,13 @@ local nodeTests = {
           _paramSpecs: [
             { name: 'from', type: 'string', default: 'now-1h' },
             { name: 'to', type: 'string', default: 'now' },
-            { name: 'columns', type: 'array', items: { type: 'array', items: 'string' }, default: [] },
+            { name: 'columns', type: 'array', items: 'string', default: [] },
             { name: 'filter', type: 'string' },
           ],
         },
       },
-      output(input):: (node(input) { _params: { from: 'now-6h', to: 'now', columns: [['k8s', 'pod']], filter: 'a b' } })._queryPath,
-      expected: '/root/logs?columns=%5B%5B%22k8s%22%2C%22pod%22%5D%5D&filter=a%20b&from=now-6h',
+      output(input):: (node(input) { _params: { from: 'now-6h', to: 'now', columns: ['k8s/pod', 'msg'], filter: 'a b' } })._queryPath,
+      expected: '/root/logs?columns=k8s%2Fpod&columns=msg&filter=a+b&from=now-6h',
     },
     {
       name: 'query path omits query when all params are defaults',

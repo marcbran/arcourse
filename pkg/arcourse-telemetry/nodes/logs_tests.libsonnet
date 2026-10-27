@@ -21,28 +21,28 @@ local view(node) = node._view.fragment[2];
   output(input):: input(),
   tests: [
     {
-      name: 'logs columns default to the configured columns with plain strings as single-segment paths',
+      name: 'logs columns default to the configured columns encoded as slash-separated paths',
       input:: function()
-        logsNode(['namespace', ['k8s', 'pod']], {})._paramSpecs[2].default,
-      expected: [['namespace'], ['k8s', 'pod']],
+        logsNode(['namespace', ['k8s', 'pod'], ['a/b', 'c~d']], {})._paramSpecs[2].default,
+      expected: ['namespace', 'k8s/pod', 'a~1b/c~0d'],
     },
     {
       name: 'logs column links are disabled by default',
       input:: function()
-        view(logsNode(['namespace'], { from: 'now-1h', to: 'now', columns: [['namespace']] })).embeddedLinks,
+        view(logsNode(['namespace'], { from: 'now-1h', to: 'now', columns: ['namespace'] })).embeddedLinks,
       expected: [],
     },
     {
       name: 'logs embedded links add the clicked leaf path to the current columns and keep other params',
       input:: function()
-        local node = logsNode(['namespace'], { from: 'now-6h', to: 'now', columns: [['namespace']] }, { columnLinks:: true });
+        local node = logsNode(['namespace'], { from: 'now-6h', to: 'now', columns: ['namespace'] }, { columnLinks:: true });
         view(node).embeddedLinks[0].fields.k8s.labels.app.key._queryPath,
-      expected: '/root/telemetry/logs?columns=%5B%5B%22namespace%22%5D%2C%5B%22k8s%22%2C%22labels%22%2C%22app%22%5D%5D&from=now-6h',
+      expected: '/root/telemetry/logs?columns=namespace&columns=k8s%2Flabels%2Fapp&from=now-6h',
     },
     {
       name: 'logs embedded links skip existing columns, array elements and empty containers',
       input:: function()
-        local node = logsNode(['namespace'], { from: 'now-1h', to: 'now', columns: [['namespace']] }, { columnLinks:: true });
+        local node = logsNode(['namespace'], { from: 'now-1h', to: 'now', columns: ['namespace'] }, { columnLinks:: true });
         local fields = view(node).embeddedLinks[0].fields;
         { namespace: fields.namespace, tags: fields.tags, empty: fields.empty },
       expected: { namespace: null, tags: [null], empty: null },
@@ -50,7 +50,7 @@ local view(node) = node._view.fragment[2];
     {
       name: 'logs header joins column path segments and cells resolve paths into nested fields',
       input:: function()
-        local node = logsNode([], { from: 'now-1h', to: 'now', columns: [['namespace'], ['k8s', 'pod'], ['missing']] });
+        local node = logsNode([], { from: 'now-1h', to: 'now', columns: ['namespace', 'k8s/pod', 'missing'] });
         local container = view(node).html[1];
         local row = container.children[1].html.children[0];
         {

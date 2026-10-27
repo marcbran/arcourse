@@ -1,4 +1,4 @@
-local url = import 'url.libsonnet';
+local url(u) = std.native('invoke:url')('format', [u]);
 
 local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
 local varNameOf(seg) = std.substr(seg, 1, std.length(seg) - 1);

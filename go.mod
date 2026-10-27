@@ -5,8 +5,9 @@ go 1.26.2
 require (
 	github.com/google/go-jsonnet v0.22.0
 	github.com/google/uuid v1.6.0
-	github.com/marcbran/jpoet v0.26.0
+	github.com/marcbran/jpoet v0.27.0
 	github.com/marcbran/jsonnet-plugin-html v0.3.0
+	github.com/marcbran/jsonnet-plugin-url v0.1.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.12.1
 	sigs.k8s.io/yaml v1.6.0

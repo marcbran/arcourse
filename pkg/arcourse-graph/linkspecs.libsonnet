@@ -1,4 +1,4 @@
-local url = import 'url.libsonnet';
+local url(u) = std.native('invoke:url')('format', [u]);
 
 local walk(current, remaining) =
   if std.length(remaining) == 0 then

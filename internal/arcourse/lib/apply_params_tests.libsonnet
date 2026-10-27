@@ -53,15 +53,27 @@ local nodeWithParams(params, extra={}) = {
       },
     },
     {
-      name: 'array param parsed and coerced',
+      name: 'array param from a single raw value',
       input:: {
         node: nodeWithParams([{ name: 'tags', type: 'array', items: 'string' }]),
-        params: { tags: '["a","b"]' },
+        params: { tags: 'a' },
       },
       expected: {
         _node: true,
         _paramSpecs: [{ name: 'tags', type: 'array', items: 'string' }],
-        _params: { tags: ['a', 'b'] },
+        _params: { tags: ['a'] },
+      },
+    },
+    {
+      name: 'array param from repeated raw string values',
+      input:: {
+        node: nodeWithParams([{ name: 'tags', type: 'array', items: 'string' }]),
+        params: { tags: ['a', '["b"]'] },
+      },
+      expected: {
+        _node: true,
+        _paramSpecs: [{ name: 'tags', type: 'array', items: 'string' }],
+        _params: { tags: ['a', '["b"]'] },
       },
     },
     {
@@ -89,10 +101,10 @@ local nodeWithParams(params, extra={}) = {
       },
     },
     {
-      name: 'nested array param parsed and coerced',
+      name: 'nested array param accepts native json arrays',
       input:: {
         node: nodeWithParams([{ name: 'paths', type: 'array', items: { type: 'array', items: 'string' } }]),
-        params: { paths: '[["a","b"],["c"]]' },
+        params: { paths: [['a', 'b'], ['c']] },
       },
       expected: {
         _node: true,

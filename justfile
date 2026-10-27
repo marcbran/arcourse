@@ -6,7 +6,7 @@ test-race:
     go test -v -race -timeout=120s ./...
 
 test-jsonnet:
-    jpoet test .
+    go test -count=1 -run TestJsonnet .
 
 build-all-pkgs:
     for dir in pkg/*/; do \
