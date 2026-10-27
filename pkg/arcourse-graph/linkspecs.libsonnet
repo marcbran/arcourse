@@ -1,19 +1,17 @@
 local url = import 'url.libsonnet';
 
-local walk(current, remaining, buildFn) =
+local walk(current, remaining) =
   if std.length(remaining) == 0 then
-    if std.type(current) == 'array' then
-      std.foldl(function(acc, item) acc + buildFn(item), current, {})
-    else buildFn(current)
+    if std.type(current) == 'array' then current else [current]
   else
     local next =
       if std.type(current) == 'object' then std.get(current, remaining[0], null)
       else null;
-    if next == null then {}
+    if next == null then []
     else if std.type(next) == 'array' then
-      std.foldl(function(acc, item) acc + walk(item, remaining[1:], buildFn), next, {})
+      std.flatMap(function(item) walk(item, remaining[1:]), next)
     else
-      walk(next, remaining[1:], buildFn);
+      walk(next, remaining[1:]);
 
 local itemPath(item, path) =
   std.foldl(
@@ -22,16 +20,24 @@ local itemPath(item, path) =
     item
   );
 
-local nestValue(labels, index, value) =
-  if index == std.length(labels) - 1 then { [labels[index]]: value }
-  else { [labels[index]]+: nestValue(labels, index + 1, value) };
+local keyLabels(keySegs, item) = [
+  if std.objectHas(seg, 'const') then seg.const else std.toString(itemPath(item, seg.path))
+  for seg in keySegs
+];
 
-local nestKeys(keySegs, item, value) =
-  local labels = [
-    if std.objectHas(seg, 'const') then seg.const else std.toString(itemPath(item, seg.path))
-    for seg in keySegs
-  ];
-  nestValue(labels, 0, value);
+local nestEntries(entries, depth) =
+  local ending = [e for e in entries if std.length(e.labels) == depth];
+  local deeper = std.sort([e for e in entries if std.length(e.labels) > depth], function(e) e.labels[depth]);
+  local n = std.length(deeper);
+  local starts = [i for i in std.range(0, n - 1) if i == 0 || deeper[i].labels[depth] != deeper[i - 1].labels[depth]];
+  local bounds = starts + [n];
+  local children = {
+    [deeper[bounds[j]].labels[depth]]: nestEntries(deeper[bounds[j]:bounds[j + 1]], depth + 1)
+    for j in std.range(0, std.length(starts) - 1)
+  };
+  if std.length(ending) == 0 then children
+  else if n == 0 then ending[std.length(ending) - 1].value
+  else ending[std.length(ending) - 1].value + children;
 
 local splitPrefix(valueSegs) =
   if std.length(valueSegs) == 0 then { prefix: [], suffix: [] }
@@ -99,47 +105,44 @@ local urlSegments(literal) =
   std.get(literal, 'host', []) + std.get(literal, 'path', [])
   + std.flattenArrays([literal.query[k] for k in std.objectFields(std.get(literal, 'query', {}))]);
 
+local linkEntries(node, spec, root) =
+  if std.type(spec.value) == 'object' then
+    local segs = urlSegments(spec.value);
+    [
+      { labels: keyLabels(spec.keys, item), value: resolveUrl(node, item, spec.value) }
+      for item in walk(node.data, spec.at)
+      if resolvable(item, segs)
+    ]
+  else
+    local split = splitPrefix(spec.value);
+    local base = resolveBase(root, node, split.prefix);
+    [
+      { labels: keyLabels(spec.keys, item), value: resolveFromBase(base, item, split.suffix) }
+      for item in walk(node.data, spec.at)
+      if resolvable(item, spec.value)
+    ];
+
 local buildLinks(node, specs, root=import 'root') =
-  std.foldl(
-    function(acc, spec)
-      acc + (
-        if std.type(spec.value) == 'object' then
-          walk(
-            node.data,
-            spec.at,
-            function(item)
-              if resolvable(item, urlSegments(spec.value))
-              then nestKeys(spec.keys, item, resolveUrl(node, item, spec.value))
-              else {}
-          )
-        else
-          local split = splitPrefix(spec.value);
-          local base = resolveBase(root, node, split.prefix);
-          walk(
-            node.data,
-            spec.at,
-            function(item)
-              if resolvable(item, spec.value)
-              then nestKeys(spec.keys, item, resolveFromBase(base, item, split.suffix))
-              else {}
-          )
-      ),
-    specs,
-    {}
-  );
+  nestEntries(std.flatMap(function(spec) linkEntries(node, spec, root), specs), 0);
 
 local rowLinkSpec(specs, at) =
   local matches = [spec for spec in specs if spec.at == at];
   if std.length(matches) == 0 then null else matches[0];
 
-local rowLinkFor(node, specs, at, root=import 'root') =
+local rowLinkFor(node, specs, at) =
   local spec = rowLinkSpec(specs, at);
   if spec == null then null
   else
-    local split = splitPrefix(spec.value);
-    local base = resolveBase(root, node, split.prefix);
+    local links = std.get(node, 'links', {});
+    local segs = if std.type(spec.value) == 'object' then urlSegments(spec.value) else spec.value;
     function(item)
-      if resolvable(item, spec.value) then resolveFromBase(base, item, split.suffix) else null;
+      if !resolvable(item, segs) then null
+      else
+        std.foldl(
+          function(acc, label) if std.type(acc) == 'object' then std.get(acc, label, null) else null,
+          keyLabels(spec.keys, item),
+          links
+        );
 
 {
   buildLinks: buildLinks,
