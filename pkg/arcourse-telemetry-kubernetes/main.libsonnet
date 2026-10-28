@@ -75,7 +75,7 @@ local telemetry = import '../arcourse-telemetry/main.libsonnet';
     base:: ['telemetry', 'kubernetes'],
     vars:: ['context', 'namespace', 'pod', 'container'],
     labels:: ['cluster', 'namespace', 'pod', 'container'],
-    listExpr:: 'container_memory_working_set_bytes{%(matchers)s}' % self,
+    listExpr:: 'container_memory_working_set_bytes{%(matchers)s, image!=""}' % self,
     logs:: {
       all: { expr:: '{cluster="%(context)s", namespace="%(namespace)s", container="%(container)s"} | pod="%(pod)s"' % self },
       errors: { expr:: '{cluster="%(context)s", namespace="%(namespace)s", container="%(container)s"} | pod="%(pod)s" | detected_level=~"error|critical|fatal"' % self },
@@ -89,11 +89,11 @@ local telemetry = import '../arcourse-telemetry/main.libsonnet';
         title:: 'Container Restarts %(titleGroupBy)s(15m)' % self,
       },
       cpu: $.a.promql.line.chart {
-        expr:: 'sum by (%(groupBy)s) (rate(container_cpu_usage_seconds_total{%(matchers)s}[5m]))' % self,
+        expr:: 'sum by (%(groupBy)s) (rate(container_cpu_usage_seconds_total{%(matchers)s, image!=""}[5m]))' % self,
         title:: 'CPU Usage %(titleGroupBy)s(cores)' % self,
       },
       memory: $.a.promql.line.chart {
-        expr:: 'sum by (%(groupBy)s) (container_memory_working_set_bytes{%(matchers)s})' % self,
+        expr:: 'sum by (%(groupBy)s) (container_memory_working_set_bytes{%(matchers)s, image!=""})' % self,
         title:: 'Memory Usage %(titleGroupBy)s' % self,
         unit:: 'bytes',
       },
