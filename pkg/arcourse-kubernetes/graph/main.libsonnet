@@ -497,9 +497,7 @@ local isSubresourcePath(path) =
 local resourcesFromSpec(spec, group, version, columns, links) =
   local groupVersion = if group == '' then version else group + '/' + version;
   local columnsForGroup = std.get(columns, groupVersion, []);
-  local linksForGroup = std.get(links, groupVersion, null);
-  local effectiveLinks = if linksForGroup != null then linksForGroup else linksFromSpec(spec);
-  local nodeLinks = if linksForGroup != null then linksForGroup else [];
+  local explicitLinks = std.get(links, groupVersion, []);
   local isNamespacedPath(path) =
     std.length(std.findSubstr('/namespaces/{', path)) > 0;
   local apiPrefix = if group == '' then '/api/' + version else '/apis/' + group + '/' + version;
@@ -536,10 +534,10 @@ local resourcesFromSpec(spec, group, version, columns, links) =
   {
     resources: dedupeResources([
       resourceFromLink(link)
-      for link in effectiveLinks
+      for link in linksFromSpec(spec) + explicitLinks
       if !isSubresourcePath(link.sourcePath)
     ]),
-    links: nodeLinks,
+    links: explicitLinks,
   };
 
 local defaultColumns(namespaced) =
