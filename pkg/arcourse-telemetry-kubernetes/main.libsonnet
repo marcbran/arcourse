@@ -21,7 +21,7 @@ local telemetry = import '../arcourse-telemetry/main.libsonnet';
     vars:: ['context', 'namespace'],
     labels:: ['cluster', 'namespace'],
     entityPath:: ['kubernetes', '$context', '$namespace'],
-    listExpr:: 'count by (%(groupBy)s) (kube_pod_info{%(matchers)s})' % self,
+    listExpr:: 'count by (%(groupBy)s) (kube_pod_info{%(matchers)s}) or 0 * count by (%(groupBy)s) (kube_namespace_created{%(matchers)s})' % self,
     logs:: {
       all: { expr:: '{cluster="%(context)s", namespace="%(namespace)s"}' % self },
       errors: { expr:: '{cluster="%(context)s", namespace="%(namespace)s"} | detected_level=~"error|critical|fatal"' % self },
