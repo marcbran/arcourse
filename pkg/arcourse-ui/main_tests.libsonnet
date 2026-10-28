@@ -612,7 +612,7 @@ local resolveHtml(v) =
       ],
     },
     {
-      name: 'action renders booleans as a select, strings as text and other types as hidden json',
+      name: 'action renders booleans as a select, strings as text and arrays as repeated hidden inputs',
       input:: function()
         local c = import './components/main.libsonnet';
         local t = c.action {
@@ -622,7 +622,7 @@ local resolveHtml(v) =
             { name: 'reason', type: 'string', default: null },
             { name: 'tags', type: 'array', items: 'string', default: null },
           ],
-          params:: { force: false, tags: ['a'] },
+          params:: { force: false, tags: ['a', 'b'] },
           action:: { plugin: 'test', name: 'echo', data: {} },
         };
         local form = resolveHtml(t.html)[2].children[0];
@@ -630,7 +630,7 @@ local resolveHtml(v) =
         {
           options: [{ value: o.attributes.value, selected: o.attributes.selected } for o in select.children],
           text: form.children[1].children[1].attributes,
-          hidden: form.children[2].attributes,
+          hidden: [form.children[2].attributes, form.children[3].attributes],
         },
       expected: {
         options: [
@@ -639,7 +639,10 @@ local resolveHtml(v) =
           { value: 'false', selected: true },
         ],
         text: { type: 'text', name: 'reason', value: null },
-        hidden: { type: 'hidden', name: 'tags', value: '["a"]' },
+        hidden: [
+          { type: 'hidden', name: 'tags', value: 'a' },
+          { type: 'hidden', name: 'tags', value: 'b' },
+        ],
       },
     },
     {

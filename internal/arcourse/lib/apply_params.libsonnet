@@ -34,7 +34,7 @@ local coerceRawValue(spec, raw, label='parameter value') =
     if std.isString(raw) then raw
     else error '%s %s cannot be coerced to string' % [label, std.manifestJsonEx(raw, '')]
   else if spec.type == 'array' then
-    local value = if std.isString(raw) then std.parseJson(raw) else raw;
+    local value = if std.isString(raw) && label == 'parameter value' then [raw] else raw;
     if !std.isArray(value) then
       error '%s %s cannot be coerced to array' % [label, std.manifestJsonEx(value, '')]
     else

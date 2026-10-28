@@ -50,32 +50,20 @@ func NewQueryPath(raw string) QueryPath {
 	for i, segment := range segments {
 		decoded, err := url.PathUnescape(segment)
 		if err == nil {
-			segments[i] = escapePathSegment(decoded)
+			segments[i] = url.PathEscape(decoded)
 		}
 	}
 	path := strings.Join(segments, "/")
-	if hasQuery {
-		return QueryPath(path + "?" + query)
+	if !hasQuery {
+		return QueryPath(path)
 	}
-	return QueryPath(path)
-}
-
-func escapePathSegment(s string) string {
-	var b strings.Builder
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if isUnreserved(c) {
-			b.WriteByte(c)
-		} else {
-			fmt.Fprintf(&b, "%%%02X", c)
-		}
+	if values, err := url.ParseQuery(query); err == nil {
+		query = values.Encode()
 	}
-	return b.String()
-}
-
-func isUnreserved(c byte) bool {
-	return 'A' <= c && c <= 'Z' || 'a' <= c && c <= 'z' || '0' <= c && c <= '9' ||
-		c == '-' || c == '_' || c == '.' || c == '~'
+	if query == "" {
+		return QueryPath(path)
+	}
+	return QueryPath(path + "?" + query)
 }
 
 func (p QueryPath) String() string {

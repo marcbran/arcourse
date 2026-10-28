@@ -1,8 +1,5 @@
 local compileGraph = import 'compile_graph.libsonnet';
+local generateGraphRoot = import 'generate_graph_root.libsonnet';
 
 function(entryPath, graphSpec)
-  local compiledShape = compileGraph(graphSpec);
-  |||
-    local construct_compiled_graph_root = import 'lib/construct_compiled_graph_root.libsonnet';
-    construct_compiled_graph_root(import '%s', %s)
-  ||| % [entryPath, std.manifestJson(compiledShape)]
+  generateGraphRoot('import ' + std.escapeStringJson(entryPath), compileGraph(graphSpec))

@@ -2,6 +2,9 @@ local ui = import '../../arcourse-ui/components/main.libsonnet';
 local html = import '../../arcourse-ui/html/main.libsonnet';
 local logs = import '../components/logs.libsonnet';
 
+local encodePath(path) = std.join('/', [std.strReplace(std.strReplace(seg, '~', '~0'), '/', '~1') for seg in path]);
+local decodePath(s) = [std.strReplace(std.strReplace(seg, '~1', '/'), '~0', '~') for seg in std.split(s, '/')];
+
 function(query, timeRange, record=null)
   {
     local n = self,
@@ -13,8 +16,8 @@ function(query, timeRange, record=null)
     _paramSpecs: timeRange.paramSpecs + [{
       name: 'columns',
       type: 'array',
-      items: { type: 'array', items: 'string' },
-      default: [if std.isString(col) then [col] else col for col in n.columns],
+      items: 'string',
+      default: [encodePath(if std.isString(col) then [col] else col) for col in n.columns],
     }],
     _telemetryItems:: [{ type: n.type, expr: n.expr }],
     data: query(n.datasource, n._telemetryItems, n._params.from, n._params.to),
@@ -32,8 +35,8 @@ function(query, timeRange, record=null)
     _view:: {
       local columnLink(path, value) =
         if std.isObject(value) || std.isArray(value) then null
-        else if std.any([std.isNumber(seg) for seg in path]) || std.member(n._params.columns, path) then null
-        else { key: n { _params+: { columns: n._params.columns + [path] } } },
+        else if std.any([std.isNumber(seg) for seg in path]) || std.member(n._params.columns, encodePath(path)) then null
+        else { key: n { _params+: { columns: n._params.columns + [encodePath(path)] } } },
       local embeddedLinks =
         if n.columnLinks then [
           { fields: ui.yaml.mapLeaves(std.get(rec, 'fields', {}), columnLink) }
@@ -52,7 +55,7 @@ function(query, timeRange, record=null)
         logs {
           records:: records,
           links:: { [id]: n.links[id]._queryPath for id in std.objectFields(n.links) },
-          columns:: n._params.columns,
+          columns:: [decodePath(col) for col in n._params.columns],
           embeddedLinks:: embeddedLinks,
         },
         nav.html,

@@ -15,6 +15,7 @@ import (
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 	"github.com/marcbran/jpoet/pkg/jpoet"
 	"github.com/marcbran/jpoet/pkg/watch"
+	urlplugin "github.com/marcbran/jsonnet-plugin-url/url"
 )
 
 type Evaluator struct {
@@ -27,9 +28,9 @@ type Evaluator struct {
 }
 
 func NewEvaluator(lib fs.FS, jpaths []string, plugins []*jpoet.Plugin) *Evaluator {
-	all := make([]*jpoet.Plugin, 0, len(plugins)+1)
+	all := make([]*jpoet.Plugin, 0, len(plugins)+2)
+	all = append(all, urlplugin.Plugin(), newPlugin())
 	all = append(all, plugins...)
-	all = append(all, newPlugin())
 	return &Evaluator{lib: lib, jpaths: jpaths, plugins: all}
 }
 

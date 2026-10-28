@@ -143,12 +143,10 @@ local hiddenControl = {
   local c = self,
   name:: error 'hiddenControl requires a name',
   value:: null,
-  html:
-    if c.value == null then []
-    else [{
-      element: 'input',
-      attributes: { type: 'hidden', name: c.name, value: std.manifestJsonMinified(c.value) },
-    }],
+  html: [
+    { element: 'input', attributes: { type: 'hidden', name: c.name, value: std.toString(v) } }
+    for v in if c.value == null then [] else if std.isArray(c.value) then c.value else [c.value]
+  ],
 };
 
 local controls = {
