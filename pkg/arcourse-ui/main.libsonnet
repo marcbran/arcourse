@@ -189,11 +189,10 @@ local tableView = baseView {
   items: [projectItem(item, columns) for item in dataItems],
   _view+:: {
     fragment:
-      local rowLink = linkspecs.rowLinkFor($, std.get($, 'linkSpecs', []), at);
       c.table {
         items:: $.items,
         columns:: columns,
-        rowLinks:: if rowLink == null then [] else [rowLink(item) for item in dataItems],
+        rowLinks:: linkspecs.rowLinksFor($, std.get($, 'linkSpecs', []), at),
         pagination:: std.get(std.get($, 'links', {}), 'pagination', null),
       },
   },

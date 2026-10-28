@@ -26,18 +26,20 @@ local keyLabels(keySegs, item) = [
 ];
 
 local nestEntries(entries, depth) =
-  local ending = [e for e in entries if std.length(e.labels) == depth];
-  local deeper = std.sort([e for e in entries if std.length(e.labels) > depth], function(e) e.labels[depth]);
-  local n = std.length(deeper);
-  local starts = [i for i in std.range(0, n - 1) if i == 0 || deeper[i].labels[depth] != deeper[i - 1].labels[depth]];
+  local nestGroup(group) =
+    local ending = [e for e in group if std.length(e.labels) == depth + 1];
+    local deeper = [e for e in group if std.length(e.labels) > depth + 1];
+    if std.length(deeper) == 0 then ending[std.length(ending) - 1].value
+    else if std.length(ending) == 0 then nestEntries(deeper, depth + 1)
+    else ending[std.length(ending) - 1].value + nestEntries(deeper, depth + 1);
+  local sorted = std.sort(entries, function(e) e.labels[depth]);
+  local n = std.length(sorted);
+  local starts = [i for i in std.range(0, n - 1) if i == 0 || sorted[i].labels[depth] != sorted[i - 1].labels[depth]];
   local bounds = starts + [n];
-  local children = {
-    [deeper[bounds[j]].labels[depth]]: nestEntries(deeper[bounds[j]:bounds[j + 1]], depth + 1)
+  {
+    [sorted[bounds[j]].labels[depth]]: nestGroup(sorted[bounds[j]:bounds[j + 1]])
     for j in std.range(0, std.length(starts) - 1)
   };
-  if std.length(ending) == 0 then children
-  else if n == 0 then ending[std.length(ending) - 1].value
-  else ending[std.length(ending) - 1].value + children;
 
 local splitPrefix(valueSegs) =
   if std.length(valueSegs) == 0 then { prefix: [], suffix: [] }
@@ -105,50 +107,47 @@ local urlSegments(literal) =
   std.get(literal, 'host', []) + std.get(literal, 'path', [])
   + std.flattenArrays([literal.query[k] for k in std.objectFields(std.get(literal, 'query', {}))]);
 
-local linkEntries(node, spec, root) =
+local specEntries(node, spec, root) =
   if std.type(spec.value) == 'object' then
     local segs = urlSegments(spec.value);
     [
-      { labels: keyLabels(spec.keys, item), value: resolveUrl(node, item, spec.value) }
-      for item in walk(node.data, spec.at)
       if resolvable(item, segs)
+      then { labels: keyLabels(spec.keys, item), value: resolveUrl(node, item, spec.value) }
+      else null
+      for item in walk(node.data, spec.at)
     ]
   else
     local split = splitPrefix(spec.value);
     local base = resolveBase(root, node, split.prefix);
     [
-      { labels: keyLabels(spec.keys, item), value: resolveFromBase(base, item, split.suffix) }
-      for item in walk(node.data, spec.at)
       if resolvable(item, spec.value)
+      then { labels: keyLabels(spec.keys, item), value: resolveFromBase(base, item, split.suffix) }
+      else null
+      for item in walk(node.data, spec.at)
     ];
 
+local linksFromEntries(entriesPerSpec) =
+  local entries = [e for entries in entriesPerSpec for e in entries if e != null];
+  if std.length(entries) == 0 then {} else nestEntries(entries, 0);
+
 local buildLinks(node, specs, root=import 'root') =
-  nestEntries(std.flatMap(function(spec) linkEntries(node, spec, root), specs), 0);
+  linksFromEntries([specEntries(node, spec, root) for spec in specs]);
 
-local rowLinkSpec(specs, at) =
-  local matches = [spec for spec in specs if spec.at == at];
-  if std.length(matches) == 0 then null else matches[0];
-
-local rowLinkFor(node, specs, at) =
-  local spec = rowLinkSpec(specs, at);
-  if spec == null then null
+local rowLinksFor(node, specs, at) =
+  local matches = [i for i in std.range(0, std.length(specs) - 1) if specs[i].at == at];
+  if std.length(matches) == 0 then []
   else
-    local links = std.get(node, 'links', {});
-    local segs = if std.type(spec.value) == 'object' then urlSegments(spec.value) else spec.value;
-    function(item)
-      if !resolvable(item, segs) then null
-      else
-        std.foldl(
-          function(acc, label) if std.type(acc) == 'object' then std.get(acc, label, null) else null,
-          keyLabels(spec.keys, item),
-          links
-        );
+    local entries =
+      if std.objectHasAll(node, '_linkEntries') then node._linkEntries[matches[0]]
+      else specEntries(node, specs[matches[0]], import 'root');
+    [if e == null then null else e.value for e in entries];
 
 {
   buildLinks: buildLinks,
-  rowLinkFor: rowLinkFor,
+  rowLinksFor: rowLinksFor,
   withLinkSpecs: {
     linkSpecs:: [],
-    links: buildLinks(self, self.linkSpecs, import 'root'),
+    _linkEntries:: [specEntries(self, spec, import 'root') for spec in self.linkSpecs],
+    links: linksFromEntries(self._linkEntries),
   },
 }
