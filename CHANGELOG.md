@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.24.0](https://github.com/marcbran/arcourse/compare/v0.23.0...v0.24.0) (2026-10-28)
+
+
+### Features
+
+* k8s resource overview ([#156](https://github.com/marcbran/arcourse/issues/156)) ([b4debeb](https://github.com/marcbran/arcourse/commit/b4debeb0c5f0edfabf5ef01c18aa88c6e7e25302))
+
+
+### Performance Improvements
+
+* performance improvements ([#158](https://github.com/marcbran/arcourse/issues/158)) ([dfd5491](https://github.com/marcbran/arcourse/commit/dfd549182d8511a2b56fd8a6e6ab1ed1027cb76e))
+
 ## [0.23.0](https://github.com/marcbran/arcourse/compare/v0.22.0...v0.23.0) (2026-10-23)
 
 
