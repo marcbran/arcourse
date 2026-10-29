@@ -1,40 +1,113 @@
 local telemetry = import '../arcourse-telemetry/main.libsonnet';
 
-local deploymentStateTimeline = {
+local workloadStateTimeline = {
   local t = self,
-  states:: {
-    local replicas(metric, extra='') = 'max by (cluster, namespace, deployment) (%s{%s%s})' % [metric, t.matchers, extra],
-    local state(name, expr) = 'label_replace(0 * (%s) + 1, "state", "%s", "", "")' % [expr, name],
-    local desired = replicas('kube_deployment_spec_replicas'),
-    local available = replicas('kube_deployment_status_replicas_available'),
-    local updated = replicas('kube_deployment_status_replicas_updated'),
-    local current = replicas('kube_deployment_status_replicas'),
-    local paused = '(%s == 1)' % replicas('kube_deployment_spec_paused'),
-    local stuck = '(%s == 1)' % replicas('kube_deployment_status_condition', ', condition="Progressing", status="false", reason="ProgressDeadlineExceeded"'),
-    full: state('Full', '(%s >= %s) and (%s > 0)' % [available, desired, desired]),
-    degraded: state('Degraded', '(%s > 0) < %s' % [available, desired]),
-    down: state('Down', '(%s == 0) and (%s > 0)' % [available, desired]),
-    scaledToZero: state('ScaledToZero', '%s == 0' % desired),
-    settled: state('Settled', '((%s == %s) and (%s == %s)) unless %s unless %s' % [updated, desired, current, desired, paused, stuck]),
-    rollingOut: state('RollingOut', '((%s < %s) or (%s > %s)) unless %s unless %s' % [updated, desired, current, desired, paused, stuck]),
-    stuck: state('Stuck', '%s unless %s' % [stuck, paused]),
-    paused: state('Paused', paused),
-  },
-  all:: error 'deploymentStateTimeline requires all',
-  unhealthy:: error 'deploymentStateTimeline requires unhealthy',
-  expr:: 'max by (%s, state) (%s)' % [self.groupBy, std.join(' or ', self.all)],
+  local labelled(name, expr) = 'label_replace(0 * (%s) + 1, "state", "%s", "", "")' % [expr, name],
+  workload:: error 'workloadStateTimeline requires workload',
+  workloadTitle:: error 'workloadStateTimeline requires workloadTitle',
+  desiredMetric:: error 'workloadStateTimeline requires desiredMetric',
+  series(metric, extra=''):: 'max by (cluster, namespace, %s) (%s{%s%s})' % [t.workload, metric, t.matchers, extra],
+  desired:: t.series(t.desiredMetric),
+  conditions:: error 'workloadStateTimeline requires conditions',
+  states:: error 'workloadStateTimeline requires states',
+  unhealthy:: error 'workloadStateTimeline requires unhealthy',
+  expr:: 'max by (%s, state) (%s)' % [t.groupBy, std.join(' or ', [labelled(s, t.conditions[s]) for s in t.states])],
   colorBy:: '{{state}}',
-  rowBy:: '{{deployment}}',
+  rowBy:: '{{%s}}' % t.workload,
   labelBy:: '{{state}}',
-  tooltip:: '{{deployment}} · {{state}} · {{from}} – {{to}}',
+  tooltip:: '{{%s}} · {{state}} · {{from}} – {{to}}' % t.workload,
   levels:: {
     root: self.context,
     context: {
-      expr:: 'count by (%s, state) (%s)' % [self.groupBy, std.join(' or ', self.unhealthy)],
+      expr:: 'count by (%s, state) (%s)' % [self.groupBy, std.join(' or ', [labelled(s, self.conditions[s]) for s in self.unhealthy])],
       rowBy:: '{{%s}}: {{state}}' % self.groupBy,
       labelBy:: '{{value}}',
-      tooltip:: '{{%s}} · {{state}}: {{value}} deployments · {{from}} – {{to}}' % self.groupBy,
+      tooltip:: '{{%s}} · {{state}}: {{value}} %ss · {{from}} – {{to}}' % [self.groupBy, self.workload],
     },
+  },
+};
+
+local capacityTimeline = workloadStateTimeline {
+  local t = self,
+  local available = '(%s or %s)' % [
+    t.series('kube_%s_status_replicas_available' % t.workload),
+    t.series('kube_%s_status_replicas_ready' % t.workload),
+  ],
+  local heldDesired = 'max by (cluster, namespace, %s) (min_over_time(%s{%s}[5m]))' % [t.workload, t.desiredMetric, t.matchers],
+  title:: '%s Capacity %s' % [t.workloadTitle, t.titleGroupBy],
+  states:: ['Full', 'ScalingUp', 'Degraded', 'Down', 'ScaledToZero'],
+  unhealthy:: ['Degraded', 'Down'],
+  conditions:: {
+    Full: '(%s >= %s) and (%s > 0)' % [available, t.desired, t.desired],
+    ScalingUp: '(%s >= %s) < %s' % [available, heldDesired, t.desired],
+    Degraded: '(%s > 0) < %s' % [available, heldDesired],
+    Down: '(%s == 0) and (%s > 0)' % [available, heldDesired],
+    ScaledToZero: '%s == 0' % t.desired,
+  },
+  colors:: {
+    Full: '#5b8a5b',
+    ScalingUp: '#5a7a94',
+    Degraded: '#b0902f',
+    Down: '#a35454',
+    ScaledToZero: '#7a7a7a',
+  },
+  levels+:: {
+    context+: { title:: 'Unhealthy %s Capacity %s' % [self.workloadTitle, self.titleGroupBy] },
+  },
+};
+
+local deploymentWorkload = {
+  workload:: 'deployment',
+  workloadTitle:: 'Deployment',
+  desiredMetric:: 'kube_deployment_spec_replicas',
+};
+
+local statefulsetWorkload = {
+  workload:: 'statefulset',
+  workloadTitle:: 'StatefulSet',
+  desiredMetric:: 'kube_statefulset_replicas',
+};
+
+local deploymentRolloutTimeline = workloadStateTimeline + deploymentWorkload {
+  local t = self,
+  local updated = t.series('kube_deployment_status_replicas_updated'),
+  local current = t.series('kube_deployment_status_replicas'),
+  local paused = '(%s == 1)' % t.series('kube_deployment_spec_paused'),
+  local stuck = '(%s == 1)' % t.series('kube_deployment_status_condition', ', condition="Progressing", status="false", reason="ProgressDeadlineExceeded"'),
+  title:: 'Deployment Rollout %s' % t.titleGroupBy,
+  states:: ['Settled', 'RollingOut', 'Stuck', 'Paused'],
+  unhealthy:: ['Stuck'],
+  conditions:: {
+    Settled: '((%s == %s) and (%s == %s)) unless %s unless %s' % [updated, t.desired, current, t.desired, paused, stuck],
+    RollingOut: '((%s < %s) or (%s > %s)) unless %s unless %s' % [updated, t.desired, current, t.desired, paused, stuck],
+    Stuck: '%s unless %s' % [stuck, paused],
+    Paused: paused,
+  },
+  colors:: {
+    Settled: '#5b8a5b',
+    RollingOut: '#5a7a94',
+    Stuck: '#a35454',
+    Paused: '#7a7a7a',
+  },
+  levels+:: {
+    context+: { title:: 'Stuck Deployment Rollouts %s' % self.titleGroupBy },
+  },
+};
+
+local statefulsetRolloutTimeline = workloadStateTimeline + statefulsetWorkload {
+  local t = self,
+  local outdated = 'max by (cluster, namespace, statefulset) (kube_statefulset_status_update_revision{%s} unless on (cluster, namespace, statefulset, revision) kube_statefulset_status_current_revision{%s})' % [t.matchers, t.matchers],
+  title:: 'StatefulSet Rollout %s' % t.titleGroupBy,
+  hidden:: ['root', 'context'],
+  states:: ['Settled', 'Outdated'],
+  unhealthy:: [],
+  conditions:: {
+    Settled: '%s unless on (cluster, namespace, statefulset) %s' % [t.desired, outdated],
+    Outdated: outdated,
+  },
+  colors:: {
+    Settled: '#5b8a5b',
+    Outdated: '#5a7a94',
   },
 };
 
@@ -164,34 +237,21 @@ local deploymentStateTimeline = {
     labels:: ['cluster', 'namespace', 'deployment'],
     listExpr:: 'kube_deployment_spec_replicas{%(matchers)s}' % self,
     drillDowns:: {
-      capacity: $.a.promql.stateTimeline.chart + deploymentStateTimeline {
-        title:: 'Deployment Capacity %(titleGroupBy)s' % self,
-        all:: [self.states.full, self.states.degraded, self.states.down, self.states.scaledToZero],
-        unhealthy:: [self.states.degraded, self.states.down],
-        colors:: {
-          Full: '#5b8a5b',
-          Degraded: '#b0902f',
-          Down: '#a35454',
-          ScaledToZero: '#7a7a7a',
-        },
-        levels+:: {
-          context+: { title:: 'Unhealthy Deployment Capacity %(titleGroupBy)s' % self },
-        },
-      },
-      rollout: $.a.promql.stateTimeline.chart + deploymentStateTimeline {
-        title:: 'Deployment Rollout %(titleGroupBy)s' % self,
-        all:: [self.states.settled, self.states.rollingOut, self.states.stuck, self.states.paused],
-        unhealthy:: [self.states.rollingOut, self.states.stuck, self.states.paused],
-        colors:: {
-          Settled: '#5b8a5b',
-          RollingOut: '#5a7a94',
-          Stuck: '#a35454',
-          Paused: '#7a7a7a',
-        },
-        levels+:: {
-          context+: { title:: 'Deployment Rollouts %(titleGroupBy)s' % self },
-        },
-      },
+      capacity: $.a.promql.stateTimeline.chart + capacityTimeline + deploymentWorkload,
+      rollout: $.a.promql.stateTimeline.chart + deploymentRolloutTimeline,
+    },
+  },
+
+  statefulset:: {
+    base:: ['telemetry', 'kubernetes'],
+    vars:: ['context', 'namespace', 'statefulset'],
+    entityPath:: ['kubernetes', '$context', '$namespace', 'apps', '$statefulset'],
+    labels:: ['cluster', 'namespace', 'statefulset'],
+    titles:: ['Context', 'Namespace', 'StatefulSet'],
+    listExpr:: 'kube_statefulset_replicas{%(matchers)s}' % self,
+    drillDowns:: {
+      capacity: $.a.promql.stateTimeline.chart + capacityTimeline + statefulsetWorkload,
+      rollout: $.a.promql.stateTimeline.chart + statefulsetRolloutTimeline,
     },
   },
 
@@ -213,5 +273,5 @@ local deploymentStateTimeline = {
     },
   },
 
-  nodeList: $.a.promql.entities.nodeList([$.context, $.namespace, $.pod, $.container, $.pvc, $.deployment, $.node]),
+  nodeList: $.a.promql.entities.nodeList([$.context, $.namespace, $.pod, $.container, $.pvc, $.deployment, $.statefulset, $.node]),
 }

@@ -15,7 +15,7 @@ p.pkg({
 }, |||
   Ready-made Kubernetes telemetry entities for arcourse-telemetry, mounted under
   `telemetry/kubernetes`. Each entity browses a dimension (`context`, `namespace`,
-  `pod`, `container`, `pvc`, `deployment`, `node`) via kube-state-metrics and
+  `pod`, `container`, `pvc`, `deployment`, `statefulset`, `node`) via kube-state-metrics and
   cAdvisor queries, with drilldown charts and cross-links to the matching
   `arcourse-kubernetes` resource nodes (and back). The `context`, `namespace`,
   `pod`, and `container` entities also expose `logs` views: each field of an
@@ -38,7 +38,8 @@ p.pkg({
   pod: p.desc('Entity spec for the pod dimension, with a pod-phase state timeline drilldown and all/errors logs views.'),
   container: p.desc('Entity spec for the container dimension, with restarts/cpu/memory drilldowns and all/errors logs views.'),
   pvc: p.desc('Entity spec for the persistent volume claim dimension, with a usage drilldown.'),
-  deployment: p.desc('Entity spec for the deployment dimension, with capacity and rollout state drilldowns.'),
+  deployment: p.desc('Entity spec for the deployment dimension, with capacity and rollout state drilldowns. The Stuck rollout state needs the `reason` label on kube-state-metrics conditions.'),
+  statefulset: p.desc('Entity spec for the statefulset dimension, with capacity and rollout state drilldowns.'),
   node: p.desc('Entity spec for the node dimension, with a conditions drilldown.'),
   nodeList: p.desc('All entity specs materialized through `entities.nodeList`.'),
 })
