@@ -244,6 +244,67 @@ local containerSeries = {
   worstTitle:: if t.groupBy == 'container' then '' else 'of Worst Container ',
 };
 
+local nodeSeries = {
+  local t = self,
+  nodes:: 'max by (cluster, node) (kube_node_info{%s})' % t.matchers,
+  fromNodeExporter(expr, by=''):: '(max by (cluster, node%s) ((%s) * on (cluster, instance) group_left (node) %s) and on (cluster, node) %s)' % [by, expr, t.nodeExporterInfo, t.nodes],
+  activePods:: '(max by (cluster, namespace, pod) (kube_pod_status_phase{phase=~"Pending|Running"}) == 1)',
+  allocatable(resource):: 'max by (cluster, node) (kube_node_status_allocatable{%s, resource="%s"})' % [t.matchers, resource],
+  requested(resource)::
+    local podKey = 'cluster, namespace, pod, node';
+    local containers = 'sum by (%s) (max by (%s, container) (kube_pod_container_resource_requests{%s, resource="%s"}))' % [podKey, podKey, t.matchers, resource];
+    local init = 'max by (%s) (kube_pod_init_container_resource_requests{%s, resource="%s"})' % [podKey, t.matchers, resource];
+    local effective = 'max by (%s) (label_replace(%s, "source", "containers", "", "") or label_replace(%s, "source", "init", "", ""))' % [podKey, containers, init];
+    local requests = 'sum by (cluster, node) (%s * on (cluster, namespace, pod) group_left () %s)' % [effective, t.activePods];
+    '100 * (%s or 0 * %s) / %s' % [requests, t.allocatable(resource), t.allocatable(resource)],
+  worst(expr):: 'max by (%s) (%s)' % [t.groupBy, expr],
+  worstTitle:: if t.groupBy == 'node' then '' else 'of Worst Node ',
+};
+
+local nodeStateTimeline = {
+  local t = self,
+  local key = 'cluster, node',
+  local condition(name, status) = '(%s == 1)' % 'max by (%s) (kube_node_status_condition{%s, condition="%s", status="%s"})' % [key, t.matchers, name, status],
+  local notReady = '(%s == 0)' % 'max by (%s) (kube_node_status_condition{%s, condition="Ready", status="true"})' % [key, t.matchers],
+  local young = '((time() - max by (%s) (kube_node_created{%s})) < 300)' % [key, t.matchers],
+  local pressure = 'topk by (%s) (1, label_replace(max by (%s, condition) (kube_node_status_condition{%s, condition=~"MemoryPressure|DiskPressure|PIDPressure|NetworkUnavailable", status="true"}) == 1, "reason", "$1", "condition", "(.*)"))' % [key, key, t.matchers],
+  local cordoned = '(%s == 1)' % 'max by (%s) (kube_node_spec_unschedulable{%s})' % [key, t.matchers],
+  local labelled(name, expr) = 'label_replace(0 * (%s) + 1, "state", "%s", "", "")' % [expr, name],
+  conditions:: {
+    Joining: '%s and on (%s) %s' % [notReady, key, young],
+    Unreachable: '%s unless on (%s) %s' % [condition('Ready', 'unknown'), key, young],
+    NotReady: '%s unless on (%s) %s' % [condition('Ready', 'false'), key, young],
+    Pressure: '%s unless on (%s) %s' % [pressure, key, notReady],
+    Cordoned: '%s unless on (%s) %s unless on (%s) %s' % [cordoned, key, notReady, key, pressure],
+    Ready: '%s unless on (%s) %s unless on (%s) %s' % [condition('Ready', 'true'), key, pressure, key, cordoned],
+  },
+  states:: ['Joining', 'Unreachable', 'NotReady', 'Pressure', 'Cordoned', 'Ready'],
+  unhealthy:: ['Unreachable', 'NotReady', 'Pressure'],
+  title:: 'Node State %s' % t.titleGroupBy,
+  expr:: 'max by (%s, state, reason) (%s)' % [t.groupBy, std.join(' or ', [labelled(s, t.conditions[s]) for s in t.states])],
+  colorBy:: '{{state}}',
+  rowBy:: '{{node}}',
+  labelBy:: '{{state}}',
+  tooltip:: '{{node}} · {{state}} {{reason}} · {{from}} – {{to}}',
+  colors:: {
+    Ready: '#5b8a5b',
+    Joining: '#5a7a94',
+    Cordoned: '#7a7a7a',
+    Pressure: '#b0902f',
+    NotReady: '#a35454',
+    Unreachable: '#a35454',
+  },
+  levels:: {
+    root: {
+      expr:: 'count by (%s, state) (%s)' % [self.groupBy, std.join(' or ', [labelled(s, self.conditions[s]) for s in self.unhealthy])],
+      title:: 'Unhealthy Nodes %s' % self.titleGroupBy,
+      rowBy:: '{{%s}}: {{state}}' % self.groupBy,
+      labelBy:: '{{value}}',
+      tooltip:: '{{%s}} · {{state}}: {{value}} nodes · {{from}} – {{to}}' % self.groupBy,
+    },
+  },
+};
+
 {
   a:: telemetry,
 
@@ -417,15 +478,49 @@ local containerSeries = {
     vars:: ['context', 'node'],
     labels:: ['cluster', 'node'],
     entityPath:: ['kubernetes', '$context', '$node'],
+    nodeExporterInfo:: 'label_replace(max by (cluster, instance, nodename) (node_uname_info), "node", "$1", "nodename", "(.*)")',
     listExpr:: 'count by (%(groupBy)s) (kube_node_info{%(matchers)s})' % self,
     drillDowns:: {
-      conditions: $.a.promql.line.chart {
-        expr::
-          |||
-            sum by (%(groupBy)s, condition, status) (kube_node_status_condition{%(matchers)s})
-          ||| % self,
-        title:: 'Node Conditions %(titleGroupBy)s' % self,
-        legend:: '{{%(groupBy)s}}: {{condition}}: {{status}}' % self,
+      state: $.a.promql.stateTimeline.chart + nodeStateTimeline,
+      cpuRequested: $.a.promql.line.chart + nodeSeries {
+        local t = self,
+        expr:: t.worst(t.requested('cpu')),
+        title:: 'CPU Requested %(worstTitle)s%(titleGroupBy)s(%% of allocatable)' % self,
+      },
+      memoryRequested: $.a.promql.line.chart + nodeSeries {
+        local t = self,
+        expr:: t.worst(t.requested('memory')),
+        title:: 'Memory Requested %(worstTitle)s%(titleGroupBy)s(%% of allocatable)' % self,
+      },
+      pods: $.a.promql.line.chart + nodeSeries {
+        local t = self,
+        local active = 'count by (cluster, node) (max by (cluster, namespace, pod, node) (kube_pod_info{%s}) * on (cluster, namespace, pod) group_left () %s)' % [t.matchers, t.activePods],
+        expr:: t.worst('100 * (%s or 0 * %s) / %s' % [active, t.allocatable('pods'), t.allocatable('pods')]),
+        title:: 'Pods %(worstTitle)s%(titleGroupBy)s(%% of capacity)' % self,
+      },
+      cpuUtilisation: $.a.promql.line.chart + nodeSeries {
+        local t = self,
+        expr:: t.worst(t.fromNodeExporter('100 * (1 - avg by (cluster, instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])))')),
+        title:: 'CPU Utilisation %(worstTitle)s%(titleGroupBy)s(%%)' % self,
+      },
+      memoryUtilisation: $.a.promql.line.chart + nodeSeries {
+        local t = self,
+        expr:: t.worst(t.fromNodeExporter('100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)')),
+        title:: 'Memory Utilisation %(worstTitle)s%(titleGroupBy)s(%%)' % self,
+      },
+      filesystemUtilisation: $.a.promql.line.chart + nodeSeries {
+        local t = self,
+        local filesystems = 'fstype!~"tmpfs|ramfs|overlay|squashfs|nsfs|fuse.*|nfs.*|cifs|smb.*|ceph.*|glusterfs|9p", mountpoint!~".*/kubelet/pods/.*"',
+        local used = '100 * (1 - node_filesystem_avail_bytes{%s} / node_filesystem_size_bytes{%s}) unless node_filesystem_readonly == 1' % [filesystems, filesystems],
+        expr:: t.worst(t.fromNodeExporter(used)),
+        title:: 'Filesystem Utilisation %(worstTitle)s%(titleGroupBy)s(%% of worst filesystem)' % self,
+        levels:: {
+          node: {
+            expr:: 'max by (mountpoint) (%s)' % t.fromNodeExporter(used, ', mountpoint'),
+            legend:: '{{mountpoint}}',
+            title:: 'Filesystem Utilisation (%)',
+          },
+        },
       },
     },
   },

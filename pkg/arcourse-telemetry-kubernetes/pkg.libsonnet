@@ -41,6 +41,6 @@ p.pkg({
   deployment: p.desc('Entity spec for the deployment dimension, with capacity, rollout and pod state drilldowns. The Stuck rollout state needs the `reason` label on kube-state-metrics conditions.'),
   statefulset: p.desc('Entity spec for the statefulset dimension, with capacity, rollout and pod state drilldowns.'),
   daemonset: p.desc('Entity spec for the daemonset dimension, with capacity, rollout and pod state drilldowns and a misscheduled pods drilldown.'),
-  node: p.desc('Entity spec for the node dimension, with a conditions drilldown.'),
+  node: p.desc('Entity spec for the node dimension, with state, requested resources, pods and node-exporter utilisation drilldowns. `nodeExporterInfo` maps node-exporter series to nodes, by `nodename` by default.'),
   nodeList: p.desc('All entity specs materialized through `entities.nodeList`.'),
 })
