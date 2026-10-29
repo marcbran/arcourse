@@ -6,6 +6,8 @@ local common = import 'common.libsonnet';
   series:: [],
   unit:: null,
   decimals:: 2,
+  timeMin:: null,
+  timeMax:: null,
   option::
     local styled = [
       s { type: 'line', showSymbol: true, symbolSize: 16, itemStyle: { opacity: 0 } }
@@ -26,7 +28,7 @@ local common = import 'common.libsonnet';
         icon: 'roundRect',
       },
       grid: { top: 40, bottom: 40, containLabel: true },
-      xAxis: common.timeAxis,
+      xAxis: common.timeAxis + std.prune({ min: c.timeMin, max: c.timeMax }),
       yAxis: { type: 'value' } + (
         if scale.suffix != null then { axisLabel: { formatter: '{value} ' + scale.suffix } } else {}
       ),

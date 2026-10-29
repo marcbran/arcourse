@@ -23,6 +23,11 @@ function(query, timeRange)
 
   local hasPoints(series) = std.length(series.points) > 0;
 
+  local queriedRange = {
+    timeMin:: std.parseInt(self.data.from),
+    timeMax:: std.parseInt(self.data.to),
+  };
+
   local minList(l) = std.foldl(function(a, b) if b < a then b else a, l[1:], l[0]);
 
   local stepFor(points) =
@@ -71,7 +76,7 @@ function(query, timeRange)
       },
     },
 
-    line: a.line.chart {
+    line: a.line.chart + queriedRange {
       local n = self,
       links: std.foldl(
         function(acc, i) acc + linksFromResult(
@@ -92,7 +97,7 @@ function(query, timeRange)
       ]),
     },
 
-    stateTimeline: a.stateTimeline.chart {
+    stateTimeline: a.stateTimeline.chart + queriedRange {
       local n = self,
       local render(template, labels, value) =
         if template != null then applyLegendFormat(template, labels + { value: std.toString(value) }) else null,
