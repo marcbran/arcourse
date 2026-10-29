@@ -37,7 +37,7 @@ p.pkg({
   namespace: p.desc('Entity spec for the namespace dimension, with all/errors logs views.'),
   pod: p.desc('Entity spec for the pod dimension, with a pod state timeline drilldown and all/errors logs views.'),
   container: p.desc('Entity spec for the container dimension, with restarts, cpu/memory usage, utilisation and throttling drilldowns and all/errors logs views. `usageMatchers` selects one cAdvisor source.'),
-  pvc: p.desc('Entity spec for the persistent volume claim dimension, with a usage drilldown.'),
+  pvc: p.desc('Entity spec for the persistent volume claim dimension, with state, usage and inodes drilldowns.'),
   deployment: p.desc('Entity spec for the deployment dimension, with capacity, rollout and pod state drilldowns. The Stuck rollout state needs the `reason` label on kube-state-metrics conditions.'),
   statefulset: p.desc('Entity spec for the statefulset dimension, with capacity, rollout and pod state drilldowns.'),
   daemonset: p.desc('Entity spec for the daemonset dimension, with capacity, rollout and pod state drilldowns and a misscheduled pods drilldown.'),

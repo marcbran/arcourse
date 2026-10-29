@@ -305,6 +305,58 @@ local nodeStateTimeline = {
   },
 };
 
+local pvcSeries = {
+  local t = self,
+  stat(metric):: 'max by (cluster, namespace, persistentvolumeclaim) (%s{%s})' % [metric, t.matchers],
+  worst(expr):: 'max by (%s) (%s)' % [t.groupBy, expr],
+  worstTitle:: if t.groupBy == 'persistentvolumeclaim' then '' else 'of Worst PVC ',
+};
+
+local pvcStateTimeline = {
+  local t = self,
+  local key = 'cluster, namespace, persistentvolumeclaim',
+  local phase(name) = '(max by (%s) (kube_persistentvolumeclaim_status_phase{%s, phase="%s"}) == 1)' % [key, t.matchers, name],
+  local young = '((time() - max by (%s) (kube_persistentvolumeclaim_created{%s})) < 300)' % [key, t.matchers],
+  local waitsForConsumer = 'max by (%s) (kube_persistentvolumeclaim_info{%s} * on (cluster, storageclass) group_left () max by (cluster, storageclass) (kube_storageclass_info{volume_binding_mode="WaitForFirstConsumer"}))' % [key, t.matchers],
+  local resizing = '(max by (%s) (kube_persistentvolumeclaim_status_condition{%s, condition=~"Resizing|FileSystemResizePending", status="true"}) == 1)' % [key, t.matchers],
+  local unbound = '(%s unless on (%s) %s)' % [phase('Pending'), key, waitsForConsumer],
+  local labelled(name, expr) = 'label_replace(0 * (%s) + 1, "state", "%s", "", "")' % [expr, name],
+  conditions:: {
+    Lost: phase('Lost'),
+    WaitingForConsumer: '%s and on (%s) %s' % [phase('Pending'), key, waitsForConsumer],
+    Provisioning: '%s and on (%s) %s' % [unbound, key, young],
+    Pending: '%s unless on (%s) %s' % [unbound, key, young],
+    Resizing: '%s and on (%s) %s' % [phase('Bound'), key, resizing],
+    Bound: '%s unless on (%s) %s' % [phase('Bound'), key, resizing],
+  },
+  states:: ['Lost', 'WaitingForConsumer', 'Provisioning', 'Pending', 'Resizing', 'Bound'],
+  unhealthy:: ['Pending', 'Lost'],
+  title:: 'PVC State %s' % t.titleGroupBy,
+  expr:: 'max by (%s, state) (%s)' % [t.groupBy, std.join(' or ', [labelled(s, t.conditions[s]) for s in t.states])],
+  colorBy:: '{{state}}',
+  rowBy:: '{{persistentvolumeclaim}}',
+  labelBy:: '{{state}}',
+  tooltip:: '{{persistentvolumeclaim}} · {{state}} · {{from}} – {{to}}',
+  colors:: {
+    Bound: '#5b8a5b',
+    Provisioning: '#5a7a94',
+    WaitingForConsumer: '#5a7a94',
+    Resizing: '#5a7a94',
+    Pending: '#b0902f',
+    Lost: '#a35454',
+  },
+  levels:: {
+    root: self.context,
+    context: {
+      expr:: 'count by (%s, state) (%s)' % [self.groupBy, std.join(' or ', [labelled(s, self.conditions[s]) for s in self.unhealthy])],
+      title:: 'Unhealthy PVCs %s' % self.titleGroupBy,
+      rowBy:: '{{%s}}: {{state}}' % self.groupBy,
+      labelBy:: '{{value}}',
+      tooltip:: '{{%s}} · {{state}}: {{value}} PVCs · {{from}} – {{to}}' % self.groupBy,
+    },
+  },
+};
+
 {
   a:: telemetry,
 
@@ -415,15 +467,30 @@ local nodeStateTimeline = {
     entityPath:: ['kubernetes', '$context', '$namespace', '$persistentvolumeclaim'],
     labels:: ['cluster', 'namespace', 'persistentvolumeclaim'],
     titles:: ['Context', 'Namespace', 'PVC'],
-    listExpr:: 'kubelet_volume_stats_capacity_bytes{%(matchers)s}' % self,
+    listExpr:: 'kube_persistentvolumeclaim_info{%(matchers)s}' % self,
     drillDowns:: {
-      usage: $.a.promql.line.chart {
-        expr::
-          |||
-            100 * sum by (%(groupBy)s) (kubelet_volume_stats_used_bytes{%(matchers)s})
-            / sum by (%(groupBy)s) (kubelet_volume_stats_capacity_bytes{%(matchers)s})
-          ||| % self,
-        title:: 'PVC Usage (%%) %(titleGroupBy)s' % self,
+      state: $.a.promql.stateTimeline.chart + pvcStateTimeline,
+      usage: $.a.promql.line.chart + pvcSeries {
+        local t = self,
+        expr:: t.worst('100 * %s / %s' % [t.stat('kubelet_volume_stats_used_bytes'), t.stat('kubelet_volume_stats_capacity_bytes')]),
+        title:: 'PVC Usage %(worstTitle)s%(titleGroupBy)s(%% of capacity)' % self,
+        levels:: {
+          pvc: {
+            expr:: std.join(' or ', [
+              'label_replace(%s, "series", "used", "", "")' % t.stat('kubelet_volume_stats_used_bytes'),
+              'label_replace(%s, "series", "capacity", "", "")' % t.stat('kubelet_volume_stats_capacity_bytes'),
+              'label_replace(%s, "series", "requested", "", "")' % t.stat('kube_persistentvolumeclaim_resource_requests_storage_bytes'),
+            ]),
+            legend:: '{{series}}',
+            title:: 'PVC Usage',
+            unit:: 'bytes',
+          },
+        },
+      },
+      inodes: $.a.promql.line.chart + pvcSeries {
+        local t = self,
+        expr:: t.worst('100 * %s / (%s > 0)' % [t.stat('kubelet_volume_stats_inodes_used'), t.stat('kubelet_volume_stats_inodes')]),
+        title:: 'PVC Inodes %(worstTitle)s%(titleGroupBy)s(%% used)' % self,
       },
     },
   },
