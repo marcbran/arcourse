@@ -229,6 +229,21 @@ local workloadPodsTimeline = podStateTimeline {
   podFilter:: t.podOwners,
 };
 
+local containerSeries = {
+  local t = self,
+  key:: 'cluster, namespace, pod, container',
+  usage(metric):: 'max by (%s) (%s{%s, %s})' % [t.key, metric, t.matchers, t.usageMatchers],
+  usageRate(metric):: 'max by (%s) (rate(%s{%s, %s}[5m]))' % [t.key, metric, t.matchers, t.usageMatchers],
+  state(expr):: 'max by (%s) (%s)' % [t.key, expr],
+  withBounds(usage, resource):: std.join(' or ', [
+    'label_replace(%s, "series", "usage", "", "")' % usage,
+    'label_replace(%s, "series", "request", "", "")' % t.state('kube_pod_container_resource_requests{%s, resource="%s"}' % [t.matchers, resource]),
+    'label_replace(%s, "series", "limit", "", "")' % t.state('kube_pod_container_resource_limits{%s, resource="%s"}' % [t.matchers, resource]),
+  ]),
+  worst(expr):: 'max by (%s) (%s)' % [t.groupBy, expr],
+  worstTitle:: if t.groupBy == 'container' then '' else 'of Worst Container ',
+};
+
 {
   a:: telemetry,
 
@@ -277,27 +292,58 @@ local workloadPodsTimeline = podStateTimeline {
     base:: ['telemetry', 'kubernetes'],
     vars:: ['context', 'namespace', 'pod', 'container'],
     labels:: ['cluster', 'namespace', 'pod', 'container'],
-    listExpr:: 'container_memory_working_set_bytes{%(matchers)s, image!=""}' % self,
+    usageMatchers:: 'image!="", container!="POD"',
+    listExpr:: 'kube_pod_container_info{%(matchers)s}' % self,
     logs:: {
       all: { expr:: '{cluster="%(context)s", namespace="%(namespace)s", container="%(container)s"} | pod="%(pod)s"' % self },
       errors: { expr:: '{cluster="%(context)s", namespace="%(namespace)s", container="%(container)s"} | pod="%(pod)s" | detected_level=~"error|critical|fatal"' % self },
     },
     drillDowns:: {
-      restarts: $.a.promql.line.chart {
-        expr::
-          |||
-            sum by (%(groupBy)s) (increase(kube_pod_container_status_restarts_total{%(matchers)s}[15m]))
-          ||| % self,
+      restarts: $.a.promql.line.chart + containerSeries {
+        local t = self,
+        local restarts = t.state('increase(kube_pod_container_status_restarts_total{%s}[15m])' % t.matchers),
+        local reasons = 'max by (%s, reason) (kube_pod_container_status_last_terminated_reason{%s})' % [t.key, t.matchers],
+        expr:: 'sum by (%s, reason) ((%s * on (%s) group_left (reason) %s) or (%s unless on (%s) %s)) > 0' % [t.groupBy, restarts, t.key, reasons, restarts, t.key, reasons],
+        legend:: '{{%s}}: {{reason}}' % t.groupBy,
         title:: 'Container Restarts %(titleGroupBy)s(15m)' % self,
       },
-      cpu: $.a.promql.line.chart {
-        expr:: 'sum by (%(groupBy)s) (rate(container_cpu_usage_seconds_total{%(matchers)s, image!=""}[5m]))' % self,
+      cpu: $.a.promql.line.chart + containerSeries {
+        local t = self,
+        expr:: 'sum by (%s) (%s)' % [t.groupBy, t.usageRate('container_cpu_usage_seconds_total')],
         title:: 'CPU Usage %(titleGroupBy)s(cores)' % self,
+        levels:: {
+          container: {
+            expr:: t.withBounds(t.usageRate('container_cpu_usage_seconds_total'), 'cpu'),
+            legend:: '{{series}}',
+          },
+        },
       },
-      memory: $.a.promql.line.chart {
-        expr:: 'sum by (%(groupBy)s) (container_memory_working_set_bytes{%(matchers)s, image!=""})' % self,
+      memory: $.a.promql.line.chart + containerSeries {
+        local t = self,
+        expr:: 'sum by (%s) (%s)' % [t.groupBy, t.usage('container_memory_working_set_bytes')],
         title:: 'Memory Usage %(titleGroupBy)s' % self,
         unit:: 'bytes',
+        levels:: {
+          container: {
+            expr:: t.withBounds(t.usage('container_memory_working_set_bytes'), 'memory'),
+            legend:: '{{series}}',
+          },
+        },
+      },
+      memoryUtilisation: $.a.promql.line.chart + containerSeries {
+        local t = self,
+        expr:: t.worst('100 * %s / on (%s) %s' % [t.usage('container_memory_working_set_bytes'), t.key, t.state('kube_pod_container_resource_limits{%s, resource="memory"}' % t.matchers)]),
+        title:: 'Memory Utilisation of Limit %(worstTitle)s%(titleGroupBy)s(%%)' % self,
+      },
+      cpuUtilisation: $.a.promql.line.chart + containerSeries {
+        local t = self,
+        expr:: t.worst('100 * %s / on (%s) %s' % [t.usageRate('container_cpu_usage_seconds_total'), t.key, t.state('kube_pod_container_resource_requests{%s, resource="cpu"}' % t.matchers)]),
+        title:: 'CPU Utilisation of Request %(worstTitle)s%(titleGroupBy)s(%%)' % self,
+      },
+      throttling: $.a.promql.line.chart + containerSeries {
+        local t = self,
+        expr:: t.worst('100 * %s / on (%s) %s' % [t.usageRate('container_cpu_cfs_throttled_periods_total'), t.key, t.usageRate('container_cpu_cfs_periods_total')]),
+        title:: 'CPU Throttling %(worstTitle)s%(titleGroupBy)s(%% of periods)' % self,
       },
     },
   },
