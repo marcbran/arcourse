@@ -1,5 +1,43 @@
 local telemetry = import '../arcourse-telemetry/main.libsonnet';
 
+local deploymentStateTimeline = {
+  local t = self,
+  states:: {
+    local replicas(metric, extra='') = 'max by (cluster, namespace, deployment) (%s{%s%s})' % [metric, t.matchers, extra],
+    local state(name, expr) = 'label_replace(0 * (%s) + 1, "state", "%s", "", "")' % [expr, name],
+    local desired = replicas('kube_deployment_spec_replicas'),
+    local available = replicas('kube_deployment_status_replicas_available'),
+    local updated = replicas('kube_deployment_status_replicas_updated'),
+    local current = replicas('kube_deployment_status_replicas'),
+    local paused = '(%s == 1)' % replicas('kube_deployment_spec_paused'),
+    local stuck = '(%s == 1)' % replicas('kube_deployment_status_condition', ', condition="Progressing", status="false", reason="ProgressDeadlineExceeded"'),
+    full: state('Full', '(%s >= %s) and (%s > 0)' % [available, desired, desired]),
+    degraded: state('Degraded', '(%s > 0) < %s' % [available, desired]),
+    down: state('Down', '(%s == 0) and (%s > 0)' % [available, desired]),
+    scaledToZero: state('ScaledToZero', '%s == 0' % desired),
+    settled: state('Settled', '((%s == %s) and (%s == %s)) unless %s unless %s' % [updated, desired, current, desired, paused, stuck]),
+    rollingOut: state('RollingOut', '((%s < %s) or (%s > %s)) unless %s unless %s' % [updated, desired, current, desired, paused, stuck]),
+    stuck: state('Stuck', '%s unless %s' % [stuck, paused]),
+    paused: state('Paused', paused),
+  },
+  all:: error 'deploymentStateTimeline requires all',
+  unhealthy:: error 'deploymentStateTimeline requires unhealthy',
+  expr:: 'max by (%s, state) (%s)' % [self.groupBy, std.join(' or ', self.all)],
+  colorBy:: '{{state}}',
+  rowBy:: '{{deployment}}',
+  labelBy:: '{{state}}',
+  tooltip:: '{{deployment}} · {{state}} · {{from}} – {{to}}',
+  levels:: {
+    root: self.context,
+    context: {
+      expr:: 'count by (%s, state) (%s)' % [self.groupBy, std.join(' or ', self.unhealthy)],
+      rowBy:: '{{%s}}: {{state}}' % self.groupBy,
+      labelBy:: '{{value}}',
+      tooltip:: '{{%s}} · {{state}}: {{value}} deployments · {{from}} – {{to}}' % self.groupBy,
+    },
+  },
+};
+
 {
   a:: telemetry,
 
@@ -126,13 +164,33 @@ local telemetry = import '../arcourse-telemetry/main.libsonnet';
     labels:: ['cluster', 'namespace', 'deployment'],
     listExpr:: 'kube_deployment_spec_replicas{%(matchers)s}' % self,
     drillDowns:: {
-      availability: $.a.promql.line.chart {
-        expr::
-          |||
-            sum by (%(groupBy)s) (kube_deployment_status_replicas_available{%(matchers)s})
-            / sum by (%(groupBy)s) (kube_deployment_spec_replicas{%(matchers)s})
-          ||| % self,
-        title:: 'Deployment Availability %(titleGroupBy)s' % self,
+      capacity: $.a.promql.stateTimeline.chart + deploymentStateTimeline {
+        title:: 'Deployment Capacity %(titleGroupBy)s' % self,
+        all:: [self.states.full, self.states.degraded, self.states.down, self.states.scaledToZero],
+        unhealthy:: [self.states.degraded, self.states.down],
+        colors:: {
+          Full: '#5b8a5b',
+          Degraded: '#b0902f',
+          Down: '#a35454',
+          ScaledToZero: '#7a7a7a',
+        },
+        levels+:: {
+          context+: { title:: 'Unhealthy Deployment Capacity %(titleGroupBy)s' % self },
+        },
+      },
+      rollout: $.a.promql.stateTimeline.chart + deploymentStateTimeline {
+        title:: 'Deployment Rollout %(titleGroupBy)s' % self,
+        all:: [self.states.settled, self.states.rollingOut, self.states.stuck, self.states.paused],
+        unhealthy:: [self.states.rollingOut, self.states.stuck, self.states.paused],
+        colors:: {
+          Settled: '#5b8a5b',
+          RollingOut: '#5a7a94',
+          Stuck: '#a35454',
+          Paused: '#7a7a7a',
+        },
+        levels+:: {
+          context+: { title:: 'Deployment Rollouts %(titleGroupBy)s' % self },
+        },
       },
     },
   },
