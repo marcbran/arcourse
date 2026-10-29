@@ -6,6 +6,8 @@ local workloadStateTimeline = {
   workload:: error 'workloadStateTimeline requires workload',
   workloadTitle:: error 'workloadStateTimeline requires workloadTitle',
   desiredMetric:: error 'workloadStateTimeline requires desiredMetric',
+  availableMetric:: error 'workloadStateTimeline requires availableMetric',
+  readyMetric:: error 'workloadStateTimeline requires readyMetric',
   series(metric, extra=''):: 'max by (cluster, namespace, %s) (%s{%s%s})' % [t.workload, metric, t.matchers, extra],
   desired:: t.series(t.desiredMetric),
   conditions:: error 'workloadStateTimeline requires conditions',
@@ -29,27 +31,25 @@ local workloadStateTimeline = {
 
 local capacityTimeline = workloadStateTimeline {
   local t = self,
-  local available = '(%s or %s)' % [
-    t.series('kube_%s_status_replicas_available' % t.workload),
-    t.series('kube_%s_status_replicas_ready' % t.workload),
-  ],
+  local available = '(%s or %s)' % [t.series(t.availableMetric), t.series(t.readyMetric)],
   local heldDesired = 'max by (cluster, namespace, %s) (min_over_time(%s{%s}[5m]))' % [t.workload, t.desiredMetric, t.matchers],
   title:: '%s Capacity %s' % [t.workloadTitle, t.titleGroupBy],
-  states:: ['Full', 'ScalingUp', 'Degraded', 'Down', 'ScaledToZero'],
+  zeroState:: 'ScaledToZero',
+  states:: ['Full', 'ScalingUp', 'Degraded', 'Down', t.zeroState],
   unhealthy:: ['Degraded', 'Down'],
   conditions:: {
     Full: '(%s >= %s) and (%s > 0)' % [available, t.desired, t.desired],
     ScalingUp: '(%s >= %s) < %s' % [available, heldDesired, t.desired],
     Degraded: '(%s > 0) < %s' % [available, heldDesired],
     Down: '(%s == 0) and (%s > 0)' % [available, heldDesired],
-    ScaledToZero: '%s == 0' % t.desired,
+    [t.zeroState]: '%s == 0' % t.desired,
   },
   colors:: {
     Full: '#5b8a5b',
     ScalingUp: '#5a7a94',
     Degraded: '#b0902f',
     Down: '#a35454',
-    ScaledToZero: '#7a7a7a',
+    [t.zeroState]: '#7a7a7a',
   },
   levels+:: {
     context+: { title:: 'Unhealthy %s Capacity %s' % [self.workloadTitle, self.titleGroupBy] },
@@ -60,12 +60,25 @@ local deploymentWorkload = {
   workload:: 'deployment',
   workloadTitle:: 'Deployment',
   desiredMetric:: 'kube_deployment_spec_replicas',
+  availableMetric:: 'kube_deployment_status_replicas_available',
+  readyMetric:: 'kube_deployment_status_replicas_ready',
 };
 
 local statefulsetWorkload = {
   workload:: 'statefulset',
   workloadTitle:: 'StatefulSet',
   desiredMetric:: 'kube_statefulset_replicas',
+  availableMetric:: 'kube_statefulset_status_replicas_available',
+  readyMetric:: 'kube_statefulset_status_replicas_ready',
+};
+
+local daemonsetWorkload = {
+  workload:: 'daemonset',
+  workloadTitle:: 'DaemonSet',
+  desiredMetric:: 'kube_daemonset_status_desired_number_scheduled',
+  availableMetric:: 'kube_daemonset_status_number_available',
+  readyMetric:: 'kube_daemonset_status_number_ready',
+  zeroState:: 'NoNodes',
 };
 
 local deploymentRolloutTimeline = workloadStateTimeline + deploymentWorkload {
@@ -104,6 +117,23 @@ local statefulsetRolloutTimeline = workloadStateTimeline + statefulsetWorkload {
   conditions:: {
     Settled: '%s unless on (cluster, namespace, statefulset) %s' % [t.desired, outdated],
     Outdated: outdated,
+  },
+  colors:: {
+    Settled: '#5b8a5b',
+    Outdated: '#5a7a94',
+  },
+};
+
+local daemonsetRolloutTimeline = workloadStateTimeline + daemonsetWorkload {
+  local t = self,
+  local updated = t.series('kube_daemonset_status_updated_number_scheduled'),
+  title:: 'DaemonSet Rollout %s' % t.titleGroupBy,
+  hidden:: ['root', 'context'],
+  states:: ['Settled', 'Outdated'],
+  unhealthy:: [],
+  conditions:: {
+    Settled: '%s >= %s' % [updated, t.desired],
+    Outdated: '%s < %s' % [updated, t.desired],
   },
   colors:: {
     Settled: '#5b8a5b',
@@ -255,6 +285,23 @@ local statefulsetRolloutTimeline = workloadStateTimeline + statefulsetWorkload {
     },
   },
 
+  daemonset:: {
+    base:: ['telemetry', 'kubernetes'],
+    vars:: ['context', 'namespace', 'daemonset'],
+    entityPath:: ['kubernetes', '$context', '$namespace', 'apps', '$daemonset'],
+    labels:: ['cluster', 'namespace', 'daemonset'],
+    titles:: ['Context', 'Namespace', 'DaemonSet'],
+    listExpr:: 'kube_daemonset_status_desired_number_scheduled{%(matchers)s}' % self,
+    drillDowns:: {
+      capacity: $.a.promql.stateTimeline.chart + capacityTimeline + daemonsetWorkload,
+      rollout: $.a.promql.stateTimeline.chart + daemonsetRolloutTimeline,
+      misscheduled: $.a.promql.line.chart {
+        expr:: 'sum by (%(groupBy)s) (max by (cluster, namespace, daemonset) (kube_daemonset_status_number_misscheduled{%(matchers)s})) > 0' % self,
+        title:: 'Misscheduled DaemonSet Pods %(titleGroupBy)s' % self,
+      },
+    },
+  },
+
   node:: {
     base:: ['telemetry', 'kubernetes'],
     vars:: ['context', 'node'],
@@ -273,5 +320,5 @@ local statefulsetRolloutTimeline = workloadStateTimeline + statefulsetWorkload {
     },
   },
 
-  nodeList: $.a.promql.entities.nodeList([$.context, $.namespace, $.pod, $.container, $.pvc, $.deployment, $.statefulset, $.node]),
+  nodeList: $.a.promql.entities.nodeList([$.context, $.namespace, $.pod, $.container, $.pvc, $.deployment, $.statefulset, $.daemonset, $.node]),
 }
