@@ -10,12 +10,20 @@ function(query, timeRange)
     else if rest != '' then '{%s}' % rest
     else 'value';
 
+  local dropPlaceholders(text) =
+    local parts = std.split(text, '{{');
+    parts[0] + std.join('', [
+      local closing = std.findSubstr('}}', part);
+      if std.length(closing) == 0 then '{{' + part else std.substr(part, closing[0] + 2, std.length(part) - closing[0] - 2)
+      for part in parts[1:]
+    ]);
+
   local applyLegendFormat(legendFormat, labels) =
-    std.foldl(
+    dropPlaceholders(std.foldl(
       function(acc, k) std.strReplace(acc, '{{%s}}' % k, labels[k]),
       std.objectFields(labels),
       legendFormat
-    );
+    ));
 
   local seriesName(labels, legendFormat) =
     if legendFormat != null then applyLegendFormat(legendFormat, labels)

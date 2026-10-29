@@ -48,11 +48,15 @@ function(c)
           {
             expr: $.expr % $,
             legendFormat: if std.objectHasAll($, 'legend') then $.legend else '{{%s}}' % ctx.groupBy,
-            link:: if !li.linksNext then null else function(series)
-              c.chainFields(
-                c.chain(rootNode, [[v, $[v]] for v in li.ancestorVars] + [[li.var, series[li.label]]]),
-                li.nextPathSuffix
-              ),
+            link::
+              if li.linksNext then function(series)
+                c.chainFields(
+                  c.chain(rootNode, [[v, $[v]] for v in li.ancestorVars] + [[li.var, series[li.label]]]),
+                  li.nextPathSuffix
+                )
+              else if li.isLeaf && std.objectHasAll(ctx, 'leafLink') then function(series)
+                c.chainFields(c.chain(rootNode, [[v, $[v]] for v in li.ancestorVars]), ['metrics', ctx.leafLink])
+              else null,
           },
         ],
       }]

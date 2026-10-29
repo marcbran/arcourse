@@ -6,6 +6,7 @@ local workloadStateTimeline = {
   workload:: error 'workloadStateTimeline requires workload',
   workloadTitle:: error 'workloadStateTimeline requires workloadTitle',
   desiredMetric:: error 'workloadStateTimeline requires desiredMetric',
+  leafLink:: 'pods',
   availableMetric:: error 'workloadStateTimeline requires availableMetric',
   readyMetric:: error 'workloadStateTimeline requires readyMetric',
   series(metric, extra=''):: 'max by (cluster, namespace, %s) (%s{%s%s})' % [t.workload, metric, t.matchers, extra],
@@ -62,6 +63,7 @@ local deploymentWorkload = {
   desiredMetric:: 'kube_deployment_spec_replicas',
   availableMetric:: 'kube_deployment_status_replicas_available',
   readyMetric:: 'kube_deployment_status_replicas_ready',
+  podOwners:: 'max by (cluster, namespace, pod) (label_replace(kube_pod_owner{cluster="%(context)s", namespace="%(namespace)s", owner_kind="ReplicaSet"}, "replicaset", "$1", "owner_name", "(.*)") * on (cluster, namespace, replicaset) group_left () max by (cluster, namespace, replicaset) (kube_replicaset_owner{cluster="%(context)s", namespace="%(namespace)s", owner_kind="Deployment", owner_name="%(deployment)s"}))',
 };
 
 local statefulsetWorkload = {
@@ -70,6 +72,7 @@ local statefulsetWorkload = {
   desiredMetric:: 'kube_statefulset_replicas',
   availableMetric:: 'kube_statefulset_status_replicas_available',
   readyMetric:: 'kube_statefulset_status_replicas_ready',
+  podOwners:: 'max by (cluster, namespace, pod) (kube_pod_owner{cluster="%(context)s", namespace="%(namespace)s", owner_kind="StatefulSet", owner_name="%(statefulset)s"})',
 };
 
 local daemonsetWorkload = {
@@ -79,6 +82,7 @@ local daemonsetWorkload = {
   availableMetric:: 'kube_daemonset_status_number_available',
   readyMetric:: 'kube_daemonset_status_number_ready',
   zeroState:: 'NoNodes',
+  podOwners:: 'max by (cluster, namespace, pod) (kube_pod_owner{cluster="%(context)s", namespace="%(namespace)s", owner_kind="DaemonSet", owner_name="%(daemonset)s"})',
 };
 
 local deploymentRolloutTimeline = workloadStateTimeline + deploymentWorkload {
@@ -141,6 +145,90 @@ local daemonsetRolloutTimeline = workloadStateTimeline + daemonsetWorkload {
   },
 };
 
+local podStateTimeline = {
+  local t = self,
+  local key = 'cluster, namespace, pod',
+  local series(metric, extra='') = 'max by (%s) (%s{%s%s})' % [key, metric, t.podMatchers, extra],
+  local phase(name) = '(%s == 1)' % series('kube_pod_status_phase', ', phase="%s"' % name),
+  local deletedAt = series('kube_pod_deletion_timestamp'),
+  local age = '(time() - %s)' % series('kube_pod_created'),
+  local notReady = '(%s == 0)' % series('kube_pod_status_ready', ', condition="true"'),
+  local unscheduled = '(%s == 1)' % series('kube_pod_status_scheduled', ', condition="false"'),
+  local scheduledPending = '(%s unless on (%s) %s)' % [phase('Pending'), key, unscheduled],
+  local runningNotReady = '(%s and on (%s) %s)' % [phase('Running'), key, notReady],
+  local young = '(%s < 300)' % age,
+  local old = '(%s >= 300)' % age,
+  local alive(expr) = '((%s) unless on (%s) %s)' % [expr, key, deletedAt],
+  local reason = 'topk by (%s) (1, %s or %s or %s)' % [
+    key,
+    'max by (%s, reason) (kube_pod_status_reason{%s} == 1)' % [key, t.podMatchers],
+    'max by (%s, reason) (kube_pod_container_status_waiting_reason{%s} == 1)' % [key, t.podMatchers],
+    'max by (%s, reason) (kube_pod_init_container_status_waiting_reason{%s} == 1)' % [key, t.podMatchers],
+  ],
+  local labelled(name, expr) = 'label_replace(0 * (%s) + 1, "state", "%s", "", "")' % [expr, name],
+  local withReason(expr) = '((%s) * on (%s) group_left (reason) %s or ((%s) unless on (%s) %s))' % [expr, key, reason, expr, key, reason],
+  local filtered(expr) = if t.podFilter == null then expr else '(%s) and on (%s) %s' % [expr, key, t.podFilter],
+  local perPod(states) = 'max by (%s, state, reason) (%s)' % [t.podGroupBy, withReason(filtered(std.join(' or ', [labelled(s, t.conditions[s]) for s in states])))],
+  podMatchers:: t.matchers,
+  podGroupBy:: t.groupBy,
+  podFilter:: null,
+  conditions:: {
+    StuckTerminating: '(time() - %s) >= 300' % deletedAt,
+    Terminating: '(time() - %s) < 300' % deletedAt,
+    Succeeded: alive(phase('Succeeded')),
+    Failed: alive(phase('Failed')),
+    Unknown: alive(phase('Unknown')),
+    Unschedulable: alive('(%s and on (%s) %s) and on (%s) %s' % [phase('Pending'), key, unscheduled, key, old]),
+    Starting: alive('(%s or %s or (%s and on (%s) %s)) and on (%s) %s' % [scheduledPending, runningNotReady, phase('Pending'), key, unscheduled, key, young]),
+    Pending: alive('%s and on (%s) %s' % [scheduledPending, key, old]),
+    NotReady: alive('%s and on (%s) %s' % [runningNotReady, key, old]),
+    Ready: alive('%s unless on (%s) %s' % [phase('Running'), key, notReady]),
+  },
+  states:: ['StuckTerminating', 'Terminating', 'Succeeded', 'Failed', 'Unknown', 'Unschedulable', 'Starting', 'Pending', 'NotReady', 'Ready'],
+  unhealthy:: ['StuckTerminating', 'Failed', 'Unknown', 'Unschedulable', 'Pending', 'NotReady'],
+  title:: 'Pod State %s' % t.titleGroupBy,
+  expr:: perPod(t.states),
+  colorBy:: '{{state}}',
+  rowBy:: '{{pod}}',
+  labelBy:: '{{state}}',
+  tooltip:: '{{pod}} · {{state}} {{reason}} · {{from}} – {{to}}',
+  colors:: {
+    Ready: '#5b8a5b',
+    Starting: '#5a7a94',
+    Succeeded: '#5a7a94',
+    Terminating: '#7a7a7a',
+    Pending: '#b0902f',
+    Unschedulable: '#b0902f',
+    NotReady: '#a35454',
+    Failed: '#a35454',
+    StuckTerminating: '#a35454',
+    Unknown: '#7a7a7a',
+  },
+  levels:: {
+    root: self.context,
+    context: {
+      expr:: 'count by (%s, state) (%s)' % [self.groupBy, std.join(' or ', [labelled(s, self.conditions[s]) for s in self.unhealthy])],
+      title:: 'Unhealthy Pods %s' % self.titleGroupBy,
+      rowBy:: '{{%s}}: {{state}}' % self.groupBy,
+      labelBy:: '{{value}}',
+      tooltip:: '{{%s}} · {{state}}: {{value}} pods · {{from}} – {{to}}' % self.groupBy,
+    },
+    namespace: {
+      expr:: perPod([s for s in self.states if s != 'Ready' && s != 'Succeeded']),
+      title:: 'Pods Not Ready %s' % self.titleGroupBy,
+    },
+  },
+};
+
+local workloadPodsTimeline = podStateTimeline {
+  local t = self,
+  title:: '%s Pods' % t.workloadTitle,
+  hidden:: ['root', 'context', 'namespace'],
+  podMatchers:: 'cluster="%(context)s", namespace="%(namespace)s"',
+  podGroupBy:: 'pod',
+  podFilter:: t.podOwners,
+};
+
 {
   a:: telemetry,
 
@@ -181,34 +269,7 @@ local daemonsetRolloutTimeline = workloadStateTimeline + daemonsetWorkload {
       errors: { expr:: '{cluster="%(context)s", namespace="%(namespace)s"} | pod="%(pod)s" | detected_level=~"error|critical|fatal"' % self },
     },
     drillDowns:: {
-      phase: $.a.promql.stateTimeline.chart {
-        expr:: 'sum by (%(groupBy)s, phase) (kube_pod_status_phase{%(matchers)s}) > 0' % self,
-        title:: 'Pod Phase %(titleGroupBy)s' % self,
-        colorBy:: '{{phase}}',
-        rowBy:: '{{namespace}}: {{phase}}',
-        labelBy:: '{{value}}',
-        tooltip:: '{{namespace}} · {{phase}}: {{value}} pods · {{from}} – {{to}}',
-        colors:: {
-          Running: '#5b8a5b',
-          Pending: '#b0902f',
-          Failed: '#a35454',
-          Succeeded: '#5a7a94',
-          Unknown: '#7a7a7a',
-        },
-        levels:: {
-          root: self.context,
-          context: {
-            expr:: 'sum by (%(groupBy)s, phase) (kube_pod_status_phase{%(matchers)s, phase!="Running", phase!="Succeeded"}) > 0' % self,
-            title:: 'Unhealthy Pod Phase %(titleGroupBy)s' % self,
-          },
-          namespace: self.pod,
-          pod: {
-            rowBy:: '{{pod}}',
-            labelBy:: '{{phase}}',
-            tooltip:: '{{pod}} · {{phase}} · {{from}} – {{to}}',
-          },
-        },
-      },
+      state: $.a.promql.stateTimeline.chart + podStateTimeline,
     },
   },
 
@@ -269,6 +330,7 @@ local daemonsetRolloutTimeline = workloadStateTimeline + daemonsetWorkload {
     drillDowns:: {
       capacity: $.a.promql.stateTimeline.chart + capacityTimeline + deploymentWorkload,
       rollout: $.a.promql.stateTimeline.chart + deploymentRolloutTimeline,
+      pods: $.a.promql.stateTimeline.chart + workloadPodsTimeline + deploymentWorkload,
     },
   },
 
@@ -282,6 +344,7 @@ local daemonsetRolloutTimeline = workloadStateTimeline + daemonsetWorkload {
     drillDowns:: {
       capacity: $.a.promql.stateTimeline.chart + capacityTimeline + statefulsetWorkload,
       rollout: $.a.promql.stateTimeline.chart + statefulsetRolloutTimeline,
+      pods: $.a.promql.stateTimeline.chart + workloadPodsTimeline + statefulsetWorkload,
     },
   },
 
@@ -295,6 +358,7 @@ local daemonsetRolloutTimeline = workloadStateTimeline + daemonsetWorkload {
     drillDowns:: {
       capacity: $.a.promql.stateTimeline.chart + capacityTimeline + daemonsetWorkload,
       rollout: $.a.promql.stateTimeline.chart + daemonsetRolloutTimeline,
+      pods: $.a.promql.stateTimeline.chart + workloadPodsTimeline + daemonsetWorkload,
       misscheduled: $.a.promql.line.chart {
         expr:: 'sum by (%(groupBy)s) (max by (cluster, namespace, daemonset) (kube_daemonset_status_number_misscheduled{%(matchers)s})) > 0' % self,
         title:: 'Misscheduled DaemonSet Pods %(titleGroupBy)s' % self,

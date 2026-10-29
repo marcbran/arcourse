@@ -35,12 +35,12 @@ p.pkg({
 |||, {
   context: p.desc('Entity spec for the cluster/context dimension, with all/errors logs views.'),
   namespace: p.desc('Entity spec for the namespace dimension, with all/errors logs views.'),
-  pod: p.desc('Entity spec for the pod dimension, with a pod-phase state timeline drilldown and all/errors logs views.'),
+  pod: p.desc('Entity spec for the pod dimension, with a pod state timeline drilldown and all/errors logs views.'),
   container: p.desc('Entity spec for the container dimension, with restarts/cpu/memory drilldowns and all/errors logs views.'),
   pvc: p.desc('Entity spec for the persistent volume claim dimension, with a usage drilldown.'),
-  deployment: p.desc('Entity spec for the deployment dimension, with capacity and rollout state drilldowns. The Stuck rollout state needs the `reason` label on kube-state-metrics conditions.'),
-  statefulset: p.desc('Entity spec for the statefulset dimension, with capacity and rollout state drilldowns.'),
-  daemonset: p.desc('Entity spec for the daemonset dimension, with capacity and rollout state drilldowns and a misscheduled pods drilldown.'),
+  deployment: p.desc('Entity spec for the deployment dimension, with capacity, rollout and pod state drilldowns. The Stuck rollout state needs the `reason` label on kube-state-metrics conditions.'),
+  statefulset: p.desc('Entity spec for the statefulset dimension, with capacity, rollout and pod state drilldowns.'),
+  daemonset: p.desc('Entity spec for the daemonset dimension, with capacity, rollout and pod state drilldowns and a misscheduled pods drilldown.'),
   node: p.desc('Entity spec for the node dimension, with a conditions drilldown.'),
   nodeList: p.desc('All entity specs materialized through `entities.nodeList`.'),
 })
