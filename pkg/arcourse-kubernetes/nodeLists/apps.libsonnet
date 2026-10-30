@@ -22,6 +22,54 @@ local podSelectorTable = a.table.node + coreLib.podTableNode {
   ],
 };
 
+local replicaSetTableNode = {
+  table+:: {
+    columns: [
+      { label: 'Name', path: ['metadata', 'name'] },
+      { label: 'Namespace', path: ['metadata', 'namespace'] },
+      {
+        label: 'Revision',
+        paths: [['metadata', 'annotations']],
+        value(item):: std.get(std.get(item.metadata, 'annotations', {}), 'deployment.kubernetes.io/revision', ''),
+      },
+      {
+        label: 'Desired',
+        paths: [['spec', 'replicas']],
+        value(item):: std.get(std.get(item, 'spec', {}), 'replicas', 1),
+      },
+      {
+        label: 'Current',
+        paths: [['status', 'replicas']],
+        value(item):: std.get(std.get(item, 'status', {}), 'replicas', 0),
+      },
+      {
+        label: 'Ready',
+        paths: [['status', 'readyReplicas']],
+        value(item):: std.get(std.get(item, 'status', {}), 'readyReplicas', 0),
+      },
+      { label: 'Created', path: ['metadata', 'creationTimestamp'] },
+    ],
+  },
+};
+
+local replicaSetTable = a.table.node + replicaSetTableNode {
+  allReplicaSets:: kubernetes.get($.context, std.format('/apis/apps/v1/namespaces/%s/replicasets', [std.toString($.namespace)])).items,
+  data:: {
+    items: std.reverse(std.sort([
+      rs
+      for rs in $.allReplicaSets
+      if std.member([o.uid for o in std.get(rs.metadata, 'ownerReferences', [])], $.ownerUid)
+    ], function(rs) rs.metadata.creationTimestamp)),
+  },
+  linkSpecs:: [
+    {
+      at: ['items'],
+      keys: [{ path: ['metadata', 'name'] }],
+      value: [{ const: 'kubernetes' }, { origin: 'context' }, { origin: 'namespace' }, { const: 'apps' }, { param: 'replicaset', path: ['metadata', 'name'] }],
+    },
+  ],
+};
+
 local restartNode = a.action.node {
   resource:: error 'restartNode requires a resource',
   resourceName:: error 'restartNode requires a resourceName',
@@ -78,8 +126,16 @@ local scaleNode = a.action.node {
 };
 
 local nodeList = [
+  [['kubernetes', '$context', 'apps', 'replicasets'], replicaSetTableNode],
+  [['kubernetes', '$context', '$namespace', 'apps', 'replicasets'], replicaSetTableNode],
   [['kubernetes', '$context', '$namespace', 'apps', '$deployment', 'pods'], podSelectorTable {
     selector: kubernetes.neat.get($.context, std.format('/apis/apps/v1/namespaces/%s/deployments/%s', [std.toString($.namespace), std.toString($.deployment)])).spec.selector.matchLabels,
+  }],
+  [['kubernetes', '$context', '$namespace', 'apps', '$deployment', 'replicasets'], replicaSetTable {
+    ownerUid: kubernetes.neat.get($.context, std.format('/apis/apps/v1/namespaces/%s/deployments/%s', [std.toString($.namespace), std.toString($.deployment)])).metadata.uid,
+  }],
+  [['kubernetes', '$context', '$namespace', 'apps', '$replicaset', 'pods'], podSelectorTable {
+    selector: kubernetes.neat.get($.context, std.format('/apis/apps/v1/namespaces/%s/replicasets/%s', [std.toString($.namespace), std.toString($.replicaset)])).spec.selector.matchLabels,
   }],
   [['kubernetes', '$context', '$namespace', 'apps', '$statefulset', 'pods'], podSelectorTable {
     selector: kubernetes.neat.get($.context, std.format('/apis/apps/v1/namespaces/%s/statefulsets/%s', [std.toString($.namespace), std.toString($.statefulset)])).spec.selector.matchLabels,

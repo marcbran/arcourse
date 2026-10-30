@@ -5,13 +5,15 @@ local common = import 'common.libsonnet';
   title:: null,
   rows:: [],
   segments:: [],
+  timeMin:: null,
+  timeMax:: null,
   option::
     local rowIndex = { [c.rows[i]]: i for i in std.range(0, std.length(c.rows) - 1) };
     {
       title: { text: c.title },
       tooltip: { trigger: 'item', formatter: '{b}' },
       grid: { top: 40, bottom: 40, containLabel: true },
-      xAxis: common.timeAxis,
+      xAxis: common.timeAxis + std.prune({ min: c.timeMin, max: c.timeMax }),
       yAxis: { type: 'category', data: c.rows },
       series: [{
         type: 'custom',

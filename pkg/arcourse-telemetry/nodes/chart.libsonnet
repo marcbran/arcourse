@@ -10,18 +10,31 @@ function(query, timeRange)
     else if rest != '' then '{%s}' % rest
     else 'value';
 
+  local dropPlaceholders(text) =
+    local parts = std.split(text, '{{');
+    parts[0] + std.join('', [
+      local closing = std.findSubstr('}}', part);
+      if std.length(closing) == 0 then '{{' + part else std.substr(part, closing[0] + 2, std.length(part) - closing[0] - 2)
+      for part in parts[1:]
+    ]);
+
   local applyLegendFormat(legendFormat, labels) =
-    std.foldl(
+    dropPlaceholders(std.foldl(
       function(acc, k) std.strReplace(acc, '{{%s}}' % k, labels[k]),
       std.objectFields(labels),
       legendFormat
-    );
+    ));
 
   local seriesName(labels, legendFormat) =
     if legendFormat != null then applyLegendFormat(legendFormat, labels)
     else defaultSeriesName(labels);
 
   local hasPoints(series) = std.length(series.points) > 0;
+
+  local queriedRange = {
+    timeMin:: std.parseInt(self.data.from),
+    timeMax:: std.parseInt(self.data.to),
+  };
 
   local minList(l) = std.foldl(function(a, b) if b < a then b else a, l[1:], l[0]);
 
@@ -71,7 +84,7 @@ function(query, timeRange)
       },
     },
 
-    line: a.line.chart {
+    line: a.line.chart + queriedRange {
       local n = self,
       links: std.foldl(
         function(acc, i) acc + linksFromResult(
@@ -92,7 +105,7 @@ function(query, timeRange)
       ]),
     },
 
-    stateTimeline: a.stateTimeline.chart {
+    stateTimeline: a.stateTimeline.chart + queriedRange {
       local n = self,
       local render(template, labels, value) =
         if template != null then applyLegendFormat(template, labels + { value: std.toString(value) }) else null,

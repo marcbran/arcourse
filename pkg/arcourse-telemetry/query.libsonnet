@@ -14,4 +14,4 @@ function(time, telemetry)
     telemetry.query([
       item { datasource: datasource, from: resolvedFrom, to: resolvedTo }
       for item in items
-    ])
+    ]) + { from: resolvedFrom, to: resolvedTo }

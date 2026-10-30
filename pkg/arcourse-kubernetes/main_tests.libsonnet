@@ -491,6 +491,29 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
       },
     },
     {
+      name: 'a specs.json resource without an entry in links keeps its list and detail nodes, also when its group version has an empty links entry',
+      input:: function()
+        local spec = {
+          paths: {
+            '/apis/acme.io/v1/widgets': { get: { 'x-kubernetes-group-version-kind': { kind: 'Widget' } } },
+            '/apis/acme.io/v1/widgets/{name}': { get: {} },
+          },
+        };
+        local entries = resourceEntries(arcourseKubernetes.graph {
+          manifest: false,
+          contexts: [],
+          specs: { 'apis/acme.io/v1': spec },
+          links: { 'acme.io/v1': [] },
+        });
+        { paths: [nodePath(e) for e in entries[2:]] },
+      expected: {
+        paths: [
+          ['kubernetes', '$context', 'acme.io', 'widgets'],
+          ['kubernetes', '$context', 'acme.io', '$widget'],
+        ],
+      },
+    },
+    {
       name: 'a group resource detail node gets an extra linkSpec from a matching inferred link, rewritten from the raw OpenAPI target path into the node-route convention',
       input:: function()
         local daemonset = { name: 'daemonsets', kind: 'DaemonSet', namespaced: true, verbs: ['list', 'get'], version: 'v1' };
