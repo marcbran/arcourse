@@ -10,7 +10,7 @@ function(c)
     local n = std.length(vars);
 
     local pathSuffixes = [
-      [vars[i] + 's', if i == n - 1 then metric else vars[n - 1] + c.capitalize(metric)]
+      ['by' + c.capitalize(vars[i]), if i == n - 1 then metric else vars[n - 1] + c.capitalize(metric)]
       for i in std.range(0, n - 1)
     ] + [[metric]];
 
