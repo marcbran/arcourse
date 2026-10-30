@@ -286,7 +286,7 @@ local resolveHtml(v) =
       ],
     },
     {
-      name: 'a non-node child renders as a titled group of its reachable nodes, deeper nodes slash-labeled within the group, empty ones omitted',
+      name: 'a non-node child renders as titled groups of its reachable nodes, one per parent path, empty ones omitted',
       input:: function()
         local node = a.list.node {
           arcourse: { _node: true, _queryPath: '/root/arcourse' },
@@ -302,14 +302,31 @@ local resolveHtml(v) =
         },
       expected: {
         items: [{ link: '/root/arcourse', text: 'arcourse' }],
-        groups: [{
-          title: 'kubernetes',
-          items: [
-            { link: '/root/kubernetes/contexts', text: 'contexts' },
-            { link: '/root/kubernetes/nested/deep', text: 'nested/deep' },
-          ],
-        }],
+        groups: [
+          { title: 'kubernetes', items: [{ link: '/root/kubernetes/contexts', text: 'contexts' }] },
+          { title: 'kubernetes/nested', items: [{ link: '/root/kubernetes/nested/deep', text: 'deep' }] },
+        ],
       },
+    },
+    {
+      name: 'a nested links object renders one group per parent path, external links included',
+      input:: function()
+        local link(path) = { _node: true, _queryPath: '/root/' + path };
+        local node = a.list.node {
+          links: {
+            logs: { all: link('logs/all') },
+            metrics: {
+              byNamespace: { cpu: link('metrics/byNamespace/cpu') },
+              byNode: { state: link('metrics/byNode/state'), docs: 'https://example.com/nodes' },
+            },
+          },
+        };
+        [{ title: g.title, items: [i.text for i in g.items] } for g in node._view.fragment.groups],
+      expected: [
+        { title: 'logs', items: ['all'] },
+        { title: 'metrics/byNamespace', items: ['cpu'] },
+        { title: 'metrics/byNode', items: ['docs', 'state'] },
+      ],
     },
     {
       name: 'a node reachable through a links group is not repeated in a child group',
@@ -422,7 +439,7 @@ local resolveHtml(v) =
       input:: function()
         local link(name) = { _node: true, _queryPath: '/root/' + name };
         local node = a.list.node {
-          list:: { hiddenItems: { '': ['services'], apps: ['replicasets'], metrics: ['pods/phase'], batch: ['jobs'] } },
+          list:: { hiddenItems: { '': ['services'], apps: ['replicasets'], 'metrics/pods': ['phase'], batch: ['jobs'] } },
           pods: link('pods'),
           services: link('services'),
           apps: { deployments: link('apps/deployments'), replicasets: link('apps/replicasets') },
@@ -437,7 +454,7 @@ local resolveHtml(v) =
         items: ['pods'],
         groups: [
           { title: 'apps', items: ['deployments'] },
-          { title: 'metrics', items: ['pods/cpu'] },
+          { title: 'metrics/pods', items: ['cpu'] },
         ],
       },
     },
