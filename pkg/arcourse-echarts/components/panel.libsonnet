@@ -1,4 +1,8 @@
 local style = |||
+  .deck:has(> .panel) {
+    display: flex;
+    align-items: stretch;
+  }
   @scope (.panel) {
     :scope {
       display: block;
