@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.25.0](https://github.com/marcbran/arcourse/compare/v0.24.0...v0.25.0) (2026-10-30)
+
+
+### Features
+
+* chart breadcrumbs ([#160](https://github.com/marcbran/arcourse/issues/160)) ([8c4bcf1](https://github.com/marcbran/arcourse/commit/8c4bcf1c76e9016583f2e30fe2e2d43611f4be1f))
+* intermediate node breadcrumbs ([#161](https://github.com/marcbran/arcourse/issues/161)) ([c884516](https://github.com/marcbran/arcourse/commit/c8845162ef1f493da8cf5dcef7561fa83582d46a))
+* k8s additions ([#159](https://github.com/marcbran/arcourse/issues/159)) ([ca12cc0](https://github.com/marcbran/arcourse/commit/ca12cc0ace8b9584b7787f9f72802ca2e74aed01))
+* telemetry improvements ([#163](https://github.com/marcbran/arcourse/issues/163)) ([4ab5641](https://github.com/marcbran/arcourse/commit/4ab564135b0db3daf36d81705a3a308060cb84a6))
+
 ## [0.24.0](https://github.com/marcbran/arcourse/compare/v0.23.0...v0.24.0) (2026-10-28)
 
 
