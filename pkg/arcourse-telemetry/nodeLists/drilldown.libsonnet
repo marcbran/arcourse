@@ -10,7 +10,7 @@ function(c)
     local n = std.length(vars);
 
     local pathSuffixes = [
-      [vars[i] + 's', if i == n - 1 then metric else vars[n - 1] + c.capitalize(metric)]
+      ['by' + c.capitalize(vars[i]), if i == n - 1 then metric else vars[n - 1] + c.capitalize(metric)]
       for i in std.range(0, n - 1)
     ] + [[metric]];
 
@@ -31,7 +31,10 @@ function(c)
         ancestorVars: accs[i].ancestorVars,
         matchers: c.matcherClause(accs[i].matchers),
         path: base + ['$' + v for v in accs[i].ancestorVars] + ['metrics'] + pathSuffixes[i],
-        nextPathSuffix: if i < n then ['metrics'] + pathSuffixes[i + 1] else null,
+        nextPathSuffix:
+          if i == n - 1 && std.objectHasAll(params, 'leafLink') then ['metrics', params.leafLink]
+          else if i < n then ['metrics'] + pathSuffixes[i + 1]
+          else null,
       }
       for i in std.range(0, n)
     ];
