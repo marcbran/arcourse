@@ -27,7 +27,8 @@ function(graphSpecExpr, shape)
       else '{\n' + std.join('', [childField(node.path, k) for k in fields]) + '  }';
     local leafs = shapeNode.leafs;
     local body =
-      if std.length(leafs) == 0 then children
+      if std.length(leafs) == 0 then
+        'g.intermediate(' + std.manifestJsonMinified(node.path) + ', vars) + ' + children
       else
         'g.node(layers[' + leafs[0] + '].fullPath, ['
         + std.join(', ', ['layers[' + i + '].layer' for i in leafs])

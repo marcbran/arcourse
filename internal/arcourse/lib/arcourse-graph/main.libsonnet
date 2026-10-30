@@ -53,6 +53,9 @@ local node(path, body={}) =
     _queryPath:: local n = self; url({ path: urlPathSegments(n, path), params: nonDefaultParams(n) }),
   };
 
+local intermediate(path, vars) =
+  std.foldl(function(acc, v) acc { [v]:: vars[v] }, std.objectFields(vars), { _pathTemplate:: path });
+
 local toLayers(nodeSpecs) =
   std.flatMap(
     function(spec)
@@ -79,7 +82,7 @@ local shape(layers) =
     };
   build([{ path: layers[i].path, index: i } for i in std.range(0, std.length(layers) - 1)]);
 
-local instantiateFromShape(shapeNode, layers, defaultView={}, vars={}) =
+local instantiateFromShape(shapeNode, layers, defaultView={}, vars={}, path=[]) =
   local withDefaultView(obj) =
     if std.objectHasAll(obj, '_view') then obj else obj + defaultView;
   local leafs = [layers[i] for i in shapeNode.leafs];
@@ -87,12 +90,12 @@ local instantiateFromShape(shapeNode, layers, defaultView={}, vars={}) =
     [if isVar(k) then varNameOf(k) else k]:
       if isVar(k) then
         local vName = varNameOf(k);
-        function(val) instantiateFromShape(shapeNode.children[k], layers, defaultView, vars { [vName]: val })
+        function(val) instantiateFromShape(shapeNode.children[k], layers, defaultView, vars { [vName]: val }, path + [k])
       else
-        instantiateFromShape(shapeNode.children[k], layers, defaultView, vars)
+        instantiateFromShape(shapeNode.children[k], layers, defaultView, vars, path + [k])
     for k in std.objectFields(shapeNode.children)
   };
-  if std.length(leafs) == 0 then withDefaultView(children)
+  if std.length(leafs) == 0 then withDefaultView(intermediate(path, vars) + children)
   else withDefaultView(node(leafs[0].fullPath, [l.layer for l in leafs]) + vars + children);
 
 local rootFromShape(layers, compiledShape, defaultView={}) =
@@ -109,6 +112,7 @@ local graph(nodeSpecs, defaultView={}) =
 
 {
   node: node,
+  intermediate: intermediate,
   graph: graph,
   toLayers: toLayers,
   shape: shape,

@@ -162,6 +162,24 @@ local graphTests = {
   output(input):: graph(input),
   tests: [
     {
+      name: 'intermediate objects carry their path template and variables as hidden fields',
+      input:: {
+        nodeSpecs: [[['kubernetes', '$context', 'metrics', 'pods'], { kind: 'chart' }]],
+      },
+      output(input)::
+        local metrics = graph(input).kubernetes.context('prod').metrics;
+        {
+          metrics: metrics,
+          pathTemplate: metrics._pathTemplate,
+          context: metrics.context,
+        },
+      expected: {
+        metrics: { pods: { _node: true, context: 'prod', kind: 'chart' } },
+        pathTemplate: ['kubernetes', '$context', 'metrics'],
+        context: 'prod',
+      },
+    },
+    {
       name: 'turns variable path segments into functions',
       input:: {
         nodeSpecs: [
