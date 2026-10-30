@@ -16,7 +16,7 @@ local generateGraphRoot = import './generate_graph_root.libsonnet';
         local defaultView = if std.length(graphSpec) > 1 then graphSpec[1] else {};
         local view(obj) = if std.objectHasAll(obj, '_view') then obj else obj + defaultView;
         local levels = {
-          n0(vars):: view({}),
+          n0(vars):: view(g.intermediate([], vars) + {}),
         };
         view(g.node([]) + levels.n0({}))
       |||,
@@ -39,7 +39,7 @@ local generateGraphRoot = import './generate_graph_root.libsonnet';
         local defaultView = if std.length(graphSpec) > 1 then graphSpec[1] else {};
         local view(obj) = if std.objectHasAll(obj, '_view') then obj else obj + defaultView;
         local levels = {
-          n0(vars):: view({
+          n0(vars):: view(g.intermediate([], vars) + {
             "ns": levels.n1(vars),
           }),
           n1(vars):: view(g.node(layers[0].fullPath, [layers[0].layer]) + vars + {
@@ -69,7 +69,7 @@ local generateGraphRoot = import './generate_graph_root.libsonnet';
         local defaultView = if std.length(graphSpec) > 1 then graphSpec[1] else {};
         local view(obj) = if std.objectHasAll(obj, '_view') then obj else obj + defaultView;
         local levels = {
-          n0(vars):: view({
+          n0(vars):: view(g.intermediate([], vars) + {
             "my-app": levels.n1(vars),
           }),
           n1(vars):: view(g.node(layers[0].fullPath, [layers[0].layer, layers[1].layer]) + vars + {
