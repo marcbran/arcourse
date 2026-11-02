@@ -152,6 +152,45 @@ local resolveHtml(v) =
       expected: { rowTexts: ['Alpha', 'Beta'] },
     },
     {
+      name: 'a.table.view renders a failed call Status instead of an empty table',
+      input:: function()
+        local node = a.table.view {
+          data: { apiVersion: 'v1', kind: 'Status', status: 'Failure', code: 500, reason: 'ServerException', message: 'no Docker daemon is reachable' },
+          table: { at: ['items'], columns: [{ label: 'Name', path: ['name'] }] },
+        };
+        local card = node._view.fragment.html[1];
+        {
+          items: node.items,
+          class: card.attributes.class,
+          text: [p.children[0] for p in card.children],
+        },
+      expected: {
+        items: [],
+        class: 'card status-card',
+        text: ['500 ServerException', 'no Docker daemon is reachable'],
+      },
+    },
+    {
+      name: 'a.resource.node renders a failed call Status in place of the whole fragment',
+      input:: function()
+        local node = a.resource.node {
+          data: { kind: 'Status', status: 'Failure', code: 404, reason: 'NoSuchBucketPolicy', message: 'The bucket policy does not exist' },
+          child: { _node: true, _queryPath: '/root/x/child' },
+        };
+        node._view.fragment.html[1].attributes.class,
+      expected: 'card status-card',
+    },
+    {
+      name: 'a.list.node renders a failed call Status in place of its links',
+      input:: function()
+        local node = a.list.node {
+          data: { kind: 'Status', status: 'Failure', code: 403, reason: 'Forbidden', message: 'access denied' },
+          child: { _node: true, _queryPath: '/root/x/child' },
+        };
+        node._view.fragment.html[1].attributes.class,
+      expected: 'card status-card',
+    },
+    {
       name: 'a.table.node projects data items into a flat items list keyed by lowerCamelCase label or explicit key, computing value columns and dropping missing fields',
       input:: function()
         local node = a.table.node {

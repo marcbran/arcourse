@@ -253,7 +253,19 @@ local actionView = baseView {
   },
 };
 
-local withNode = { node: self.view + linkspecs.withLinkSpecs };
+local isFailure(data) =
+  std.isObject(data) && std.get(data, 'kind') == 'Status' && std.get(data, 'status') == 'Failure';
+
+local failureView = {
+  _view+:: {
+    fragment: if isFailure(std.get($, 'data')) then c.status { status:: $.data } else super.fragment,
+  },
+};
+
+local withNode = {
+  view+: failureView,
+  node: self.view + linkspecs.withLinkSpecs,
+};
 
 {
   default: { view: listView } + withNode,
