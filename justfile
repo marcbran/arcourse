@@ -1,3 +1,4 @@
+tool := "go tool -modfile=tools/go.mod"
 
 test-go:
     go test -v -cover -timeout=120s -parallel=10 ./...
@@ -11,13 +12,13 @@ test-jsonnet:
 build-all-pkgs:
     for dir in pkg/*/; do \
         [ -f "$dir/main.libsonnet" ] || continue; \
-        rm -rf "$dir/build" && jpoet pkg build "$dir" || exit 1; \
+        rm -rf "$dir/build" && {{tool}} jpoet pkg build "$dir" || exit 1; \
     done
 
 build-push-all-pkgs:
     for dir in pkg/*/; do \
         [ -f "$dir/main.libsonnet" ] || continue; \
-        rm -rf "$dir/build" && jpoet pkg build "$dir" && jpoet pkg push "$dir" || exit 1; \
+        rm -rf "$dir/build" && {{tool}} jpoet pkg build "$dir" && {{tool}} jpoet pkg push "$dir" || exit 1; \
     done
 
 test-node:
@@ -26,7 +27,10 @@ test-node:
 test: test-go test-jsonnet test-node
 
 lint:
-    golangci-lint run ./...
+    {{tool}} golangci-lint run ./...
+
+vuln:
+    {{tool}} govulncheck ./...
 
 check-graph-sync:
     for f in internal/arcourse/lib/arcourse-graph/*.libsonnet; do \
@@ -56,4 +60,4 @@ test-e2e-facade facade:
 bench:
     go test -tags e2e -bench=. -benchmem -run=^$ ./tests/...
 
-ci: lint test test-race check build test-e2e
+ci: lint vuln test test-race check build test-e2e

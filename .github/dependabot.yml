@@ -8,6 +8,10 @@ updates:
     directory: "/examples/plugin-binary"
     schedule:
       interval: "daily"
+  - package-ecosystem: "gomod"
+    directory: "/tools"
+    schedule:
+      interval: "daily"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
