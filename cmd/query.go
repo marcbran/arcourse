@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -56,11 +57,17 @@ func newQueryCmd(plugins []*jpoet.Plugin) *cobra.Command {
 				return err
 			}
 			if outputPath != "" {
-				return writeQueryOutput(outputPath, result.Output)
+				err = writeQueryOutput(outputPath, result.Output)
+			} else {
+				_, err = fmt.Fprint(os.Stdout, result.Output)
 			}
-
-			_, err = fmt.Fprint(os.Stdout, result.Output)
-			return err
+			if err != nil {
+				return err
+			}
+			if result.Failure != nil {
+				return errors.New(result.Failure.Message)
+			}
+			return nil
 		},
 	}
 	cmd.Flags().StringP("format", "f", "json", "Output format: json, html, jsonnet")

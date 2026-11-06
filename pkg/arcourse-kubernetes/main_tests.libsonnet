@@ -92,7 +92,7 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
       },
     },
     {
-      name: 'contexts node uses a.list.node and computes per-context links',
+      name: 'contexts node uses a.list.node, keeps the call in response and computes per-context links',
       input:: function()
         local entries = nodes([]);
         local contexts = entries[0];
@@ -102,7 +102,7 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
         },
       expected: {
         kind: ['node', 'list', 'a'],
-        fieldNames: ['data', 'links'],
+        fieldNames: ['response', 'data', 'links'],
       },
     },
     {
@@ -127,8 +127,8 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
         local resource = { name: 'widgets', kind: 'Widget', namespaced: false, verbs: ['list', 'get'], version: 'v1' };
         local entries = nodes([{ group: '', resources: [resource] }]);
         {
-          listDataChain: applyTargetChain(field(nodeBody(entries[2]), 'data')),
-          detailDataChain: applyTargetChain(field(nodeBody(entries[3]), 'data')),
+          listDataChain: applyTargetChain(field(nodeBody(entries[2]), 'response')),
+          detailDataChain: applyTargetChain(field(nodeBody(entries[3]), 'response')),
         },
       expected: {
         listDataChain: ['get', 'neat', 'kubernetes'],
@@ -156,7 +156,7 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
         },
       expected: {
         kind: ['node', 'table', 'a'],
-        fieldNames: ['data', 'linkSpecs', 'table'],
+        fieldNames: ['response', 'data', 'linkSpecs', 'table'],
         dataHide: 0,
         columnLabels: ['Name'],
       },
@@ -194,9 +194,9 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
           allNsLinkValue: manifestLiteral(field(nodeBody(allNs), 'linkSpecs'))[0].value,
           oneNsLinkValue: manifestLiteral(field(nodeBody(oneNs), 'linkSpecs'))[0].value,
           detailKind: nodeKind(detail),
-          allNsDataChain: applyTargetChain(field(nodeBody(allNs), 'data')),
-          oneNsDataChain: applyTargetChain(field(nodeBody(oneNs), 'data')),
-          detailDataChain: applyTargetChain(field(nodeBody(detail), 'data')),
+          allNsDataChain: applyTargetChain(field(nodeBody(allNs), 'response')),
+          oneNsDataChain: applyTargetChain(field(nodeBody(oneNs), 'response')),
+          detailDataChain: applyTargetChain(field(nodeBody(detail), 'response')),
         },
       expected: {
         paths: [
@@ -537,7 +537,7 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
           linkSpecs: manifestLiteral(field(body, 'linkSpecs')),
         },
       expected: {
-        fieldNames: ['data', 'linkSpecs'],
+        fieldNames: ['response', 'data', 'linkSpecs'],
         linkSpecs: [
           {
             at: ['metadata', 'ownerReferences'],
@@ -596,7 +596,7 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
         },
       expected: {
         listLinkSpecCount: 1,
-        detailFieldNames: ['data'],
+        detailFieldNames: ['response', 'data'],
       },
     },
     {
@@ -712,7 +712,7 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
         },
       expected: {
         extraCount: 2,
-        noneFieldNames: ['data'],
+        noneFieldNames: ['response', 'data'],
       },
     },
   ],

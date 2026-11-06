@@ -5,11 +5,16 @@ import (
 	"fmt"
 )
 
+type Evaluation struct {
+	Output string
+	Err    error
+}
+
 type Evaluator interface {
 	Warm(rootPath string) error
 	Evaluate(snippet string) (string, error)
 	EvaluateOnceRaw(snippet string) (string, error)
-	Watch(key string, snippet string) (string, <-chan string, func(), error)
+	Watch(key string, snippet string) (Evaluation, <-chan Evaluation, func(), error)
 	WatchFile(key string, snippet string, path string) (func(), error)
 	Close() error
 }
@@ -36,10 +41,10 @@ func (e *environment) Evaluate(ctx context.Context, expression string) (string, 
 	return e.evaluator.Evaluate(queryExpression(expression))
 }
 
-func (e *environment) Watch(ctx context.Context, key string, expression string) (string, <-chan string, func(), error) {
+func (e *environment) Watch(ctx context.Context, key string, expression string) (Evaluation, <-chan Evaluation, func(), error) {
 	err := e.root.Warm(ctx)
 	if err != nil {
-		return "", nil, nil, err
+		return Evaluation{}, nil, nil, err
 	}
 	return e.evaluator.Watch(key, queryExpression(expression))
 }

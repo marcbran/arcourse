@@ -1,5 +1,5 @@
 local style = |||
-  @scope (.status-card) {
+  @scope (.failure-card) {
     :scope.card {
       display: inline-flex;
       flex-direction: column;
@@ -8,12 +8,12 @@ local style = |||
       border-color: var(--error-color);
       font-family: monospace;
     }
-    .status-title {
+    .failure-title {
       margin: 0;
       color: var(--error-color);
       font-weight: bold;
     }
-    .status-message {
+    .failure-message {
       margin: 0;
       white-space: pre-wrap;
       overflow-wrap: anywhere;
@@ -23,21 +23,21 @@ local style = |||
 
 {
   local c = self,
-  status:: error 'Status requires status',
-  local code = std.get(c.status, 'code', null),
-  local reason = std.get(c.status, 'reason', null),
-  local message = std.get(c.status, 'message', null),
+  failure:: error 'Failure requires failure',
+  local code = std.get(c.failure, 'code', null),
+  local reason = std.get(c.failure, 'reason', null),
+  local message = std.get(c.failure, 'message', null),
   local title = std.join(' ', [std.toString(part) for part in [code, reason] if part != null && part != '']),
   html: [
     { element: 'style', children: [style] },
     {
       element: 'div',
-      attributes: { class: 'card status-card', role: 'alert' },
+      attributes: { class: 'card failure-card', role: 'alert' },
       children: [
-        { element: 'p', attributes: { class: 'status-title' }, children: [if title == '' then 'Failure' else title] },
+        { element: 'p', attributes: { class: 'failure-title' }, children: [if title == '' then 'Failure' else title] },
       ] + (
         if message == null || message == '' then []
-        else [{ element: 'p', attributes: { class: 'status-message' }, children: [std.toString(message)] }]
+        else [{ element: 'p', attributes: { class: 'failure-message' }, children: [std.toString(message)] }]
       ),
     },
   ],

@@ -96,6 +96,27 @@ func (s *Stage) the_raw_output_is(expected string) *Stage {
 	return s
 }
 
+func (s *Stage) the_output_is_a_failure(code float64, reason string, messageContains string) *Stage {
+	var doc struct {
+		Failure struct {
+			Code    float64 `json:"code"`
+			Reason  string  `json:"reason"`
+			Message string  `json:"message"`
+		} `json:"_failure"`
+	}
+	err := json.Unmarshal([]byte(s.LastOutput), &doc)
+	require.NoError(s.t, err)
+	assert.Equal(s.t, code, doc.Failure.Code)
+	assert.Equal(s.t, reason, doc.Failure.Reason)
+	assert.Contains(s.t, doc.Failure.Message, messageContains)
+	return s
+}
+
+func (s *Stage) the_raw_output_contains(expected string) *Stage {
+	assert.Contains(s.t, s.LastOutput, expected)
+	return s
+}
+
 func (s *Stage) the_error_contains(expected string) *Stage {
 	assert.Contains(s.t, s.LastError, expected)
 	return s

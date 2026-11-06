@@ -1,3 +1,4 @@
+local failure = import '../arcourse-graph/failure.libsonnet';
 local linkspecs = import '../arcourse-graph/linkspecs.libsonnet';
 local c = import 'components/main.libsonnet';
 local html = import 'html/main.libsonnet';
@@ -253,12 +254,9 @@ local actionView = baseView {
   },
 };
 
-local isFailure(data) =
-  std.isObject(data) && std.get(data, 'kind') == 'Status' && std.get(data, 'status') == 'Failure';
-
-local failureView = {
+local failureView = failure.withFailure {
   _view+:: {
-    fragment: if isFailure(std.get($, 'data')) then c.status { status:: $.data } else super.fragment,
+    fragment: if $._failure != null then c.failure { failure:: $._failure } else super.fragment,
   },
 };
 
@@ -275,4 +273,5 @@ local withNode = {
   yaml: { view: yamlView } + withNode,
   resource: { view: resourceView } + withNode,
   action: { view: actionView } + withNode,
+  failure: { view: failureView },
 }

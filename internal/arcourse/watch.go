@@ -2,7 +2,6 @@ package arcourse
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/marcbran/arcourse/internal/course"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
@@ -10,11 +9,11 @@ import (
 
 type watch struct {
 	environment *environment
-	course      *course.Facade
+	report      *report
 }
 
-func newWatch(environment *environment, courseFacade *course.Facade) *watch {
-	return &watch{environment: environment, course: courseFacade}
+func newWatch(environment *environment, report *report) *watch {
+	return &watch{environment: environment, report: report}
 }
 
 func (uc *watch) Exec(ctx context.Context, path pkg.QueryPath, params map[string]any, format pkg.Format, origin pkg.Origin) (<-chan pkg.Result, func(), error) {
@@ -23,29 +22,29 @@ func (uc *watch) Exec(ctx context.Context, path pkg.QueryPath, params map[string
 		return nil, nil, err
 	}
 
-	formats := mergeFormats(format, recordedFormats)
-
-	queryPath, segments, paramsJSON, key, err := queryParts(path, params, formats)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	expression, err := buildExpression(segments, paramsJSON, formats)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	initial, updates, unregister, err := uc.environment.Watch(ctx, key, expression)
+	req, err := newRequest(path, params, format, origin)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	var ref course.VisitRef
 
-	result, ok := uc.decodeAndRecord(ctx, &ref, initial, formats, format, queryPath, origin)
-	if !ok {
+	initial, updates, unregister, err := uc.environment.Watch(ctx, req.key, req.expression)
+	if err != nil {
+		result, err := uc.report.Exec(ctx, &ref, req, Evaluation{Err: err})
+		if err != nil {
+			return nil, nil, err
+		}
+		results := make(chan pkg.Result, 1)
+		results <- result
+		close(results)
+		return results, func() {}, nil
+	}
+
+	result, err := uc.report.Exec(ctx, &ref, req, initial)
+	if err != nil {
 		unregister()
-		return nil, nil, fmt.Errorf("node has no %s view", format)
+		return nil, nil, err
 	}
 
 	results := make(chan pkg.Result, 1)
@@ -59,8 +58,8 @@ func (uc *watch) Exec(ctx context.Context, path pkg.QueryPath, params map[string
 				if !ok {
 					return
 				}
-				result, ok := uc.decodeAndRecord(ctx, &ref, out, formats, format, queryPath, origin)
-				if !ok {
+				result, err := uc.report.Exec(ctx, &ref, req, out)
+				if err != nil {
 					continue
 				}
 				select {
@@ -75,21 +74,4 @@ func (uc *watch) Exec(ctx context.Context, path pkg.QueryPath, params map[string
 	}()
 
 	return results, unregister, nil
-}
-
-func (uc *watch) decodeAndRecord(ctx context.Context, ref *course.VisitRef, out string, formats []pkg.Format, format pkg.Format, queryPath pkg.QueryPath, origin pkg.Origin) (pkg.Result, bool) {
-	decoded, evaluationID, err := decodeOutput(out, formats, format)
-	if err != nil {
-		return pkg.Result{}, false
-	}
-	value, ok := decoded[format]
-	if !ok {
-		return pkg.Result{}, false
-	}
-	result := pkg.Result{Output: value}
-	if recordable(decoded) {
-		*ref = uc.course.Record(ctx, *ref, course.EvaluationID(evaluationID), course.Address(queryPath), recordableContents(decoded), courseOrigin(origin))
-		result.EvaluationID = pkg.EvaluationID(ref.EvaluationID)
-	}
-	return result, true
 }

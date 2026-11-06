@@ -152,43 +152,52 @@ local resolveHtml(v) =
       expected: { rowTexts: ['Alpha', 'Beta'] },
     },
     {
-      name: 'a.table.view renders a failed call Status instead of an empty table',
+      name: 'a.table.view renders a failed response as a failure card without evaluating the derived data',
       input:: function()
         local node = a.table.view {
-          data: { apiVersion: 'v1', kind: 'Status', status: 'Failure', code: 500, reason: 'ServerException', message: 'no Docker daemon is reachable' },
+          response:: { _failure: { code: 500, reason: 'ServerException', message: 'no Docker daemon is reachable' } },
+          data:: self.response.body,
           table: { at: ['items'], columns: [{ label: 'Name', path: ['name'] }] },
         };
         local card = node._view.fragment.html[1];
         {
-          items: node.items,
+          failure: node._failure.code,
           class: card.attributes.class,
           text: [p.children[0] for p in card.children],
         },
       expected: {
-        items: [],
-        class: 'card status-card',
+        failure: 500,
+        class: 'card failure-card',
         text: ['500 ServerException', 'no Docker daemon is reachable'],
       },
     },
     {
-      name: 'a.resource.node renders a failed call Status in place of the whole fragment',
+      name: 'a.resource.node renders a failed response in place of the whole fragment',
       input:: function()
         local node = a.resource.node {
-          data: { kind: 'Status', status: 'Failure', code: 404, reason: 'NoSuchBucketPolicy', message: 'The bucket policy does not exist' },
+          response:: { _failure: { code: 404, reason: 'NoSuchBucketPolicy', message: 'The bucket policy does not exist' } },
+          data: self.response.body,
           child: { _node: true, _queryPath: '/root/x/child' },
         };
         node._view.fragment.html[1].attributes.class,
-      expected: 'card status-card',
+      expected: 'card failure-card',
     },
     {
-      name: 'a.list.node renders a failed call Status in place of its links',
+      name: 'a.list.node renders a failed response in place of links derived from its data',
       input:: function()
         local node = a.list.node {
-          data: { kind: 'Status', status: 'Failure', code: 403, reason: 'Forbidden', message: 'access denied' },
-          child: { _node: true, _queryPath: '/root/x/child' },
+          response:: { _failure: { code: 403, reason: 'Forbidden', message: 'access denied' } },
+          data: self.response,
+          links: { [name]: { _node: true, _queryPath: '/root/x/' + name } for name in self.data },
         };
         node._view.fragment.html[1].attributes.class,
-      expected: 'card status-card',
+      expected: 'card failure-card',
+    },
+    {
+      name: 'a successful response leaves _failure null',
+      input:: function()
+        (a.resource.node { response:: { name: 'ok' }, data: self.response })._failure,
+      expected: null,
     },
     {
       name: 'a.table.node projects data items into a flat items list keyed by lowerCamelCase label or explicit key, computing value columns and dropping missing fields',

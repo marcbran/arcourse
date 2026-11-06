@@ -7,6 +7,7 @@ function(browse)
     expr:: error 'Labels requires expr',
     link:: error 'Labels requires link',
     group:: browse.defaultGroup(n),
-    data: browse.labelNames(browse.result(n.datasource, n.expr, std.get(n, 'from', 'now-5m'), std.get(n, 'to', 'now'))),
+    response:: browse.result(n.datasource, n.expr, std.get(n, 'from', 'now-5m'), std.get(n, 'to', 'now')),
+    data: browse.labelNames(n.response),
     links: { [n.group]: { [name]: n.link(name) for name in n.data } },
   }

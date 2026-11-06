@@ -92,3 +92,36 @@ func TestWatchOnlyDeliversToMatchingPath(t *testing.T) {
 	then.
 		the_raw_output_is("")
 }
+
+func TestWatchDeliversAFailingFirstEvaluationAsAnEvent(t *testing.T) {
+	skipIfLocalCLI(t)
+	given, when, then := scenario(t)
+
+	given.
+		a_graph_root(`{ _node: "resource", _view:: { html: error "view is broken" } }`)
+
+	when.
+		a_watcher_subscribes_to("root", pkg.FormatJSON).and().
+		the_watch_event_is_received()
+
+	then.
+		the_error_contains("view is broken").and().
+		the_output_is_a_failure(500, "Internal Server Error", "view is broken")
+}
+
+func TestWatchRecoversWhenAFailingNodeIsFixed(t *testing.T) {
+	skipIfLocalCLI(t)
+	given, when, then := scenario(t)
+
+	given.
+		a_graph_root(`{ _node: "resource", _view:: { html: error "view is broken" } }`)
+
+	when.
+		a_watcher_subscribes_to("root", pkg.FormatHTML).and().
+		the_watch_event_is_received_and_watcher_stays_subscribed().and().
+		a_graph_root(`{ _node: "resource", _view:: { html: "<p>fixed</p>" } }`).and().
+		the_watch_event_is_received()
+
+	then.
+		the_raw_output_is("<p>fixed</p>")
+}

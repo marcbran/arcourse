@@ -32,12 +32,15 @@ lint:
 vuln:
     {{tool}} govulncheck ./...
 
-check-graph-sync:
+check-lib-sync:
     for f in internal/arcourse/lib/arcourse-graph/*.libsonnet; do \
         diff -q "$f" "pkg/arcourse-graph/$(basename "$f")" || exit 1; \
     done
+    for f in internal/arcourse/lib/arcourse-ui/*; do \
+        diff -q "$f" "pkg/arcourse-ui/components/$(basename "$f")" || exit 1; \
+    done
 
-check: check-graph-sync
+check: check-lib-sync
 
 build-go:
     go build -o arco .

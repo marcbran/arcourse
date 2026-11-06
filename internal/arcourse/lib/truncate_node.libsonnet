@@ -15,10 +15,19 @@ local refFor(node, mode) =
   (if std.objectHasAll(node, '_paramSpecs') then { _paramSpecs: node._paramSpecs } else {}) +
   (if std.objectHas(node, '_summary') then { _summary: withDefaultParams(node)._summary } else {});
 
+local failed(node) =
+  std.objectHasAll(node, '_failure') && node._failure != null;
+
 local truncateNodeRec(value, isRoot, mode) =
   if std.isObject(value) then
     if !isRoot && std.objectHas(value, '_node') then
       refFor(value, mode)
+    else if isRoot && failed(value) then
+      {
+        [k]: truncateNodeRec(value[k], false, mode)
+        for k in std.objectFields(value)
+        if std.startsWith(k, '_') && !std.isFunction(value[k])
+      } + { _failure: value._failure }
     else
       {
         [k]: truncateNodeRec(value[k], false, mode)

@@ -57,7 +57,7 @@ func (c *Client) Watch(ctx context.Context, path pkg.QueryPath, params map[strin
 		if err != nil {
 			return nil, nil, fmt.Errorf("http %d", resp.StatusCode)
 		}
-		return nil, nil, fmt.Errorf("%s", errorResp.Message)
+		return nil, nil, errorResp.Err()
 	}
 
 	ch := make(chan pkg.Result)
@@ -80,8 +80,9 @@ func (c *Client) Watch(ctx context.Context, path pkg.QueryPath, params map[strin
 			if err != nil {
 				continue
 			}
+			result := pkg.Result{Output: out.Output, EvaluationID: pkg.EvaluationID(out.EvaluationID), Failure: out.Failure}
 			select {
-			case ch <- pkg.Result{Output: out.Output, EvaluationID: pkg.EvaluationID(out.EvaluationID)}:
+			case ch <- result:
 			case <-streamCtx.Done():
 				return
 			}

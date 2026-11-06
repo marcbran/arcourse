@@ -23,8 +23,9 @@ type queryRequest struct {
 }
 
 type outputResponse struct {
-	Output       string `json:"output"`
-	EvaluationID string `json:"evaluationId,omitempty"`
+	Output       string       `json:"output"`
+	EvaluationID string       `json:"evaluationId,omitempty"`
+	Failure      *pkg.Failure `json:"failure,omitempty"`
 }
 
 type remarkRequest struct {
@@ -92,7 +93,7 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 		returnError(w, err)
 		return
 	}
-	returnSuccess(w, outputResponse{Output: result.Output, EvaluationID: string(result.EvaluationID)})
+	returnResult(w, result)
 }
 
 func (s *Server) handleExec(w http.ResponseWriter, r *http.Request) {

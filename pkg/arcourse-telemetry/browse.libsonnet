@@ -1,6 +1,9 @@
+local failure = import '../arcourse-graph/failure.libsonnet';
+
 function(query)
   local result(datasource, expr, from='now-5m', to='now') =
-    query(datasource, [{ type: 'promql', expr: expr, instant: true }], from, to).results[0];
+    local response = query(datasource, [{ type: 'promql', expr: expr, instant: true }], from, to);
+    if failure.isFailure(response) then response else response.results[0];
 
   local labelValues(result, label) = [
     v

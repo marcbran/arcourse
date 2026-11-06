@@ -34,6 +34,9 @@ func (s *Stage) a_path_is_queried_with_params_and_format(path string, params map
 
 	s.LastOutput = result.Output
 	s.LastError = ""
+	if result.Failure != nil {
+		s.LastError = result.Failure.Message
+	}
 	return s
 }
 

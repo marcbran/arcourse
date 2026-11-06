@@ -447,3 +447,75 @@ local root = import 'root';
 		})
 	}
 }
+
+func TestQueryUnknownPathIsANotFoundFailure(t *testing.T) {
+	given, when, then := scenario(t)
+
+	given.
+		a_graph_root(`{ _node: "resource", child: { _node: "resource" } }`)
+
+	when.
+		a_path_is_queried("root/missing")
+
+	then.
+		the_error_contains("no node at root/missing").and().
+		the_output_is_a_failure(404, "Not Found", "no node at root/missing")
+}
+
+func TestQueryOfAFailedNodeShowsOnlyItsFailure(t *testing.T) {
+	given, when, then := scenario(t)
+
+	given.
+		a_graph_root(`{ _node: "resource", _failure:: { code: 403, reason: "Forbidden", message: "forbidden" }, items: error "items must not be evaluated" }`)
+
+	when.
+		a_path_is_queried("root")
+
+	then.
+		the_output_is(`{"_node": "resource", "_failure": {"code": 403, "reason": "Forbidden", "message": "forbidden"}}`)
+}
+
+func TestQueryFailurePageShowsTheFailureCode(t *testing.T) {
+	cases := []struct {
+		name   string
+		root   string
+		path   string
+		params map[string]any
+		title  string
+	}{
+		{
+			name:  "unknown path",
+			root:  `{ _node: "resource", child: { _node: "resource" } }`,
+			path:  "root/missing",
+			title: "404 Not Found",
+		},
+		{
+			name:   "invalid params",
+			root:   `{ _node: "resource", _view:: { html: "<p>ok</p>" } }`,
+			path:   "root",
+			params: map[string]any{"unknown": "value"},
+			title:  "400 Bad Request",
+		},
+		{
+			name:  "failing evaluation",
+			root:  `{ _node: "resource", _view:: { html: error "view is broken" } }`,
+			path:  "root",
+			title: "500 Internal Server Error",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			given, when, then := scenario(t)
+
+			given.
+				a_graph_root(tc.root)
+
+			when.
+				a_path_is_queried_with_params_and_format(tc.path, tc.params, pkg.FormatHTML)
+
+			then.
+				the_raw_output_contains(`class="card failure-card"`).and().
+				the_raw_output_contains(tc.title)
+		})
+	}
+}
