@@ -106,19 +106,24 @@ local applyTargetChain(apply) = [apply.target.id, apply.target.target.id, apply.
       },
     },
     {
-      name: 'a cluster-scoped resource with list and get verbs generates a list node (a.list.node, no columns) and a resource detail node',
+      name: 'a cluster-scoped resource with list and get verbs generates a list node (a.list.node, no columns) with hidden data and a resource detail node with visible data',
       input:: function()
         local resource = { name: 'widgets', kind: 'Widget', namespaced: false, verbs: ['list', 'get'], version: 'v1' };
         local entries = nodes([{ group: '', resources: [resource] }]);
+        local dataHide(entry) = [f for f in nodeBody(entry).fields if f.id == 'data'][0].Hide;
         {
           paths: [nodePath(e) for e in entries[2:]],
           listKind: nodeKind(entries[2]),
           detailKind: nodeKind(entries[3]),
+          listDataHide: dataHide(entries[2]),
+          detailDataHide: dataHide(entries[3]),
         },
       expected: {
         paths: [['kubernetes', '$context', 'widgets'], ['kubernetes', '$context', '$widget']],
         listKind: ['node', 'list', 'a'],
         detailKind: ['node', 'resource', 'a'],
+        listDataHide: 0,
+        detailDataHide: 1,
       },
     },
     {
