@@ -293,7 +293,7 @@ local generate(resources, group, links=[], globalLinkSpecs=[], namespaceListFiel
     2
   );
   local listObject(dataExpr, linkSpecs, columnsExpr=null) = prettyObject(
-    responseFields(dataExpr, columnsExpr != null) + [j.Field('linkSpecs', prettyArray([linkSpecEntry(s) for s in linkSpecs], 4)) { Hide: 0 }] +
+    responseFields(dataExpr, true) + [j.Field('linkSpecs', prettyArray([linkSpecEntry(s) for s in linkSpecs], 4)) { Hide: 0 }] +
     (if columnsExpr != null then [j.Field('table', prettyObject([
        j.Field('at', j.Array([j.String('items')])),
        j.Field('columns', columnsExpr),
@@ -405,7 +405,7 @@ local generateAll(groups, manifest, globalLinkSpecs, settings, namespaces) =
       member(member(var('a'), 'list'), 'node'),
       prettyObject([
         j.Field('response', call(member(var('kubernetes'), 'contexts'))) { Hide: 0 },
-        j.Field('data', member(j.Self, 'response')),
+        j.Field('data', member(j.Self, 'response')) { Hide: 0 },
         j.Field('links', prettyObjectComp(
           [j.Field(member(var('c'), 'name'), call(member(member(var('root'), 'kubernetes'), 'context'), [member(var('c'), 'name')]))],
           [j.ForSpec('c', member(j.Dollar, 'data'))],
