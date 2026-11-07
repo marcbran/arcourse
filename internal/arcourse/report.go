@@ -30,7 +30,7 @@ func (uc *report) Exec(ctx context.Context, ref *course.VisitRef, req request, o
 		if err != nil {
 			return pkg.Result{Failure: failure}, nil
 		}
-		page, err := uc.evaluator.EvaluateOnceRaw(snippet)
+		page, err := uc.evaluator.EvaluateOnceRaw(ctx, snippet)
 		if err != nil {
 			return pkg.Result{Failure: failure}, nil
 		}

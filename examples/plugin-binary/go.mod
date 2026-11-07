@@ -5,7 +5,7 @@ go 1.26.2
 require (
 	github.com/google/go-jsonnet v0.22.0
 	github.com/marcbran/arcourse v0.0.0
-	github.com/marcbran/jpoet v0.28.0
+	github.com/marcbran/jpoet v0.29.0
 )
 
 require (
@@ -27,6 +27,7 @@ require (
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/net v0.62.0 // indirect
+	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260817212433-ac3dfec99bb1 // indirect

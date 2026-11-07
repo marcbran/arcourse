@@ -1,6 +1,7 @@
 package jsonnet
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -28,7 +29,7 @@ func TestEvaluatorConcurrentWarmAndEvaluate(t *testing.T) {
 					continue
 				}
 				snippet := fmt.Sprintf(`local root = { value: 1 }; root.value + %d`, g)
-				out, err := e.Evaluate(snippet)
+				out, err := e.Evaluate(context.Background(), snippet)
 				if err != nil {
 					errs <- err
 					continue
