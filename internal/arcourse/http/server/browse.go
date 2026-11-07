@@ -67,7 +67,7 @@ func (s *Server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 	})
 	watchURL := browseWatchURL(token)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(resultStatus(result))
 	_, err = fmt.Fprintf(w, browseTemplate, result.Output, browseRemark(result.EvaluationID), watchURL)
 	if err != nil {
 		slog.Warn("write browse response", "err", err)

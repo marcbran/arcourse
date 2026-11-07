@@ -415,7 +415,7 @@ local arcourseOpenapi = import './main.libsonnet';
         ],
         nodeElements: 2,
         bodyKind: 'Binary',
-        bodyFields: 1,
+        bodyFields: 2,
       },
     },
     {
@@ -447,7 +447,7 @@ local arcourseOpenapi = import './main.libsonnet';
         }._view.jsonnet;
         local specs = generated.body.body.elements;
         local path(spec) = [part.expr.value for part in spec.expr.elements[0].expr.elements];
-        local requestApply(spec) = [f for f in spec.expr.elements[1].expr.right.fields if f.id == 'data'][0].expr2.target;
+        local requestApply(spec) = [f for f in spec.expr.elements[1].expr.right.fields if f.id == 'response'][0].expr2;
         local inputObjectExpr(spec) =
           requestApply(spec).arguments.positional[0].expr;
         local fieldNames(spec) = [f.id for f in inputObjectExpr(spec).fields];
@@ -496,7 +496,7 @@ local arcourseOpenapi = import './main.libsonnet';
           },
         }._view.jsonnet;
         local specs = generated.body.body.elements;
-        local requestApply(spec) = [f for f in spec.expr.elements[1].expr.right.fields if f.id == 'data'][0].expr2.target;
+        local requestApply(spec) = [f for f in spec.expr.elements[1].expr.right.fields if f.id == 'response'][0].expr2;
         local inputObjectExpr(spec) =
           requestApply(spec).arguments.positional[0].expr;
         local fieldNames(spec) = [f.id for f in inputObjectExpr(spec).fields];
@@ -623,7 +623,7 @@ local arcourseOpenapi = import './main.libsonnet';
       expected: {
         localVars: ['a', 'request'],
         nodeElementCount: 2,
-        bodyFieldNames: ['data', 'linkSpecs'],
+        bodyFieldNames: ['response', 'data', 'linkSpecs'],
         dataHide: 1,
         specsHide: 0,
         specsCount: 1,
@@ -689,8 +689,8 @@ local arcourseOpenapi = import './main.libsonnet';
       expected: {
         accountsElementCount: 2,
         teamsElementCount: 2,
-        accountsBodyFieldNames: ['data', 'linkSpecs'],
-        teamsBodyFieldNames: ['data'],
+        accountsBodyFieldNames: ['response', 'data', 'linkSpecs'],
+        teamsBodyFieldNames: ['response', 'data'],
       },
     },
     {
@@ -906,7 +906,7 @@ local arcourseOpenapi = import './main.libsonnet';
         },
       expected: {
         nodeElementCount: 2,
-        bodyFieldNames: ['data', 'linkSpecs'],
+        bodyFieldNames: ['response', 'data', 'linkSpecs'],
         dataHide: 1,
       },
     },
@@ -1117,7 +1117,7 @@ local arcourseOpenapi = import './main.libsonnet';
         local specNode = unwrap(generated).elements[0].expr;
         local body = specNode.elements[1].expr.right;
         local specsField = [f for f in body.fields if f.id == '_paramSpecs'][0];
-        local request = [f for f in body.fields if f.id == 'data'][0].expr2.target;
+        local request = [f for f in body.fields if f.id == 'response'][0].expr2;
         local inputObject = request.arguments.positional[0].expr;
         local headersObject = [f for f in inputObject.fields if f.id == 'headers'][0].expr2;
         local traceExpr = headersObject.fields[0].expr2;
@@ -1152,7 +1152,7 @@ local arcourseOpenapi = import './main.libsonnet';
         local specs = generated.body.body.elements;
         local bodyFieldNames(spec) = [f.id for f in spec.expr.elements[1].expr.right.fields];
         { bodyFieldNames: bodyFieldNames(specs[0]) },
-      expected: { bodyFieldNames: ['data'] },
+      expected: { bodyFieldNames: ['response', 'data'] },
     },
     {
       name: 'pagination source is parsed once and spliced into a.table.node, not applied per-operation',

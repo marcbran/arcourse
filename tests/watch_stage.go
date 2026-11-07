@@ -36,6 +36,9 @@ func (s *Stage) the_watch_event_is_received() *Stage {
 	case result := <-s.watchCh:
 		s.LastOutput = result.Output
 		s.LastError = ""
+		if result.Failure != nil {
+			s.LastError = result.Failure.Message
+		}
 	case <-time.After(2 * time.Second):
 		s.LastOutput = ""
 		s.LastError = "timed out waiting for a watch event"
@@ -48,6 +51,9 @@ func (s *Stage) the_watch_event_is_received_and_watcher_stays_subscribed() *Stag
 	case result := <-s.watchCh:
 		s.LastOutput = result.Output
 		s.LastError = ""
+		if result.Failure != nil {
+			s.LastError = result.Failure.Message
+		}
 	case <-time.After(2 * time.Second):
 		s.LastOutput = ""
 		s.LastError = "timed out waiting for a watch event"

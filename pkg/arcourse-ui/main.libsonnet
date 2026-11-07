@@ -1,3 +1,4 @@
+local failure = import '../arcourse-graph/failure.libsonnet';
 local linkspecs = import '../arcourse-graph/linkspecs.libsonnet';
 local c = import 'components/main.libsonnet';
 local html = import 'html/main.libsonnet';
@@ -253,7 +254,16 @@ local actionView = baseView {
   },
 };
 
-local withNode = { node: self.view + linkspecs.withLinkSpecs };
+local failureView = failure.withFailure {
+  _view+:: {
+    fragment: if $._failure != null then c.failure { failure:: $._failure } else super.fragment,
+  },
+};
+
+local withNode = {
+  view+: failureView,
+  node: self.view + linkspecs.withLinkSpecs,
+};
 
 {
   default: { view: listView } + withNode,
@@ -263,4 +273,5 @@ local withNode = { node: self.view + linkspecs.withLinkSpecs };
   yaml: { view: yamlView } + withNode,
   resource: { view: resourceView } + withNode,
   action: { view: actionView } + withNode,
+  failure: { view: failureView },
 }

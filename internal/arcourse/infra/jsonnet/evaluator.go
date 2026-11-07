@@ -12,9 +12,11 @@ import (
 	"sync"
 
 	"github.com/google/go-jsonnet"
+	"github.com/marcbran/arcourse/internal/arcourse"
 	pkg "github.com/marcbran/arcourse/pkg/arcourse"
 	"github.com/marcbran/jpoet/pkg/jpoet"
 	"github.com/marcbran/jpoet/pkg/watch"
+	htmlplugin "github.com/marcbran/jsonnet-plugin-html/html"
 	urlplugin "github.com/marcbran/jsonnet-plugin-url/url"
 )
 
@@ -28,10 +30,24 @@ type Evaluator struct {
 }
 
 func NewEvaluator(lib fs.FS, jpaths []string, plugins []*jpoet.Plugin) *Evaluator {
-	all := make([]*jpoet.Plugin, 0, len(plugins)+2)
-	all = append(all, urlplugin.Plugin(), newPlugin())
+	all := make([]*jpoet.Plugin, 0, len(plugins)+3)
+	all = append(all, newPlugin())
+	for _, p := range []*jpoet.Plugin{urlplugin.Plugin(), htmlplugin.Plugin()} {
+		if !hasPlugin(plugins, p.Name()) {
+			all = append(all, p)
+		}
+	}
 	all = append(all, plugins...)
 	return &Evaluator{lib: lib, jpaths: jpaths, plugins: all}
+}
+
+func hasPlugin(plugins []*jpoet.Plugin, name string) bool {
+	for _, p := range plugins {
+		if p.Name() == name {
+			return true
+		}
+	}
+	return false
 }
 
 func (e *Evaluator) Warm(rootPath string) error {
@@ -59,7 +75,7 @@ func (e *Evaluator) Evaluate(snippet string) (string, error) {
 		jpoet.EvalWriterOutput(&out),
 	)
 	if err != nil {
-		return "", err
+		return "", evaluationFailed(err)
 	}
 	return out.String(), nil
 }
@@ -77,7 +93,7 @@ func (e *Evaluator) EvaluateOnceRaw(snippet string) (string, error) {
 		jpoet.EvalSerialize(false),
 	)
 	if err != nil {
-		return "", err
+		return "", evaluationFailed(err)
 	}
 	return out.String(), nil
 }
@@ -89,9 +105,9 @@ func (e *Evaluator) Exec(ctx context.Context, plugin string, action string, data
 	return e.env.Exec(ctx, plugin, action, data)
 }
 
-func (e *Evaluator) Watch(key string, snippet string) (string, <-chan string, func(), error) {
+func (e *Evaluator) Watch(key string, snippet string) (arcourse.Evaluation, <-chan arcourse.Evaluation, func(), error) {
 	if e.env == nil {
-		return "", nil, nil, fmt.Errorf("evaluator not warmed")
+		return arcourse.Evaluation{}, nil, nil, fmt.Errorf("evaluator not warmed")
 	}
 	var initial watch.Result
 	var updates <-chan watch.Result
@@ -101,54 +117,33 @@ func (e *Evaluator) Watch(key string, snippet string) (string, <-chan string, fu
 		watch.WatchWithIdentity(contentIdentity),
 		watch.WatchValueOutput(&initial, &updates),
 	)
-	if err != nil {
-		return "", nil, nil, err
+	if err != nil && unregister == nil {
+		return arcourse.Evaluation{}, nil, nil, err
 	}
-	if initial.Err != nil {
-		return "", nil, nil, initial.Err
-	}
-	ch := make(chan string, 1)
+	ch := make(chan arcourse.Evaluation, 1)
 	go func() {
 		defer close(ch)
 		for r := range updates {
-			if r.Err != nil {
-				continue
-			}
-			ch <- r.Output
+			ch <- arcourse.Evaluation{Output: r.Output, Err: evaluationFailed(r.Err)}
 		}
 	}()
-	return initial.Output, ch, unregister, nil
+	return arcourse.Evaluation{Output: initial.Output, Err: evaluationFailed(initial.Err)}, ch, unregister, nil
 }
 
 func (e *Evaluator) WatchFile(key string, snippet string, path string) (func(), error) {
 	if e.env == nil {
 		return nil, fmt.Errorf("evaluator not warmed")
 	}
-	return e.env.Watch(
+	unregister, err := e.env.Watch(
 		watch.WatchSnippetInput("arcourse.jsonnet", snippet),
 		watch.WatchWithKey(watch.WatchKey(key)),
 		watch.WatchFileOutput(path),
 		watch.WatchSerialize(false),
 	)
-}
-
-func contentIdentity(output string) (string, bool) {
-	var raw map[string]json.RawMessage
-	err := json.Unmarshal([]byte(output), &raw)
-	if err != nil {
-		return "", false
+	if err != nil && unregister != nil {
+		return unregister, evaluationFailed(err)
 	}
-	rawID, ok := raw[pkg.EvaluationIDField]
-	if !ok {
-		return "", false
-	}
-	var id string
-	err = json.Unmarshal(rawID, &id)
-	if err != nil || id == "" {
-		return "", false
-	}
-	sum := sha256.Sum256([]byte(strings.ReplaceAll(output, id, "")))
-	return hex.EncodeToString(sum[:]), true
+	return unregister, err
 }
 
 func (e *Evaluator) buildWatchedEnv(rootPath string) (*watch.Environment, error) {
@@ -185,4 +180,46 @@ func (a *rootAliasImporter) Import(importedFrom, importedPath string) (jsonnet.C
 		return jsonnet.Contents{}, "", fmt.Errorf("import not available %q", importedPath)
 	}
 	return a.inner.Import(importedFrom, a.target)
+}
+
+func contentIdentity(output string) (string, bool) {
+	var raw map[string]json.RawMessage
+	err := json.Unmarshal([]byte(output), &raw)
+	if err != nil {
+		return "", false
+	}
+	rawID, ok := raw[pkg.EvaluationIDField]
+	if !ok {
+		return "", false
+	}
+	var id string
+	err = json.Unmarshal(rawID, &id)
+	if err != nil || id == "" {
+		return "", false
+	}
+	sum := sha256.Sum256([]byte(strings.ReplaceAll(output, id, "")))
+	return hex.EncodeToString(sum[:]), true
+}
+
+type evaluationError struct {
+	err error
+}
+
+func (e evaluationError) Error() string {
+	return e.err.Error()
+}
+
+func (e evaluationError) Unwrap() error {
+	return e.err
+}
+
+func (e evaluationError) Is(target error) bool {
+	return target == pkg.ErrEvaluation
+}
+
+func evaluationFailed(err error) error {
+	if err == nil {
+		return nil
+	}
+	return evaluationError{err: err}
 }

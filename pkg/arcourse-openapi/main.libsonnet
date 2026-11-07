@@ -244,7 +244,7 @@ local generate(service, spec, links=[], columns=[], contextParams=[], manifest=t
   local dataObject(op, expr) =
     local ls = linksFor(op);
     local specs = paramSpecsField(op);
-    local fields = [dataField(access(expr, 'body'))] +
+    local fields = [responseField(expr), dataField(access(selfResponse, 'body'))] +
       (if std.length(ls) == 0 then [] else [linkSpecsField(ls)]) +
       (if specs == null then [] else [specs]);
     prettyObject(fields, 2);

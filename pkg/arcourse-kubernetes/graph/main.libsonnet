@@ -280,18 +280,20 @@ local generate(resources, group, links=[], globalLinkSpecs=[], namespaceListFiel
     ])
     else error 'unsupported literal type: ' + std.type(value);
 
-  local dataField(expr, hidden=false) =
-    j.Field('data', expr) { Hide: if hidden then 0 else 1 };
+  local responseFields(expr, hidden=false) = [
+    j.Field('response', expr) { Hide: 0 },
+    j.Field('data', member(j.Self, 'response')) { Hide: if hidden then 0 else 1 },
+  ];
   local linkSpecEntry(spec) =
     prettyObject([objectField(field, compactLiteral(spec[field])) for field in ['at', 'keys', 'value']], 6);
   local dataObject(expr, linkSpecs=[], viewFields=[]) = prettyObject(
-    [dataField(expr)] +
+    responseFields(expr) +
     (if std.length(linkSpecs) > 0 then [j.Field('linkSpecs', prettyArray([linkSpecEntry(s) for s in linkSpecs], 4)) { Hide: 0 }] else []) +
     viewFields,
     2
   );
   local listObject(dataExpr, linkSpecs, columnsExpr=null) = prettyObject(
-    [dataField(dataExpr, columnsExpr != null), j.Field('linkSpecs', prettyArray([linkSpecEntry(s) for s in linkSpecs], 4)) { Hide: 0 }] +
+    responseFields(dataExpr, columnsExpr != null) + [j.Field('linkSpecs', prettyArray([linkSpecEntry(s) for s in linkSpecs], 4)) { Hide: 0 }] +
     (if columnsExpr != null then [j.Field('table', prettyObject([
        j.Field('at', j.Array([j.String('items')])),
        j.Field('columns', columnsExpr),
@@ -402,7 +404,8 @@ local generateAll(groups, manifest, globalLinkSpecs, settings, namespaces) =
     j.Add(
       member(member(var('a'), 'list'), 'node'),
       prettyObject([
-        j.Field('data', call(member(var('kubernetes'), 'contexts'))),
+        j.Field('response', call(member(var('kubernetes'), 'contexts'))) { Hide: 0 },
+        j.Field('data', member(j.Self, 'response')),
         j.Field('links', prettyObjectComp(
           [j.Field(member(var('c'), 'name'), call(member(member(var('root'), 'kubernetes'), 'context'), [member(var('c'), 'name')]))],
           [j.ForSpec('c', member(j.Dollar, 'data'))],

@@ -1,3 +1,4 @@
+local a = import '../../arcourse-ui/main.libsonnet';
 local ui = import '../../arcourse-ui/components/main.libsonnet';
 local html = import '../../arcourse-ui/html/main.libsonnet';
 local logs = import '../components/logs.libsonnet';
@@ -20,9 +21,10 @@ function(query, timeRange, record=null)
       default: [encodePath(if std.isString(col) then [col] else col) for col in n.columns],
     }],
     _telemetryItems:: [{ type: n.type, expr: n.expr }],
-    data: query(n.datasource, n._telemetryItems, n._params.from, n._params.to),
+    response:: query(n.datasource, n._telemetryItems, n._params.from, n._params.to),
+    data: n.response,
     local records = std.reverse(std.sort(
-      std.get(n.data.results[0], 'records', []),
+      std.get(n.response.results[0], 'records', []),
       function(rec) rec.timestamp
     )),
     links:
@@ -66,4 +68,4 @@ function(query, timeRange, record=null)
       },
       html: html.manifestHtml(self.page),
     },
-  }
+  } + a.failure.view

@@ -38,18 +38,19 @@ func (c *Client) Query(ctx context.Context, path pkg.QueryPath, params map[strin
 	defer func() {
 		_ = resp.Body.Close()
 	}()
-	if resp.StatusCode != http.StatusOK {
-		var errorResp http2.ErrorResponse
-		err = json.NewDecoder(resp.Body).Decode(&errorResp)
-		if err != nil {
-			return pkg.Result{}, fmt.Errorf("http %d", resp.StatusCode)
-		}
-		return pkg.Result{}, fmt.Errorf("%s", errorResp.Message)
+	var out struct {
+		outputResponse
+		http2.ErrorResponse
 	}
-	var out outputResponse
 	err = json.NewDecoder(resp.Body).Decode(&out)
 	if err != nil {
+		if resp.StatusCode != http.StatusOK {
+			return pkg.Result{}, fmt.Errorf("http %d", resp.StatusCode)
+		}
 		return pkg.Result{}, err
 	}
-	return pkg.Result{Output: out.Output, EvaluationID: pkg.EvaluationID(out.EvaluationID)}, nil
+	if resp.StatusCode != http.StatusOK && out.Failure == nil {
+		return pkg.Result{}, out.Err()
+	}
+	return pkg.Result{Output: out.Output, EvaluationID: pkg.EvaluationID(out.EvaluationID), Failure: out.Failure}, nil
 }

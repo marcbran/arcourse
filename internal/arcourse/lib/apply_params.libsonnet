@@ -3,60 +3,63 @@ local specByName(specs) = {
   for spec in specs
 };
 
-local coerceScalar(type, value) =
-  if type == 'string' then
-    if std.isString(value) then value
-    else error 'parameter value %s cannot be coerced to string' % std.manifestJsonEx(value, '')
-  else if type == 'number' then
-    if std.isNumber(value) then value
-    else error 'parameter value %s cannot be coerced to number' % std.manifestJsonEx(value, '')
-  else if type == 'boolean' then
-    if std.isBoolean(value) then value
-    else error 'parameter value %s cannot be coerced to boolean' % std.manifestJsonEx(value, '')
-  else
-    error 'unknown scalar type %s' % type;
+local ok(value) = { value: value };
+local problem(message) = { problem: message };
+local isProblem(result) = std.objectHas(result, 'problem');
 
-local coerceElement(type, value) =
-  if type == 'string' then
-    if std.isString(value) then value
-    else error 'array element %s cannot be coerced to string' % std.manifestJsonEx(value, '')
-  else if type == 'number' then
-    if std.isNumber(value) then value
-    else error 'array element %s cannot be coerced to number' % std.manifestJsonEx(value, '')
-  else if type == 'boolean' then
-    if std.isBoolean(value) then value
-    else error 'array element %s cannot be coerced to boolean' % std.manifestJsonEx(value, '')
-  else
-    error 'unknown array element type %s' % type;
+local manifest(value) = std.manifestJsonEx(value, '');
+
+local matches(type, value) =
+  if type == 'string' then std.isString(value)
+  else if type == 'number' then std.isNumber(value)
+  else if type == 'boolean' then std.isBoolean(value)
+  else error 'unknown parameter type %s' % type;
+
+local isNumeric(s) =
+  local chars = std.stringChars(s);
+  std.length(chars) > 0
+  && std.all([std.member('0123456789+-.eE', c) for c in chars])
+  && std.any([std.member('0123456789', c) for c in chars]);
+
+local parseScalar(type, raw) =
+  if !std.isString(raw) then raw
+  else if type == 'number' && isNumeric(raw) then std.parseJson(raw)
+  else if type == 'boolean' && (raw == 'true' || raw == 'false') then raw == 'true'
+  else raw;
 
 local coerceRawValue(spec, raw, label='parameter value') =
   if spec.type == 'string' then
-    if std.isString(raw) then raw
-    else error '%s %s cannot be coerced to string' % [label, std.manifestJsonEx(raw, '')]
+    if std.isString(raw) then ok(raw)
+    else problem('%s %s cannot be coerced to string' % [label, manifest(raw)])
   else if spec.type == 'array' then
     local value = if std.isString(raw) && label == 'parameter value' then [raw] else raw;
     if !std.isArray(value) then
-      error '%s %s cannot be coerced to array' % [label, std.manifestJsonEx(value, '')]
+      problem('%s %s cannot be coerced to array' % [label, manifest(value)])
     else
       local itemSpec = if std.isObject(spec.items) then spec.items else { type: spec.items };
-      [coerceRawValue(itemSpec, element, 'array element') for element in value]
+      local items = [coerceRawValue(itemSpec, element, 'array element') for element in value];
+      local problems = [item.problem for item in items if isProblem(item)];
+      if std.length(problems) > 0 then problem(problems[0])
+      else ok([item.value for item in items])
   else
-    local value = if std.isString(raw) then std.parseJson(raw) else raw;
-    if label == 'array element' then
-      coerceElement(spec.type, value)
-    else
-      coerceScalar(spec.type, value);
+    local value = parseScalar(spec.type, raw);
+    if matches(spec.type, value) then ok(value)
+    else problem('%s %s cannot be coerced to %s' % [label, manifest(raw), spec.type]);
 
 local resolveParam(spec, params, nodeParams) =
   local name = spec.name;
   if std.objectHas(params, name) && params[name] != '' then
     coerceRawValue(spec, params[name])
   else if std.objectHas(nodeParams, name) then
-    nodeParams[name]
+    ok(nodeParams[name])
   else if std.objectHas(spec, 'default') then
-    spec.default
+    ok(spec.default)
   else
-    error 'required parameter %s is missing' % name;
+    problem('required parameter %s is missing' % name);
+
+local badRequest(problems) = {
+  _failure: { code: 400, reason: 'Bad Request', message: std.join('; ', problems) },
+};
 
 function(node, params)
   local specs = if std.objectHasAll(node, '_paramSpecs') then node._paramSpecs else [];
@@ -64,26 +67,22 @@ function(node, params)
 
   if std.length(specs) == 0 then
     if std.length(paramKeys) > 0 then
-      error 'node does not accept parameters'
+      badRequest(['node does not accept parameters'])
     else
       node
   else
     local specsByName = specByName(specs);
     local nodeParams = std.get(node, '_params', {});
-    local validated = std.foldl(
-      function(acc, key)
-        if std.objectHas(specsByName, key) then acc
-        else error 'undeclared parameter %s' % key,
-      paramKeys,
-      {},
-    );
-    local resolvedAll = {
-      [spec.name]: resolveParam(spec, params, nodeParams)
-      for spec in specs
-    };
-    local resolved = {
-      [k]: resolvedAll[k]
-      for k in std.objectFields(resolvedAll)
-      if resolvedAll[k] != null
-    };
-    node + validated + { _params::: resolved }
+    local results = [{ name: spec.name, result: resolveParam(spec, params, nodeParams) } for spec in specs];
+    local problems =
+      ['undeclared parameter %s' % key for key in paramKeys if !std.objectHas(specsByName, key)]
+      + [entry.result.problem for entry in results if isProblem(entry.result)];
+    if std.length(problems) > 0 then
+      badRequest(problems)
+    else
+      local resolved = {
+        [entry.name]: entry.result.value
+        for entry in results
+        if entry.result.value != null
+      };
+      node + { _params::: resolved }

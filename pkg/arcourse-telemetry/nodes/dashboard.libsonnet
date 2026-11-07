@@ -8,7 +8,7 @@ function(query, timeRange)
   local resolveTree(node, data, index) =
     if node.type == 'panel' then
       local count = std.length(node.chart._telemetryItems);
-      local resolved = node.chart { data: data { results: data.results[index:index + count] } };
+      local resolved = node.chart { response:: data { results: data.results[index:index + count] } };
       { node: node { chart: { option: resolved.option, links: resolved.links } }, next: index + count }
     else
       local acc = std.foldl(
@@ -25,8 +25,9 @@ function(query, timeRange)
     datasource:: 'default',
     layout:: error 'Dashboard requires layout',
     _paramSpecs: timeRange.paramSpecs,
-    data: query(n.datasource, collectItems(n.layout), n._params.from, n._params.to),
-    tree:: resolveTree(n.layout, n.data, 0).node,
+    response:: query(n.datasource, collectItems(n.layout), n._params.from, n._params.to),
+    data: n.response,
+    tree:: resolveTree(n.layout, n.response, 0).node,
     _view+:: {
       local base = super.fragment,
       fragment: base { child:: [(timeRange.nav { from:: n._params.from, to:: n._params.to }).html, base.child] },

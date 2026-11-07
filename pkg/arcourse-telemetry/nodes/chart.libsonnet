@@ -32,8 +32,8 @@ function(query, timeRange)
   local hasPoints(series) = std.length(series.points) > 0;
 
   local queriedRange = {
-    timeMin:: std.parseInt(self.data.from),
-    timeMax:: std.parseInt(self.data.to),
+    timeMin:: std.parseInt(self.response.from),
+    timeMax:: std.parseInt(self.response.to),
   };
 
   local minList(l) = std.foldl(function(a, b) if b < a then b else a, l[1:], l[0]);
@@ -77,7 +77,8 @@ function(query, timeRange)
         { type: 'promql', expr: qr.expr, instant: std.get(qr, 'instant', false) }
         for qr in n.queries
       ],
-      data: query(n.datasource, n._telemetryItems, n._params.from, n._params.to),
+      response:: query(n.datasource, n._telemetryItems, n._params.from, n._params.to),
+      data: n.response,
       _view+:: {
         local baseFragment = super.fragment,
         fragment: baseFragment { child:: [(timeRange.nav { from:: n._params.from, to:: n._params.to }).html, baseFragment.child] },
@@ -88,7 +89,7 @@ function(query, timeRange)
       local n = self,
       links: std.foldl(
         function(acc, i) acc + linksFromResult(
-          n.data.results[i],
+          n.response.results[i],
           std.get(n.queries[i], 'link', null),
           std.get(n.queries[i], 'legendFormat', null)
         ),
@@ -98,7 +99,7 @@ function(query, timeRange)
       series:: std.flattenArrays([
         [
           { name: seriesName(s.labels, std.get(n.queries[i], 'legendFormat', null)), data: [[p[0], p[1]] for p in s.points] }
-          for s in n.data.results[i].series
+          for s in n.response.results[i].series
           if hasPoints(s)
         ]
         for i in std.range(0, std.length(n.queries) - 1)
@@ -119,7 +120,7 @@ function(query, timeRange)
             labels: s.labels,
             segments: segmentsFor(s.points, stepFor(s.points)),
           }
-          for s in n.data.results[i].series
+          for s in n.response.results[i].series
           if hasPoints(s)
         ]
         for i in std.range(0, std.length(n.queries) - 1)

@@ -9,6 +9,28 @@ local nodeWithParams(params, extra={}) = {
   output(input):: applyParams(input.node, input.params),
   tests: [
     {
+      name: 'params on a node without param specs are a bad request',
+      input:: {
+        node: { _node: true },
+        params: { page: '2' },
+      },
+      expected: { _failure: { code: 400, reason: 'Bad Request', message: 'node does not accept parameters' } },
+    },
+    {
+      name: 'undeclared, missing and uncoercible params are collected into one bad request',
+      input:: {
+        node: nodeWithParams([{ name: 'limit', type: 'number' }, { name: 'id', type: 'string' }]),
+        params: { limit: 'abc', extra: 'x' },
+      },
+      expected: {
+        _failure: {
+          code: 400,
+          reason: 'Bad Request',
+          message: 'undeclared parameter extra; parameter value "abc" cannot be coerced to number; required parameter id is missing',
+        },
+      },
+    },
+    {
       name: 'node without params passes through',
       input:: {
         node: { _node: true, value: 1 },

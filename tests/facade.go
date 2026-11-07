@@ -293,7 +293,8 @@ func waitForDial(ctx context.Context, network string, address string) error {
 }
 
 type commandOutput struct {
-	Output string `json:"output"`
+	Output  string       `json:"output"`
+	Failure *pkg.Failure `json:"failure"`
 }
 
 func (f *CLIFacade) Evaluate(ctx context.Context, expression string) (pkg.Result, error) {
@@ -336,6 +337,9 @@ func (f *CLIFacade) Query(ctx context.Context, path pkg.QueryPath, params map[st
 
 	err := cmd.Run()
 	if err != nil {
+		if stdout.String() != "" {
+			return pkg.Result{Output: strings.TrimSuffix(stdout.String(), "\n"), Failure: &pkg.Failure{Message: strings.TrimSpace(stderr.String())}}, nil
+		}
 		if stderr.String() != "" {
 			return pkg.Result{}, errors.New(stderr.String())
 		}
@@ -376,8 +380,9 @@ func (f *CLIFacade) Watch(ctx context.Context, path pkg.QueryPath, params map[st
 			if err != nil {
 				continue
 			}
+			result := pkg.Result{Output: out.Output, Failure: out.Failure}
 			select {
-			case ch <- pkg.Result{Output: out.Output}:
+			case ch <- result:
 			case <-cmdCtx.Done():
 				return
 			}

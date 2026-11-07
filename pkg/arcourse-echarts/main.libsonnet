@@ -1,4 +1,5 @@
 local c = import 'components/main.libsonnet';
+local a = import '../arcourse-ui/main.libsonnet';
 local ui = import '../arcourse-ui/components/main.libsonnet';
 local html = import 'html/main.libsonnet';
 local charts = import 'charts/main.libsonnet';
@@ -58,9 +59,9 @@ local dashboardView = baseView {
 };
 
 {
-  default: { view: chartView },
-  chart: { view: chartView },
-  dashboard: { view: dashboardView },
+  default: { view: chartView + a.failure.view },
+  chart: { view: chartView + a.failure.view },
+  dashboard: { view: dashboardView + a.failure.view },
   row(flex, children):: { type: 'row', flex: flex, children: children },
   column(flex, children):: { type: 'column', flex: flex, children: children },
   panel(flex, chart):: { type: 'panel', flex: flex, chart: chart },

@@ -63,7 +63,7 @@ func (s *Server) streamWatch(w http.ResponseWriter, r *http.Request, ch <-chan p
 			if !ok {
 				return
 			}
-			data, err := json.Marshal(outputResponse{Output: result.Output, EvaluationID: string(result.EvaluationID)})
+			data, err := json.Marshal(outputResponse{Output: result.Output, EvaluationID: string(result.EvaluationID), Failure: result.Failure})
 			if err != nil {
 				slog.Warn("marshal watch event", "err", err)
 				continue

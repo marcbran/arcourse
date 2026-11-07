@@ -8,6 +8,7 @@ function(browse)
     label:: error 'List requires label',
     link:: error 'List requires link',
     group:: browse.defaultGroup(n),
-    data: browse.labelValues(browse.result(n.datasource, n.expr, std.get(n, 'from', 'now-5m'), std.get(n, 'to', 'now')), n.label),
+    response:: browse.result(n.datasource, n.expr, std.get(n, 'from', 'now-5m'), std.get(n, 'to', 'now')),
+    data: browse.labelValues(n.response, n.label),
     links: { [n.group]: { [name]: n.link(name) for name in n.data } },
   }

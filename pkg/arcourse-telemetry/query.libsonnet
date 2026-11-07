@@ -1,3 +1,5 @@
+local failure = import '../arcourse-graph/failure.libsonnet';
+
 function(time, telemetry)
   local rfc3339 = '2006-01-02T15:04:05Z07:00';
   local resolveTime(nowMs, value) =
@@ -11,7 +13,11 @@ function(time, telemetry)
     local nowMs = time.now();
     local resolvedFrom = resolveTime(nowMs, from);
     local resolvedTo = resolveTime(nowMs, to);
-    telemetry.query([
+    local response = telemetry.query([
       item { datasource: datasource, from: resolvedFrom, to: resolvedTo }
       for item in items
-    ]) + { from: resolvedFrom, to: resolvedTo }
+    ]);
+    local failures =
+      if failure.isFailure(response) then [response]
+      else [result for result in response.results if failure.isFailure(result)];
+    if std.length(failures) > 0 then failures[0] else response { from: resolvedFrom, to: resolvedTo }

@@ -17,6 +17,7 @@ var (
 	ErrActionInvalid      = errors.New("action is invalid")
 	ErrAlreadyExecuted    = errors.New("query already executed")
 	ErrEmptyRemark        = errors.New("remark text is empty")
+	ErrEvaluation         = errors.New("evaluation failed")
 	ErrShapeNotSupported  = errors.New("compiling a root shape requires immediateGraph or compiledGraph mode (root.jsonnet must be a node-spec list, not a finished value)")
 )
 
@@ -89,6 +90,13 @@ type Origin struct {
 type Result struct {
 	Output       string
 	EvaluationID EvaluationID
+	Failure      *Failure
+}
+
+type Failure struct {
+	Code    int    `json:"code"`
+	Reason  string `json:"reason"`
+	Message string `json:"message"`
 }
 
 type ExecResult struct {

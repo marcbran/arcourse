@@ -13,6 +13,23 @@ type ErrorResponse struct {
 	Message string `json:"message"`
 }
 
+func (e ErrorResponse) Err() error {
+	return errors.New(e.Message)
+}
+
+func resultStatus(result pkg.Result) int {
+	if result.Failure != nil {
+		return result.Failure.Code
+	}
+	return http.StatusOK
+}
+
+func returnResult(w http.ResponseWriter, result pkg.Result) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(resultStatus(result))
+	returnJSON(w, outputResponse{Output: result.Output, EvaluationID: string(result.EvaluationID), Failure: result.Failure})
+}
+
 func returnSuccess(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

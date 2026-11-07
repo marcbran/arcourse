@@ -5,6 +5,7 @@
   yaml: import 'yaml.libsonnet',
   page: import 'page.libsonnet',
   resource: import 'resource.libsonnet',
+  failure: import 'failure.libsonnet',
   breadcrumbs: import 'breadcrumbs.libsonnet',
   action: import 'action.libsonnet',
 }

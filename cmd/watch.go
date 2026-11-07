@@ -53,9 +53,7 @@ func newWatchCmd(plugins []*jpoet.Plugin) *cobra.Command {
 
 			encoder := json.NewEncoder(os.Stdout)
 			for result := range ch {
-				err := encoder.Encode(struct {
-					Output string `json:"output"`
-				}{Output: result.Output})
+				err := encoder.Encode(watchLine{Output: result.Output, Failure: result.Failure})
 				if err != nil {
 					return err
 				}
@@ -67,4 +65,9 @@ func newWatchCmd(plugins []*jpoet.Plugin) *cobra.Command {
 	cmd.Flags().StringArrayVar(&paramFlags, "param", nil, "Parameter as key=value (repeatable)")
 	addOriginFlags(cmd)
 	return cmd
+}
+
+type watchLine struct {
+	Output  string       `json:"output"`
+	Failure *pkg.Failure `json:"failure,omitempty"`
 }

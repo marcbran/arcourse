@@ -21,6 +21,33 @@ local truncateNode = import './truncate_node.libsonnet';
       },
     },
     {
+      name: 'failed root node shows only its failure and underscore fields without evaluating the rest',
+      input:: {
+        _node: 'resource',
+        _paramSpecs: [{ name: 'page', type: 'string' }],
+        _failure:: { code: 403, reason: 'Forbidden', message: 'forbidden' },
+        items: error 'items must not be evaluated',
+        child: { _node: 'resource', _queryPath: '/root/child' },
+      },
+      expected: {
+        _node: 'resource',
+        _paramSpecs: [{ name: 'page', type: 'string' }],
+        _failure: { code: 403, reason: 'Forbidden', message: 'forbidden' },
+      },
+    },
+    {
+      name: 'root node with a null failure is projected as usual',
+      input:: {
+        _node: 'resource',
+        _failure:: null,
+        name: 'root',
+      },
+      expected: {
+        _node: 'resource',
+        name: 'root',
+      },
+    },
+    {
       name: 'root node kept',
       input:: {
         _node: 'resource',

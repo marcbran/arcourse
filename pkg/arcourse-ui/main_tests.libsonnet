@@ -152,6 +152,54 @@ local resolveHtml(v) =
       expected: { rowTexts: ['Alpha', 'Beta'] },
     },
     {
+      name: 'a.table.view renders a failed response as a failure card without evaluating the derived data',
+      input:: function()
+        local node = a.table.view {
+          response:: { _failure: { code: 500, reason: 'ServerException', message: 'no Docker daemon is reachable' } },
+          data:: self.response.body,
+          table: { at: ['items'], columns: [{ label: 'Name', path: ['name'] }] },
+        };
+        local card = node._view.fragment.html[1];
+        {
+          failure: node._failure.code,
+          class: card.attributes.class,
+          text: [p.children[0] for p in card.children],
+        },
+      expected: {
+        failure: 500,
+        class: 'card failure-card',
+        text: ['500 ServerException', 'no Docker daemon is reachable'],
+      },
+    },
+    {
+      name: 'a.resource.node renders a failed response in place of the whole fragment',
+      input:: function()
+        local node = a.resource.node {
+          response:: { _failure: { code: 404, reason: 'NoSuchBucketPolicy', message: 'The bucket policy does not exist' } },
+          data: self.response.body,
+          child: { _node: true, _queryPath: '/root/x/child' },
+        };
+        node._view.fragment.html[1].attributes.class,
+      expected: 'card failure-card',
+    },
+    {
+      name: 'a.list.node renders a failed response in place of links derived from its data',
+      input:: function()
+        local node = a.list.node {
+          response:: { _failure: { code: 403, reason: 'Forbidden', message: 'access denied' } },
+          data: self.response,
+          links: { [name]: { _node: true, _queryPath: '/root/x/' + name } for name in self.data },
+        };
+        node._view.fragment.html[1].attributes.class,
+      expected: 'card failure-card',
+    },
+    {
+      name: 'a successful response leaves _failure null',
+      input:: function()
+        (a.resource.node { response:: { name: 'ok' }, data: self.response })._failure,
+      expected: null,
+    },
+    {
       name: 'a.table.node projects data items into a flat items list keyed by lowerCamelCase label or explicit key, computing value columns and dropping missing fields',
       input:: function()
         local node = a.table.node {

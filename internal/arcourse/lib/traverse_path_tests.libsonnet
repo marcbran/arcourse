@@ -4,6 +4,22 @@ local traversePath = import './traverse_path.libsonnet';
   output(input):: traversePath(input.obj, input.path),
   tests: [
     {
+      name: 'missing field returns a not found failure naming the path walked so far',
+      input:: {
+        obj: { a: { b: {} } },
+        path: ['a', 'missing', 'c'],
+      },
+      expected: { _failure: { code: 404, reason: 'Not Found', message: 'no node at root/a/missing' } },
+    },
+    {
+      name: 'parameterised segment without a value returns a not found failure',
+      input:: {
+        obj: { context: function(name) { name: name } },
+        path: ['context'],
+      },
+      expected: { _failure: { code: 404, reason: 'Not Found', message: 'no node at root/context' } },
+    },
+    {
       name: 'empty path returns object',
       input:: {
         obj: { value: 42 },
