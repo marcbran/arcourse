@@ -22,6 +22,7 @@ function(query, timeRange, record=null)
     }],
     _telemetryItems:: [{ type: n.type, expr: n.expr }],
     response:: query(n.datasource, n._telemetryItems, n._params.from, n._params.to),
+    data: n.response,
     local records = std.reverse(std.sort(
       std.get(n.response.results[0], 'records', []),
       function(rec) rec.timestamp

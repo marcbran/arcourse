@@ -78,6 +78,7 @@ function(query, timeRange)
         for qr in n.queries
       ],
       response:: query(n.datasource, n._telemetryItems, n._params.from, n._params.to),
+      data: n.response,
       _view+:: {
         local baseFragment = super.fragment,
         fragment: baseFragment { child:: [(timeRange.nav { from:: n._params.from, to:: n._params.to }).html, baseFragment.child] },

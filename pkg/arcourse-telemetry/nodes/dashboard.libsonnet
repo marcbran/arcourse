@@ -26,6 +26,7 @@ function(query, timeRange)
     layout:: error 'Dashboard requires layout',
     _paramSpecs: timeRange.paramSpecs,
     response:: query(n.datasource, collectItems(n.layout), n._params.from, n._params.to),
+    data: n.response,
     tree:: resolveTree(n.layout, n.response, 0).node,
     _view+:: {
       local base = super.fragment,
