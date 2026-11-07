@@ -76,7 +76,7 @@ func (r *root) warm(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		_, err = r.evaluator.WatchFile(compileWatchKey, compileSnippet(entryPath), rootPath)
+		_, err = r.evaluator.WatchFile(ctx, compileWatchKey, compileSnippet(entryPath), rootPath)
 		if err != nil {
 			return err
 		}

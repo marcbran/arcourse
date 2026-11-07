@@ -29,7 +29,7 @@ func (c *compile) Exec(ctx context.Context) (pkg.Result, error) {
 	if err != nil {
 		return pkg.Result{}, err
 	}
-	out, err := c.evaluator.EvaluateOnceRaw(compileSnippet(entryPath))
+	out, err := c.evaluator.EvaluateOnceRaw(ctx, compileSnippet(entryPath))
 	if err != nil {
 		return pkg.Result{}, err
 	}

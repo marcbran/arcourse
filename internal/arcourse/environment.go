@@ -12,10 +12,10 @@ type Evaluation struct {
 
 type Evaluator interface {
 	Warm(rootPath string) error
-	Evaluate(snippet string) (string, error)
-	EvaluateOnceRaw(snippet string) (string, error)
-	Watch(key string, snippet string) (Evaluation, <-chan Evaluation, func(), error)
-	WatchFile(key string, snippet string, path string) (func(), error)
+	Evaluate(ctx context.Context, snippet string) (string, error)
+	EvaluateOnceRaw(ctx context.Context, snippet string) (string, error)
+	Watch(ctx context.Context, key string, snippet string) (Evaluation, <-chan Evaluation, func(), error)
+	WatchFile(ctx context.Context, key string, snippet string, path string) (func(), error)
 	Close() error
 }
 
@@ -38,7 +38,7 @@ func (e *environment) Evaluate(ctx context.Context, expression string) (string, 
 	if err != nil {
 		return "", err
 	}
-	return e.evaluator.Evaluate(queryExpression(expression))
+	return e.evaluator.Evaluate(ctx, queryExpression(expression))
 }
 
 func (e *environment) Watch(ctx context.Context, key string, expression string) (Evaluation, <-chan Evaluation, func(), error) {
@@ -46,7 +46,7 @@ func (e *environment) Watch(ctx context.Context, key string, expression string) 
 	if err != nil {
 		return Evaluation{}, nil, nil, err
 	}
-	return e.evaluator.Watch(key, queryExpression(expression))
+	return e.evaluator.Watch(ctx, key, queryExpression(expression))
 }
 
 func (e *environment) Exec(ctx context.Context, plugin string, action string, data map[string]any) (string, error) {
