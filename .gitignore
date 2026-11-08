@@ -3,3 +3,4 @@
 build
 /examples/plugin-binary/plugin-binary
 .DS_Store
+vendor/

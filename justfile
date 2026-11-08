@@ -9,7 +9,7 @@ build-go:
 build-jsonnet: vendor-jsonnet
     for dir in pkg/*/; do \
         [ -f "$dir/main.libsonnet" ] || continue; \
-        rm -rf "$dir/build" && {{tool}} jpoet pkg build -J pkg/vendor "$dir" || exit 1; \
+        rm -rf "$dir/build" && {{tool}} jpoet pkg build -J "${dir}vendor" "$dir" || exit 1; \
     done
 
 build: build-go build-jsonnet
@@ -62,7 +62,10 @@ test-race:
 test: test-go test-jsonnet
 
 vendor-jsonnet:
-    [ ! -f pkg/jsonnetfile.json ] || (cd pkg && go tool -modfile=../tools/go.mod jb install)
+    for dir in pkg/*/; do \
+        [ -f "$dir/jsonnetfile.json" ] || continue; \
+        (cd "$dir" && go tool -modfile=../../tools/go.mod jb install) || exit 1; \
+    done
 
 vuln:
     {{tool}} govulncheck ./...
