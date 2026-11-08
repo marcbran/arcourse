@@ -21,4 +21,8 @@ p.pkg({
     Builds a full node tree from `nodeSpecs`, applying `defaultView` to any node that
     doesn't define its own `_view`.
   |||),
+  failure: p.desc(|||
+    `isFailure(value)` checks for a plugin `_failure` value; `withFailure` surfaces a failed
+    `response` as the node's `_failure`.
+  |||),
 })

@@ -9,7 +9,7 @@ import (
 )
 
 func TestJsonnet(t *testing.T) {
-	run, err := test.RunDir(".", test.WithPlugins(urlplugin.Plugin(), htmlplugin.Plugin()))
+	run, err := test.RunDir(".", test.WithPlugins(urlplugin.Plugin(), htmlplugin.Plugin()), test.WithJPaths("pkg/vendor"))
 	if err != nil {
 		t.Fatal(err)
 	}

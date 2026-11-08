@@ -9,6 +9,18 @@ tool (
 )
 
 require (
+	github.com/google/go-jsonnet v0.22.0
+	github.com/google/uuid v1.6.0
+	github.com/marcbran/arcourse v0.25.0
+	github.com/marcbran/jpoet v0.30.0
+	github.com/marcbran/jsonnet-plugin-html v0.3.0
+	github.com/marcbran/jsonnet-plugin-url v0.1.0
+	github.com/spf13/cobra v1.10.2
+	github.com/stretchr/testify v1.12.1
+	sigs.k8s.io/yaml v1.6.0
+)
+
+require (
 	4d63.com/gocheckcompilerdirectives v1.4.0 // indirect
 	4d63.com/gochecknoglobals v0.2.2 // indirect
 	charm.land/lipgloss/v2 v2.0.6 // indirect
@@ -112,7 +124,6 @@ require (
 	github.com/golangci/unconvert v0.0.0-20250410112200-a129a6e6413e // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/go-github/v74 v74.0.0 // indirect
-	github.com/google/go-jsonnet v0.22.0 // indirect
 	github.com/google/go-querystring v1.2.0 // indirect
 	github.com/gordonklaus/ineffassign v0.2.0 // indirect
 	github.com/gostaticanalysis/analysisutil v0.7.1 // indirect
@@ -152,7 +163,6 @@ require (
 	github.com/manuelarte/funcorder v0.6.0 // indirect
 	github.com/maratori/testableexamples v1.0.1 // indirect
 	github.com/maratori/testpackage v1.1.2 // indirect
-	github.com/marcbran/jpoet v0.27.0 // indirect
 	github.com/marcbran/jsonnet-plugin-jsonnet v0.4.0 // indirect
 	github.com/marcbran/jsonnet-plugin-markdown v0.3.0 // indirect
 	github.com/matoous/godox v1.1.0 // indirect
@@ -201,14 +211,12 @@ require (
 	github.com/sourcegraph/go-diff v0.9.0 // indirect
 	github.com/spf13/afero v1.15.0 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
-	github.com/spf13/cobra v1.10.2 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/spf13/viper v1.12.0 // indirect
 	github.com/ssgreg/nlreturn/v2 v2.2.1 // indirect
 	github.com/stbenjam/no-sprintf-host-port v0.3.1 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
-	github.com/stretchr/testify v1.12.1 // indirect
 	github.com/subosito/gotenv v1.4.1 // indirect
 	github.com/teekennedy/goldmark-markdown v0.5.1 // indirect
 	github.com/tetafro/godot v1.5.6 // indirect
@@ -247,7 +255,7 @@ require (
 	golang.org/x/tools v0.52.0 // indirect
 	golang.org/x/vuln v1.9.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260819154853-08b0e4226688 // indirect
-	google.golang.org/grpc v1.84.0 // indirect
+	google.golang.org/grpc v1.85.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
@@ -256,5 +264,4 @@ require (
 	honnef.co/go/tools v0.8.2 // indirect
 	mvdan.cc/gofumpt v0.12.0 // indirect
 	mvdan.cc/unparam v0.0.0-20260823230713-2fa3d841b0c8 // indirect
-	sigs.k8s.io/yaml v1.6.0 // indirect
 )

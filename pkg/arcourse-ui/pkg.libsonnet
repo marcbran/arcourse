@@ -21,4 +21,6 @@ p.pkg({
   table: p.desc('Renders `data` items (at `table.at`, default `[\'items\']`) as a table with `table.columns`, each row linking to its own item if `linkSpecs` resolves one.'),
   yaml: p.desc('Renders `data` as YAML.'),
   resource: p.desc('Renders `data` as YAML alongside its neighboring links, if any, grouping any nested (two-level) links under a titled section like `list` does.'),
+  page: p.desc('`component` is the full-page component the views wrap their fragment in.'),
+  breadcrumbs: p.desc('`component` is the breadcrumbs component built from a node\'s `pathTemplate`.'),
 })
