@@ -27,10 +27,36 @@ jobs:
             go.sum
             tools/go.sum
       - run: go mod download
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
       - run: just ci
 
+  push-packages:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: jsonnet-packages
+    concurrency: jsonnet-packages
+    steps:
+      - id: token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.JSONNET_APP_CLIENT_ID }}
+          private-key: ${{ secrets.JSONNET_APP_KEY }}
+          owner: marcbran
+          repositories: jsonnet
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+          cache-dependency-path: |
+            go.sum
+            tools/go.sum
+      - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+      - run: |
+          git config --global user.name "jsonnet-publisher[bot]"
+          git config --global user.email "350881344+jsonnet-publisher[bot]@users.noreply.github.com"
+      - run: just push
+        env:
+          GITHUB_TOKEN: ${{ steps.token.outputs.token }}
 
   release-please:
     needs: test

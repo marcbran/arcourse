@@ -267,11 +267,13 @@ local withNode = {
 
 {
   default: { view: listView } + withNode,
-  list: { view: listView } + withNode,
-  table: { view: tableView } + withNode,
-  tree: { view: treeView } + withNode,
-  yaml: { view: yamlView } + withNode,
-  resource: { view: resourceView } + withNode,
-  action: { view: actionView } + withNode,
-  failure: { view: failureView },
+  list: { view: listView, component: c.list } + withNode,
+  table: { view: tableView, component: c.table } + withNode,
+  tree: { view: treeView, component: c.tree } + withNode,
+  yaml: { view: yamlView, component: c.yaml } + withNode,
+  resource: { view: resourceView, component: c.resource } + withNode,
+  action: { view: actionView, component: c.action } + withNode,
+  failure: { view: failureView, component: c.failure },
+  page: { component: c.page },
+  breadcrumbs: { component: c.breadcrumbs },
 }

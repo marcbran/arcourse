@@ -1,36 +1,18 @@
 tool := "go tool -modfile=tools/go.mod"
 
-test-go:
-    go test -v -cover -timeout=120s -parallel=10 ./...
+bench:
+    go test -tags e2e -bench=. -benchmem -run=^$ ./tests/...
 
-test-race:
-    go test -v -race -timeout=120s ./...
+build-go:
+    go build -o arco .
 
-test-jsonnet:
-    go test -count=1 -run TestJsonnet .
-
-build-all-pkgs:
+build-jsonnet: vendor-jsonnet
     for dir in pkg/*/; do \
         [ -f "$dir/main.libsonnet" ] || continue; \
-        rm -rf "$dir/build" && {{tool}} jpoet pkg build "$dir" || exit 1; \
+        rm -rf "$dir/build" && {{tool}} jpoet pkg build -J pkg/vendor "$dir" || exit 1; \
     done
 
-build-push-all-pkgs:
-    for dir in pkg/*/; do \
-        [ -f "$dir/main.libsonnet" ] || continue; \
-        rm -rf "$dir/build" && {{tool}} jpoet pkg build "$dir" && {{tool}} jpoet pkg push "$dir" || exit 1; \
-    done
-
-test-node:
-    node --test
-
-test: test-go test-jsonnet test-node
-
-lint:
-    {{tool}} golangci-lint run ./...
-
-vuln:
-    {{tool}} govulncheck ./...
+build: build-go build-jsonnet
 
 check-lib-sync:
     for f in internal/arcourse/lib/arcourse-graph/*.libsonnet; do \
@@ -42,13 +24,21 @@ check-lib-sync:
 
 check: check-lib-sync
 
-build-go:
-    go build -o arco .
-
-build: build-go build-all-pkgs
+ci: lint vuln test test-race check build test-e2e
 
 install:
     dest=$(go env GOBIN); [ -n "$dest" ] || dest=$(go env GOPATH)/bin; go build -o "$dest/arco" .
+
+lint:
+    {{tool}} golangci-lint run ./...
+
+push-jsonnet: build-jsonnet
+    for dir in pkg/*/; do \
+        [ -f "$dir/main.libsonnet" ] || continue; \
+        {{tool}} jpoet pkg push "$dir" || exit 1; \
+    done
+
+push: push-jsonnet
 
 test-e2e:
     status=0; \
@@ -60,7 +50,19 @@ test-e2e:
 test-e2e-facade facade:
     ARCO_BINARY="$(pwd)/arco" ARCOURSE_E2E_FACADE="{{facade}}" go test -v -tags e2e ./tests/...
 
-bench:
-    go test -tags e2e -bench=. -benchmem -run=^$ ./tests/...
+test-go: vendor-jsonnet
+    go test -v -cover -timeout=120s -parallel=10 ./...
 
-ci: lint vuln test test-race check build test-e2e
+test-jsonnet: vendor-jsonnet
+    go test -count=1 -run TestJsonnet .
+
+test-race:
+    go test -v -race -timeout=120s ./...
+
+test: test-go test-jsonnet
+
+vendor-jsonnet:
+    [ ! -f pkg/jsonnetfile.json ] || (cd pkg && go tool -modfile=../tools/go.mod jb install)
+
+vuln:
+    {{tool}} govulncheck ./...
