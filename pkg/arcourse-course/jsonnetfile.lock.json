@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "dependencies": [
+    {
+      "source": {
+        "git": {
+          "remote": "https://github.com/marcbran/jsonnet.git",
+          "subdir": "plugin/html"
+        }
+      },
+      "version": "f8fbca4ece920b1f694ef55cf5faff01b3f05501",
+      "sum": "6o+PCH5fn0DzThZx2lK972203J+M86sH3ju9itLKwYU="
+    }
+  ],
+  "legacyImports": false
+}
