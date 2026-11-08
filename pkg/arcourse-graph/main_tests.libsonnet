@@ -21,7 +21,7 @@ local nodeTests = {
           hasVisiblePathTemplate: std.objectHas(result, '_pathTemplate'),
           pathTemplate: result._pathTemplate,
           queryPath: result._queryPath,
-          vars: result._vars,
+          hasVars: std.objectHasAll(result, '_vars'),
         },
       expected: {
         node: {
@@ -33,7 +33,7 @@ local nodeTests = {
         hasVisiblePathTemplate: false,
         pathTemplate: ['kubernetes', '$context', 'pods'],
         queryPath: '/root/kubernetes/context/prod/pods',
-        vars: ['context'],
+        hasVars: false,
       },
     },
     {
@@ -177,6 +177,71 @@ local graphTests = {
         metrics: { pods: { _node: true, context: 'prod', kind: 'chart' } },
         pathTemplate: ['kubernetes', '$context', 'metrics'],
         context: 'prod',
+      },
+    },
+    {
+      name: 'a child with the name of a variable stays traversable and the variable stays in _vars',
+      input:: {
+        nodeSpecs: [
+          [['kubernetes', '$context', '$namespace', 'pods'], { kind: 'Pod' }],
+          [['kubernetes', '$context', '$namespace', 'pods', 'context'], { kind: 'Context' }],
+        ],
+      },
+      output(input)::
+        local pods = graph(input).kubernetes.context('prod').namespace('default').pods;
+        {
+          childKind: pods.context.kind,
+          childHasVars: std.objectHasAll(pods.context, '_vars'),
+          namespace: pods.namespace,
+          vars: pods._vars,
+          evalPath: pods._evalPath,
+          queryPath: pods._queryPath,
+        },
+      expected: {
+        childKind: 'Context',
+        childHasVars: false,
+        namespace: 'default',
+        vars: { context: 'prod' },
+        evalPath: 'root.kubernetes.context("prod").namespace("default").pods',
+        queryPath: '/root/kubernetes/context/prod/namespace/default/pods',
+      },
+    },
+    {
+      name: 'a layer field with the name of a variable wins and the variable moves to _vars',
+      input:: {
+        nodeSpecs: [
+          [['aws', '$account', '$region', 'buckets'], { region: 'from-layer' }],
+        ],
+      },
+      output(input)::
+        local buckets = graph(input).aws.account('123').region('eu-west-1').buckets;
+        {
+          buckets: buckets,
+          vars: buckets._vars,
+          evalPath: buckets._evalPath,
+          queryPath: buckets._queryPath,
+        },
+      expected: {
+        buckets: { _node: true, account: '123', region: 'from-layer' },
+        vars: { region: 'eu-west-1' },
+        evalPath: 'root.aws.account("123").region("eu-west-1").buckets',
+        queryPath: '/root/aws/account/123/region/eu-west-1/buckets',
+      },
+    },
+    {
+      name: 'a child of an intermediate with the name of a variable stays visible and the variable stays in _vars',
+      input:: {
+        nodeSpecs: [[['kubernetes', '$context', 'metrics', 'context'], { kind: 'chart' }]],
+      },
+      output(input)::
+        local metrics = graph(input).kubernetes.context('prod').metrics;
+        {
+          metrics: metrics,
+          vars: metrics._vars,
+        },
+      expected: {
+        metrics: { context: { _node: true, context: 'prod', kind: 'chart' } },
+        vars: { context: 'prod' },
       },
     },
     {

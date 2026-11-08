@@ -4,9 +4,12 @@ local url(u) = std.native('invoke:url')('format', [u]);
 local isVar(seg) = std.length(seg) > 0 && seg[0] == '$';
 local varNameOf(seg) = std.substr(seg, 1, std.length(seg) - 1);
 
+local varValue(node, name) =
+  if std.objectHasAll(node, '_vars') && std.objectHas(node._vars, name) then node._vars[name] else node[name];
+
 local resolvePath(node, path) =
   std.join('.', ['root'] + [
-    if isVar(p) then varNameOf(p) + '("' + node[varNameOf(p)] + '")'
+    if isVar(p) then varNameOf(p) + '("' + varValue(node, varNameOf(p)) + '")'
     else p
     for p in path
   ]);
@@ -14,7 +17,7 @@ local resolvePath(node, path) =
 local urlPathSegments(node, path) =
   ['root'] + std.flatMap(
     function(p)
-      if isVar(p) then [varNameOf(p), node[varNameOf(p)]]
+      if isVar(p) then [varNameOf(p), varValue(node, varNameOf(p))]
       else [p],
     path
   );
@@ -39,23 +42,39 @@ local nonDefaultParams(node) =
 local mergeLayers(base, layers) =
   std.foldl(function(acc, l) acc + l, layers, base);
 
-local node(path, body={}) =
+local varFields(vars, shadowed) =
+  { [v]: vars[v] for v in std.objectFields(vars) if !std.member(shadowed, v) } + { _vars:: { [v]: vars[v] for v in shadowed } };
+
+local shadowedVars(path, layers, exclude=[]) =
+  local merged = mergeLayers({}, layers);
+  exclude + [
+    v
+    for v in std.map(varNameOf, std.filter(isVar, path))
+    if !std.member(exclude, v) && std.objectHasAll(merged, v)
+  ];
+
+local node(path, body={}, vars={}, shadowed=[]) =
   local layers = if std.isArray(body) then body else [body];
-  local vars = std.map(varNameOf, std.filter(isVar, path));
+  local pathVars = std.map(varNameOf, std.filter(isVar, path));
   local base = { _params:: specDefaults(std.get(self, '_paramSpecs', [])) };
-  local requiredVars = { [var]: error 'variable %s is required' % var for var in vars };
-  mergeLayers(if std.length(vars) == 0 then base else requiredVars + base, layers) +
+  local requiredVars = { [var]: error 'variable %s is required' % var for var in pathVars };
+  mergeLayers(if std.length(pathVars) == 0 || std.length(vars) > 0 then base else requiredVars + base, layers) +
   {
     _node: true,
-    _vars:: vars,
     _pathTemplate:: path,
     _defaultParams:: super._params,
     _evalPath:: resolvePath(self, path),
     _queryPath:: local n = self; url({ path: urlPathSegments(n, path), params: nonDefaultParams(n) }),
-  };
+  } +
+  (if std.length(shadowed) == 0 then vars else varFields(vars, shadowed));
 
-local intermediate(path, vars) =
-  std.foldl(function(acc, v) acc { [v]:: vars[v] }, std.objectFields(vars), { _pathTemplate:: path });
+local intermediate(path, vars, exclude=[]) =
+  std.foldl(
+    function(acc, v) if std.member(exclude, v) then acc else acc { [v]:: vars[v] },
+    std.objectFields(vars),
+    if std.length(exclude) == 0 then { _pathTemplate:: path }
+    else { _pathTemplate:: path, _vars:: { [v]: vars[v] for v in exclude } }
+  );
 
 local toLayers(nodeSpecs) =
   std.flatMap(
@@ -96,8 +115,11 @@ local instantiateFromShape(shapeNode, layers, defaultView={}, vars={}, path=[]) 
         instantiateFromShape(shapeNode.children[k], layers, defaultView, vars, path + [k])
     for k in std.objectFields(shapeNode.children)
   };
-  if std.length(leafs) == 0 then withDefaultView(intermediate(path, vars) + children)
-  else withDefaultView(node(leafs[0].fullPath, [l.layer for l in leafs]) + vars + children);
+  local conflicts = [v for v in std.objectFields(vars) if std.objectHas(children, v)];
+  if std.length(leafs) == 0 then withDefaultView(intermediate(path, vars, conflicts) + children)
+  else
+    local leafLayers = [l.layer for l in leafs];
+    withDefaultView(node(leafs[0].fullPath, leafLayers, vars, shadowedVars(path, leafLayers, conflicts)) + children);
 
 local rootFromShape(layers, compiledShape, defaultView={}) =
   local withDefaultView(obj) =
@@ -114,6 +136,7 @@ local graph(nodeSpecs, defaultView={}) =
 {
   node: node,
   intermediate: intermediate,
+  shadowedVars: shadowedVars,
   graph: graph,
   toLayers: toLayers,
   shape: shape,
