@@ -711,6 +711,21 @@ local resolveHtml(v) =
       },
     },
     {
+      name: 'breadcrumbs read a variable shadowed by a child from _vars',
+      input:: function()
+        local c = import './components/main.libsonnet';
+        local b = c.breadcrumbs {
+          pathTemplate:: ['form3', '$organisation'],
+          node:: { _vars:: { organisation: 'o1' }, organisation: { accounts: { account_id: function(v) v } } },
+        };
+        [{ href: std.get(std.get(el, 'attributes', {}), 'href', null), text: resolveHtml(el.children) } for el in b.html[1].children if el.element != 'span' || el.attributes.class == 'current'],
+      expected: [
+        { href: '/root', text: ['root'] },
+        { href: '/root/form3', text: ['form3'] },
+        { href: null, text: [{ element: 'span', attributes: { class: 'key' }, children: ['organisation/'] }, 'o1'] },
+      ],
+    },
+    {
       name: 'a.resource.node without linkSpecs exposes an empty links object',
       input:: function()
         local node = a.resource.node {
