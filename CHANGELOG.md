@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.26.1](https://github.com/marcbran/arcourse/compare/v0.26.0...v0.26.1) (2026-11-09)
+
+
+### Bug Fixes
+
+* read shadowed path variables in breadcrumbs ([#179](https://github.com/marcbran/arcourse/issues/179)) ([9da523f](https://github.com/marcbran/arcourse/commit/9da523fbcc94a84107a8d2737fb645531a192318))
+
 ## [0.26.0](https://github.com/marcbran/arcourse/compare/v0.25.0...v0.26.0) (2026-11-08)
 
 
