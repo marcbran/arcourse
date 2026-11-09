@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.26.0](https://github.com/marcbran/arcourse/compare/v0.25.0...v0.26.0) (2026-11-08)
+
+
+### Features
+
+* pass contexts to evaluation ([#169](https://github.com/marcbran/arcourse/issues/169)) ([31ecce3](https://github.com/marcbran/arcourse/commit/31ecce334ec19278ff1e613e35e45bb56a8be64d))
+* surface failures as _failure in json and failure pages in html ([#166](https://github.com/marcbran/arcourse/issues/166)) ([86f9005](https://github.com/marcbran/arcourse/commit/86f900587b9d1c59afd876676dd117450bbd16b9))
+
+
+### Bug Fixes
+
+* hide data in k8s list nodes ([#168](https://github.com/marcbran/arcourse/issues/168)) ([3f2c4e9](https://github.com/marcbran/arcourse/commit/3f2c4e908667f0534b622352cbca7fe724e5531b))
+* let children and layer fields shadow path variables ([#174](https://github.com/marcbran/arcourse/issues/174)) ([f1636d0](https://github.com/marcbran/arcourse/commit/f1636d0818f80aa8735a5bf10b5d3eb1a192400c))
+
 ## [0.25.0](https://github.com/marcbran/arcourse/compare/v0.24.0...v0.25.0) (2026-10-30)
 
 
