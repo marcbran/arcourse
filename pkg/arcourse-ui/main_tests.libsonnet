@@ -342,7 +342,7 @@ local resolveHtml(v) =
             contexts: { _node: true, _queryPath: '/root/kubernetes/contexts' },
             nested: { deep: { _node: true, _queryPath: '/root/kubernetes/nested/deep' } },
           },
-          form3: {},
+          empty: {},
         };
         {
           items: [{ link: i.link, text: i.text } for i in node._view.fragment.items],
@@ -709,6 +709,21 @@ local resolveHtml(v) =
           { type: 'hidden', name: 'tags', value: 'b' },
         ],
       },
+    },
+    {
+      name: 'breadcrumbs read a variable shadowed by a child from _vars',
+      input:: function()
+        local c = import './components/main.libsonnet';
+        local b = c.breadcrumbs {
+          pathTemplate:: ['projects', '$project'],
+          node:: { _vars:: { project: 'p1' }, project: { items: { item_id: function(v) v } } },
+        };
+        [{ href: std.get(std.get(el, 'attributes', {}), 'href', null), text: resolveHtml(el.children) } for el in b.html[1].children if el.element != 'span' || el.attributes.class == 'current'],
+      expected: [
+        { href: '/root', text: ['root'] },
+        { href: '/root/projects', text: ['projects'] },
+        { href: null, text: [{ element: 'span', attributes: { class: 'key' }, children: ['project/'] }, 'p1'] },
+      ],
     },
     {
       name: 'a.resource.node without linkSpecs exposes an empty links object',
