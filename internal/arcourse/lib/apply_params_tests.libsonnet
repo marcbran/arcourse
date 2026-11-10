@@ -147,6 +147,35 @@ local nodeWithParams(params, extra={}) = {
       },
     },
     {
+      name: 'enum param accepts a listed value after coercion',
+      input:: {
+        node: nodeWithParams([{ name: 'state', type: 'string', enum: ['open', 'closed'] }, { name: 'size', type: 'number', enum: [10, 50] }]),
+        params: { state: 'closed', size: '50' },
+      },
+      expected: {
+        _node: true,
+        _paramSpecs: [{ name: 'state', type: 'string', enum: ['open', 'closed'] }, { name: 'size', type: 'number', enum: [10, 50] }],
+        _params: { state: 'closed', size: 50 },
+      },
+    },
+    {
+      name: 'values outside a param or item enum are a bad request',
+      input:: {
+        node: nodeWithParams([
+          { name: 'state', type: 'string', enum: ['open', 'closed'] },
+          { name: 'statuses', type: 'array', items: { type: 'string', enum: ['triggered', 'resolved'] } },
+        ]),
+        params: { state: 'merged', statuses: ['triggered', 'snoozed'] },
+      },
+      expected: {
+        _failure: {
+          code: 400,
+          reason: 'Bad Request',
+          message: 'parameter value "merged" is not one of "open", "closed"; array element "snoozed" is not one of "triggered", "resolved"',
+        },
+      },
+    },
+    {
       name: 'optional param falls back to default',
       input:: {
         node: nodeWithParams([{ name: 'page', type: 'number', default: 1 }]),

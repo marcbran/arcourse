@@ -27,7 +27,11 @@ local parseScalar(type, raw) =
   else if type == 'boolean' && (raw == 'true' || raw == 'false') then raw == 'true'
   else raw;
 
-local coerceRawValue(spec, raw, label='parameter value') =
+local checkEnum(spec, result, label) =
+  if isProblem(result) || !std.objectHas(spec, 'enum') || std.member(spec.enum, result.value) then result
+  else problem('%s %s is not one of %s' % [label, manifest(result.value), std.join(', ', [manifest(v) for v in spec.enum])]);
+
+local coerceType(spec, raw, label) =
   if spec.type == 'string' then
     if std.isString(raw) then ok(raw)
     else problem('%s %s cannot be coerced to string' % [label, manifest(raw)])
@@ -37,7 +41,7 @@ local coerceRawValue(spec, raw, label='parameter value') =
       problem('%s %s cannot be coerced to array' % [label, manifest(value)])
     else
       local itemSpec = if std.isObject(spec.items) then spec.items else { type: spec.items };
-      local items = [coerceRawValue(itemSpec, element, 'array element') for element in value];
+      local items = [checkEnum(itemSpec, coerceType(itemSpec, element, 'array element'), 'array element') for element in value];
       local problems = [item.problem for item in items if isProblem(item)];
       if std.length(problems) > 0 then problem(problems[0])
       else ok([item.value for item in items])
@@ -45,6 +49,9 @@ local coerceRawValue(spec, raw, label='parameter value') =
     local value = parseScalar(spec.type, raw);
     if matches(spec.type, value) then ok(value)
     else problem('%s %s cannot be coerced to %s' % [label, manifest(raw), spec.type]);
+
+local coerceRawValue(spec, raw) =
+  checkEnum(spec, coerceType(spec, raw, 'parameter value'), 'parameter value');
 
 local resolveParam(spec, params, nodeParams) =
   local name = spec.name;
