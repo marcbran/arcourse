@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.0](https://github.com/marcbran/arcourse/compare/v0.26.1...v0.27.0) (2026-11-10)
+
+
+### Features
+
+* reject param values outside the spec enum ([#180](https://github.com/marcbran/arcourse/issues/180)) ([c4523b0](https://github.com/marcbran/arcourse/commit/c4523b00c798e545cd8c5b8422b0a183d2d60cf4))
+
 ## [0.26.1](https://github.com/marcbran/arcourse/compare/v0.26.0...v0.26.1) (2026-11-09)
 
 
