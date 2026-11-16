@@ -53,10 +53,14 @@ local coerceType(spec, raw, label) =
 local coerceRawValue(spec, raw) =
   checkEnum(spec, coerceType(spec, raw, 'parameter value'), 'parameter value');
 
+local withoutEmpty(raw) =
+  if std.isArray(raw) then [element for element in raw if element != ''] else raw;
+
 local resolveParam(spec, params, nodeParams) =
   local name = spec.name;
-  if std.objectHas(params, name) && params[name] != '' then
-    coerceRawValue(spec, params[name])
+  local raw = if std.objectHas(params, name) then withoutEmpty(params[name]) else null;
+  if raw != null && raw != '' && raw != [] then
+    coerceRawValue(spec, raw)
   else if std.objectHas(nodeParams, name) then
     ok(nodeParams[name])
   else if std.objectHas(spec, 'default') then

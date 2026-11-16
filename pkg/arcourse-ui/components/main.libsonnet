@@ -8,4 +8,5 @@
   failure: import 'failure.libsonnet',
   breadcrumbs: import 'breadcrumbs.libsonnet',
   action: import 'action.libsonnet',
+  filters: import 'filters.libsonnet',
 }

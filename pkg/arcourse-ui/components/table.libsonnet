@@ -195,6 +195,7 @@ local paginationNav = {
   columns:: [],
   rowLinks:: [],
   pagination:: null,
+  filters:: null,
   local rows = if std.isArray(c.items) then c.items else [],
   local nav = paginationNav { pagination:: c.pagination },
   html: [
@@ -202,7 +203,7 @@ local paginationNav = {
     {
       element: 'div',
       attributes: { class: 'card table-card' },
-      children: [
+      children: (if c.filters != null && c.filters.visible then [c.filters] else []) + [
         {
           element: 'table',
           attributes: { class: 'table' },

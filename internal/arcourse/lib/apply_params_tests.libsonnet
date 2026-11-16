@@ -176,6 +176,18 @@ local nodeWithParams(params, extra={}) = {
       },
     },
     {
+      name: 'empty raw values from repeated form inputs are dropped, and an all-empty param counts as unset',
+      input:: {
+        node: nodeWithParams([{ name: 'tags', type: 'array', items: 'string', default: null }, { name: 'ids', type: 'array', items: 'string', default: null }]),
+        params: { tags: ['a', ''], ids: ['', ''] },
+      },
+      expected: {
+        _node: true,
+        _paramSpecs: [{ name: 'tags', type: 'array', items: 'string', default: null }, { name: 'ids', type: 'array', items: 'string', default: null }],
+        _params: { tags: ['a'] },
+      },
+    },
+    {
       name: 'optional param falls back to default',
       input:: {
         node: nodeWithParams([{ name: 'page', type: 'number', default: 1 }]),
