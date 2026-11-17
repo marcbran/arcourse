@@ -141,6 +141,97 @@ local resolveHtml(v) =
       expected: { cardChildCount: 1 },
     },
     {
+      name: 'a.table.view renders an expanded filter card before the table card from filter params, carries sort and shaping values as hidden inputs and drops pagination',
+      input:: function()
+        local node = a.table.view {
+          data: { items: [{ name: 'alpha' }] },
+          table: { columns: [{ label: 'Name', path: ['name'] }] },
+          _paramSpecs: [
+            { name: 'status', type: 'string', enum: ['open', 'closed'], role: 'filter', default: null },
+            { name: 'ids', type: 'array', items: { type: 'string' }, role: 'filter', default: null },
+            { name: 'sort', type: 'string', role: 'sort', default: null },
+            { name: 'include', type: 'array', items: { type: 'string' }, role: 'shaping', default: null },
+            { name: 'page', type: 'number', role: 'pagination', default: null },
+          ],
+          _params: { sort: 'name', include: ['teams'], page: 2 },
+        };
+        local html = resolveHtml(node._view.fragment.html);
+        local details = html[2];
+        local tableCard = html[3];
+        local form = details.children[1];
+        local labels = [child for child in form.children if child.element == 'label'];
+        local hidden = [child.attributes for child in form.children if child.element == 'input'];
+        {
+          open: details.attributes.open,
+          classes: [details.attributes.class, tableCard.attributes.class],
+          summary: details.children[0].children[0],
+          fields: [label.children[0].children[0] for label in labels],
+          statusOptions: [o.attributes.value for o in labels[0].children[1].children],
+          idsInputs: [i.attributes.value for i in labels[1].children[1].children],
+          hidden: hidden,
+        },
+      expected: {
+        open: true,
+        classes: ['card table-filters', 'card table-card'],
+        summary: 'Filters',
+        fields: ['status', 'ids'],
+        statusOptions: ['', 'open', 'closed'],
+        idsInputs: [''],
+        hidden: [
+          { type: 'hidden', name: 'sort', value: 'name' },
+          { type: 'hidden', name: 'include', value: 'teams' },
+        ],
+      },
+    },
+    {
+      name: 'active filters count in the summary, prefill their controls and offer a clear link',
+      input:: function()
+        local c = import './components/main.libsonnet';
+        local filters = c.filters {
+          paramSpecs:: [
+            { name: 'status', type: 'string', enum: ['open', 'closed'], role: 'filter' },
+            { name: 'states', type: 'array', items: { type: 'string', enum: ['a', 'b', 'c'] }, role: 'filter' },
+            { name: 'query', type: 'string', role: 'filter' },
+          ],
+          params:: { status: 'closed', states: ['a', 'c'] },
+          clearHref:: 'root/x',
+        };
+        local details = resolveHtml(filters.html)[1];
+        local form = details.children[1];
+        local status = form.children[0].children[1];
+        local states = form.children[1].children[1].children[0];
+        local buttons = form.children[3];
+        {
+          open: details.attributes.open,
+          summary: details.children[0].children[0],
+          statusSelected: [o.attributes.value for o in status.children if o.attributes.selected],
+          statesMultiple: states.attributes.multiple,
+          statesSelected: [o.attributes.value for o in states.children if o.attributes.selected],
+          buttons: [{ element: b.element, text: b.children[0] } for b in buttons.children],
+          clearHref: buttons.children[1].attributes.href,
+        },
+      expected: {
+        open: true,
+        summary: 'Filters (2)',
+        statusSelected: ['closed'],
+        statesMultiple: true,
+        statesSelected: ['a', 'c'],
+        buttons: [{ element: 'button', text: 'Apply' }, { element: 'a', text: 'Clear' }],
+        clearHref: 'root/x',
+      },
+    },
+    {
+      name: 'a.table.view without filter params renders no filter form',
+      input:: function()
+        local node = a.table.view {
+          data: { items: [{ name: 'alpha' }] },
+          table: { columns: [{ label: 'Name', path: ['name'] }] },
+          _paramSpecs: [{ name: 'page', type: 'number', role: 'pagination', default: null }],
+        };
+        { firstCardChild: node._view.fragment.html[1].children[0].element },
+      expected: { firstCardChild: 'table' },
+    },
+    {
       name: 'a.table.view reads items and columns from the nested table field, not top-level itemsPath/columns',
       input:: function()
         local node = a.table.view {

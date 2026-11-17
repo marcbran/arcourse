@@ -1,3 +1,4 @@
+local paramsLib = import 'params.libsonnet';
 local script = importstr 'action-card.js';
 
 local style = |||
@@ -93,68 +94,6 @@ local issue = {
   },
 };
 
-local numberControl = {
-  local c = self,
-  name:: error 'numberControl requires a name',
-  value:: null,
-  html: {
-    element: 'input',
-    attributes: { type: 'number', step: 'any', name: c.name, value: if c.value == null then null else std.toString(c.value) },
-  },
-};
-
-local textControl = {
-  local c = self,
-  name:: error 'textControl requires a name',
-  value:: null,
-  html: {
-    element: 'input',
-    attributes: { type: 'text', name: c.name, value: c.value },
-  },
-};
-
-local booleanOption = {
-  local c = self,
-  value:: error 'booleanOption requires a value',
-  selected:: false,
-  html: {
-    element: 'option',
-    attributes: { value: c.value, selected: c.selected },
-    children: [c.value],
-  },
-};
-
-local booleanControl = {
-  local c = self,
-  name:: error 'booleanControl requires a name',
-  value:: null,
-  local current = if c.value == null then '' else std.toString(c.value),
-  html: {
-    element: 'select',
-    attributes: { name: c.name },
-    children: [
-      booleanOption { value:: v, selected:: v == current }
-      for v in ['', 'true', 'false']
-    ],
-  },
-};
-
-local hiddenControl = {
-  local c = self,
-  name:: error 'hiddenControl requires a name',
-  value:: null,
-  html: [
-    { element: 'input', attributes: { type: 'hidden', name: c.name, value: std.toString(v) } }
-    for v in if c.value == null then [] else if std.isArray(c.value) then c.value else [c.value]
-  ],
-};
-
-local controls = {
-  number: numberControl,
-  string: textControl,
-  boolean: booleanControl,
-};
-
 local field = {
   local c = self,
   spec:: error 'field requires a spec',
@@ -166,18 +105,18 @@ local field = {
   local initial = std.objectHas(c.initialValues, name),
   local value = if present then c.params[name] else if initial then c.initialValues[name] else null,
   html:
-    if std.objectHas(controls, c.spec.type) then [{
+    if std.member(paramsLib.scalarTypes, c.spec.type) then [{
       element: 'label',
       children: [
         { element: 'span', children: [name] },
-        controls[c.spec.type] { name:: name, value:: value },
+        paramsLib.scalarControl { spec:: c.spec, value:: value },
       ],
     }] + [
       issue { message:: i.message, hint:: !present }
       for i in c.issues
       if present || !initial
     ]
-    else hiddenControl { name:: name, value:: value },
+    else paramsLib.hiddenControl { name:: name, value:: value },
 };
 
 local paramsForm = {
@@ -235,7 +174,7 @@ local applyForm = {
   local hasParams = std.length(c.paramSpecs) > 0,
   local issues = if c.action != null && std.objectHas(c.action, 'issues') then c.action.issues else [],
   local applicable = c.action != null && !std.objectHas(c.action, 'issues'),
-  local paramNames = [spec.name for spec in c.paramSpecs if std.objectHas(controls, spec.type)],
+  local paramNames = [spec.name for spec in c.paramSpecs if std.member(paramsLib.scalarTypes, spec.type)],
   local formIssues = [i for i in issues if !std.member(paramNames, std.get(i, 'param', null))],
   html: [
     { element: 'style', children: [style] },
