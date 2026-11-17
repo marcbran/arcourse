@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.27.0](https://github.com/marcbran/arcourse/compare/v0.26.1...v0.27.0) (2026-11-17)
+
+
+### Features
+
+* add sort controls to the table params card ([#183](https://github.com/marcbran/arcourse/issues/183)) ([b90fd47](https://github.com/marcbran/arcourse/commit/b90fd47bbfaba1f2172c833dd80abaa2033133f7))
+* reject param values outside the spec enum ([#180](https://github.com/marcbran/arcourse/issues/180)) ([c4523b0](https://github.com/marcbran/arcourse/commit/c4523b00c798e545cd8c5b8422b0a183d2d60cf4))
+* table filters ([#182](https://github.com/marcbran/arcourse/issues/182)) ([3117340](https://github.com/marcbran/arcourse/commit/3117340512b9f3f0fa6a2ccef8ac6665e62fd6de))
+
 ## [0.26.1](https://github.com/marcbran/arcourse/compare/v0.26.0...v0.26.1) (2026-11-09)
 
 
