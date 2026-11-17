@@ -141,7 +141,7 @@ local resolveHtml(v) =
       expected: { cardChildCount: 1 },
     },
     {
-      name: 'a.table.view renders an expanded filter card before the table card from filter params, carries sort and shaping values as hidden inputs and drops pagination',
+      name: 'a.table.view renders an expanded params card before the table card with filter and sort groups, carries shaping values as hidden inputs and drops pagination',
       input:: function()
         local node = a.table.view {
           data: { items: [{ name: 'alpha' }] },
@@ -159,35 +159,41 @@ local resolveHtml(v) =
         local details = html[2];
         local tableCard = html[3];
         local form = details.children[1];
-        local labels = [child for child in form.children if child.element == 'label'];
+        local groups = [child for child in form.children if child.element == 'div' && child.attributes.class == 'group'];
+        local labels = groups[0].children[1].children;
         local hidden = [child.attributes for child in form.children if child.element == 'input'];
         {
           open: details.attributes.open,
           classes: [details.attributes.class, tableCard.attributes.class],
           summary: details.children[0].children[0],
+          groups: [group.children[0].children[0] for group in groups],
           fields: [label.children[0].children[0] for label in labels],
+          sortFields: [label.children[0].children[0] for label in groups[1].children[1].children],
+          sortValue: groups[1].children[1].children[0].children[1].attributes.value,
           statusOptions: [o.attributes.value for o in labels[0].children[1].children],
           idsInputs: [i.attributes.value for i in labels[1].children[1].children],
           hidden: hidden,
         },
       expected: {
         open: true,
-        classes: ['card table-filters', 'card table-card'],
-        summary: 'Filters',
+        classes: ['card table-params', 'card table-card'],
+        summary: 'Filter & sort (1)',
+        groups: ['Filter', 'Sort'],
         fields: ['status', 'ids'],
+        sortFields: ['sort'],
+        sortValue: 'name',
         statusOptions: ['', 'open', 'closed'],
         idsInputs: [''],
         hidden: [
-          { type: 'hidden', name: 'sort', value: 'name' },
           { type: 'hidden', name: 'include', value: 'teams' },
         ],
       },
     },
     {
-      name: 'active filters count in the summary, prefill their controls and offer a clear link',
+      name: 'set params count in the summary, prefill their controls and offer a clear link',
       input:: function()
         local c = import './components/main.libsonnet';
-        local filters = c.filters {
+        local params = c.params {
           paramSpecs:: [
             { name: 'status', type: 'string', enum: ['open', 'closed'], role: 'filter' },
             { name: 'states', type: 'array', items: { type: 'string', enum: ['a', 'b', 'c'] }, role: 'filter' },
@@ -196,11 +202,12 @@ local resolveHtml(v) =
           params:: { status: 'closed', states: ['a', 'c'] },
           clearHref:: 'root/x',
         };
-        local details = resolveHtml(filters.html)[1];
+        local details = resolveHtml(params.html)[1];
         local form = details.children[1];
-        local status = form.children[0].children[1];
-        local states = form.children[1].children[1].children[0];
-        local buttons = form.children[3];
+        local fields = form.children[0].children[1].children;
+        local status = fields[0].children[1];
+        local states = fields[1].children[1].children[0];
+        local buttons = form.children[1];
         {
           open: details.attributes.open,
           summary: details.children[0].children[0],
@@ -212,7 +219,7 @@ local resolveHtml(v) =
         },
       expected: {
         open: true,
-        summary: 'Filters (2)',
+        summary: 'Filter (2)',
         statusSelected: ['closed'],
         statesMultiple: true,
         statesSelected: ['a', 'c'],
@@ -221,7 +228,29 @@ local resolveHtml(v) =
       },
     },
     {
-      name: 'a.table.view without filter params renders no filter form',
+      name: 'a table with only sort params renders a params card without a filter group, counting a set sort and offering a clear link',
+      input:: function()
+        local c = import './components/main.libsonnet';
+        local params = c.params {
+          paramSpecs:: [
+            { name: 'sort', type: 'string', enum: ['created', 'updated'], role: 'sort' },
+            { name: 'direction', type: 'string', enum: ['asc', 'desc'], role: 'sort' },
+          ],
+          params:: { sort: 'updated' },
+          clearHref:: 'root/x',
+        };
+        local details = resolveHtml(params.html)[1];
+        local form = details.children[1];
+        {
+          visible: params.visible,
+          summary: details.children[0].children[0],
+          groups: [child.children[0].children[0] for child in form.children if child.attributes.class == 'group'],
+          buttons: [b.element for b in form.children[1].children],
+        },
+      expected: { visible: true, summary: 'Sort (1)', groups: ['Sort'], buttons: ['button', 'a'] },
+    },
+    {
+      name: 'a.table.view without filter or sort params renders no params card',
       input:: function()
         local node = a.table.view {
           data: { items: [{ name: 'alpha' }] },

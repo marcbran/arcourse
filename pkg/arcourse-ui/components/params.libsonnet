@@ -1,123 +1,172 @@
-local text(value) = if value == null then null else std.toString(value);
+local controlsLib = import 'controls.libsonnet';
 
-local option = {
-  local c = self,
-  value:: error 'option requires a value',
-  selected:: false,
-  html: {
-    element: 'option',
-    attributes: { value: c.value, selected: c.selected },
-    children: [c.value],
-  },
-};
+local style = |||
+  @scope (.table-params) {
+    :scope.card {
+      padding: 0.25em;
+    }
+    :scope {
+      font-family: monospace;
+    }
+    summary {
+      cursor: pointer;
+      color: var(--primary-color);
+      padding: 0.3em 0.4em;
+      user-select: none;
+    }
+    form {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.75em;
+      margin: 0;
+      padding: 0.3em 0.4em 0.6em;
+    }
+    .group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3em;
+    }
+    .group-title {
+      opacity: 0.6;
+    }
+    .fields {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 0.5em 1em;
+    }
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2em;
+    }
+    .values {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2em;
+    }
+    input, select {
+      font-family: inherit;
+      font-size: inherit;
+      color: var(--on-background-color);
+      background-color: var(--container-low-color);
+      border: 1px solid var(--border-color);
+      border-radius: 0.5em;
+      padding: 0.3em 0.6em;
+    }
+    input:focus, select:focus {
+      outline: 2px solid var(--primary-color);
+      outline-offset: 2px;
+    }
+    .buttons {
+      display: flex;
+      align-items: center;
+      gap: 0.75em;
+    }
+    button {
+      font-family: inherit;
+      font-size: inherit;
+      color: var(--on-background-color);
+      background-color: var(--container-low-color);
+      border: 1px solid var(--border-color);
+      border-radius: 0.5em;
+      padding: 0.3em 1em;
+      cursor: pointer;
+    }
+    button:hover, button:focus {
+      color: var(--primary-color);
+      border-color: var(--primary-color);
+    }
+    a {
+      color: var(--primary-color);
+    }
+  }
+|||;
 
-local numberControl = {
+local isSet(value) = value != null && value != '' && value != [];
+
+local roleOf(spec) = std.get(spec, 'role', null);
+
+local field = {
   local c = self,
-  name:: error 'numberControl requires a name',
+  spec:: error 'field requires a spec',
   value:: null,
   html: {
-    element: 'input',
-    attributes: { type: 'number', step: 'any', name: c.name, value: text(c.value) },
-  },
-};
-
-local textControl = {
-  local c = self,
-  name:: error 'textControl requires a name',
-  value:: null,
-  html: {
-    element: 'input',
-    attributes: { type: 'text', name: c.name, value: c.value },
-  },
-};
-
-local selectControl = {
-  local c = self,
-  name:: error 'selectControl requires a name',
-  options:: error 'selectControl requires options',
-  value:: null,
-  local current = if c.value == null then '' else std.toString(c.value),
-  html: {
-    element: 'select',
-    attributes: { name: c.name },
+    element: 'label',
     children: [
-      option { value:: v, selected:: v == current }
-      for v in [''] + c.options
+      { element: 'span', children: [c.spec.name] },
+      if c.spec.type == 'array' then {
+        element: 'div',
+        attributes: { class: 'values' },
+        children: [controlsLib.arrayControl { spec:: c.spec, value:: c.value }],
+      }
+      else controlsLib.scalarControl { spec:: c.spec, value:: c.value },
     ],
   },
 };
 
-local multiSelectControl = {
+local group = {
   local c = self,
-  name:: error 'multiSelectControl requires a name',
-  options:: error 'multiSelectControl requires options',
-  value:: null,
-  local current = [std.toString(v) for v in (if c.value == null then [] else c.value)],
+  title:: error 'group requires a title',
+  specs:: error 'group requires specs',
+  params:: {},
   html: {
-    element: 'select',
-    attributes: { name: c.name, multiple: true, size: std.min(std.length(c.options), 6) },
+    element: 'div',
+    attributes: { class: 'group' },
     children: [
-      option { value:: v, selected:: std.member(current, v) }
-      for v in c.options
+      { element: 'span', attributes: { class: 'group-title' }, children: [c.title] },
+      {
+        element: 'div',
+        attributes: { class: 'fields' },
+        children: [field { spec:: spec, value:: std.get(c.params, spec.name, null) } for spec in c.specs],
+      },
     ],
   },
 };
 
-local repeatedTextControl = {
+local clearLink = {
   local c = self,
-  name:: error 'repeatedTextControl requires a name',
-  value:: null,
-  html: [
-    { element: 'input', attributes: { type: 'text', name: c.name, value: v } }
-    for v in [std.toString(v) for v in (if c.value == null then [] else c.value)] + ['']
-  ],
-};
-
-local hiddenControl = {
-  local c = self,
-  name:: error 'hiddenControl requires a name',
-  value:: null,
-  html: [
-    { element: 'input', attributes: { type: 'hidden', name: c.name, value: std.toString(v) } }
-    for v in if c.value == null then [] else if std.isArray(c.value) then c.value else [c.value]
-  ],
-};
-
-local enumOf(spec) = [std.toString(v) for v in std.get(spec, 'enum', [])];
-
-local itemSpec(spec) =
-  local items = std.get(spec, 'items', 'string');
-  if std.isObject(items) then items else { type: items };
-
-local scalarTypes = ['number', 'string', 'boolean'];
-
-local scalarControl = {
-  local c = self,
-  spec:: error 'scalarControl requires a spec',
-  name:: c.spec.name,
-  value:: null,
-  local enum = enumOf(c.spec),
-  html:
-    if std.length(enum) > 0 then (selectControl { name:: c.name, options:: enum, value:: c.value }).html
-    else if c.spec.type == 'boolean' then (selectControl { name:: c.name, options:: ['true', 'false'], value:: c.value }).html
-    else if c.spec.type == 'number' then (numberControl { name:: c.name, value:: c.value }).html
-    else (textControl { name:: c.name, value:: c.value }).html,
-};
-
-local arrayControl = {
-  local c = self,
-  spec:: error 'arrayControl requires a spec',
-  name:: c.spec.name,
-  value:: null,
-  local enum = enumOf(itemSpec(c.spec)),
-  html:
-    if std.length(enum) > 0 then (multiSelectControl { name:: c.name, options:: enum, value:: c.value }).html
-    else (repeatedTextControl { name:: c.name, value:: c.value }).html,
+  href:: error 'clearLink requires an href',
+  html: { element: 'a', attributes: { href: c.href }, children: ['Clear'] },
 };
 
 {
-  scalarTypes: scalarTypes,
-  scalarControl: scalarControl,
-  arrayControl: arrayControl,
-  hiddenControl: hiddenControl,
+  local c = self,
+  paramSpecs:: [],
+  params:: {},
+  clearHref:: null,
+  local filterSpecs = [spec for spec in c.paramSpecs if roleOf(spec) == 'filter'],
+  local sortSpecs = [spec for spec in c.paramSpecs if roleOf(spec) == 'sort'],
+  local keptSpecs = [spec for spec in c.paramSpecs if !std.member(['filter', 'sort', 'pagination'], roleOf(spec))],
+  local active = std.length([spec for spec in filterSpecs + sortSpecs if isSet(std.get(c.params, spec.name, null))]),
+  local hasFilters = std.length(filterSpecs) > 0,
+  local hasSort = std.length(sortSpecs) > 0,
+  local title = if hasFilters && hasSort then 'Filter & sort' else if hasFilters then 'Filter' else 'Sort',
+  visible:: hasFilters || hasSort,
+  html: [
+    { element: 'style', children: [style] },
+    {
+      element: 'details',
+      attributes: { class: 'card table-params', open: true },
+      children: [
+        { element: 'summary', children: [title + (if active > 0 then ' (%d)' % active else '')] },
+        {
+          element: 'form',
+          attributes: { method: 'get' },
+          children:
+            (if hasFilters then [group { title:: 'Filter', specs:: filterSpecs, params:: c.params }] else []) +
+            (if hasSort then [group { title:: 'Sort', specs:: sortSpecs, params:: c.params }] else []) +
+            [controlsLib.hiddenControl { name:: spec.name, value:: std.get(c.params, spec.name, null) } for spec in keptSpecs] +
+            [{
+              element: 'div',
+              attributes: { class: 'buttons' },
+              children:
+                [{ element: 'button', attributes: { type: 'submit' }, children: ['Apply'] }] +
+                (if active > 0 && c.clearHref != null then [clearLink { href:: c.clearHref }] else []),
+            }],
+        },
+      ],
+    },
+  ],
 }
