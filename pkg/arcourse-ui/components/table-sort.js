@@ -20,30 +20,20 @@
     return a.localeCompare(b);
   }
 
-  function firstCol(table) {
-    var th = table.querySelector('thead th');
-    return th ? th.dataset.col : null;
-  }
-
   function apply(table) {
     var ths = headers(table);
     ths.forEach(function (th) { th.classList.remove('sort-asc', 'sort-desc'); });
-    if (ths.length === 0) return;
-    var key = window.hashParams.get('sort');
-    var desc = window.hashParams.get('dir') === 'desc';
-    var i = 0;
-    if (key) {
-      i = -1;
-      ths.forEach(function (th, idx) { if (th.dataset.col === key) i = idx; });
-      if (i < 0) { i = 0; desc = false; }
-    } else {
-      desc = false;
-    }
-    ths[i].classList.add(desc ? 'sort-desc' : 'sort-asc');
     var tbody = table.querySelector('tbody');
     if (!tbody || tbody.querySelector('td.empty')) return;
     var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));
+    rows.forEach(function (r, idx) { if (r.dataset.order === undefined) r.dataset.order = String(idx); });
+    var key = window.hashParams.get('sort');
+    var desc = window.hashParams.get('dir') === 'desc';
+    var i = -1;
+    ths.forEach(function (th, idx) { if (th.dataset.col === key) i = idx; });
+    if (i >= 0) ths[i].classList.add(desc ? 'sort-desc' : 'sort-asc');
     rows.sort(function (a, b) {
+      if (i < 0) return Number(a.dataset.order) - Number(b.dataset.order);
       var r = compare(cellText(a, i), cellText(b, i));
       return desc ? -r : r;
     });
@@ -65,28 +55,16 @@
     var table = th.closest('table.table');
     if (!table) return;
     var key = th.dataset.col;
-    var first = firstCol(table);
-    var curKey = window.hashParams.get('sort') || first;
+    var curKey = window.hashParams.get('sort');
     var curDesc = window.hashParams.get('dir') === 'desc';
-    var nextKey;
-    var nextDesc;
     if (curKey !== key) {
-      nextKey = key;
-      nextDesc = false;
+      window.hashParams.set('sort', key);
+      window.hashParams.remove('dir');
     } else if (!curDesc) {
-      nextKey = key;
-      nextDesc = true;
+      window.hashParams.set('dir', 'desc');
     } else {
-      nextKey = first;
-      nextDesc = false;
-    }
-    if (nextKey === first && !nextDesc) {
       window.hashParams.remove('sort');
       window.hashParams.remove('dir');
-    } else {
-      window.hashParams.set('sort', nextKey);
-      if (nextDesc) window.hashParams.set('dir', 'desc');
-      else window.hashParams.remove('dir');
     }
     applyAll();
   });

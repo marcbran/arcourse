@@ -1,4 +1,4 @@
-local paramsLib = import 'params.libsonnet';
+local controlsLib = import 'controls.libsonnet';
 local script = importstr 'action-card.js';
 
 local style = |||
@@ -105,18 +105,18 @@ local field = {
   local initial = std.objectHas(c.initialValues, name),
   local value = if present then c.params[name] else if initial then c.initialValues[name] else null,
   html:
-    if std.member(paramsLib.scalarTypes, c.spec.type) then [{
+    if std.member(controlsLib.scalarTypes, c.spec.type) then [{
       element: 'label',
       children: [
         { element: 'span', children: [name] },
-        paramsLib.scalarControl { spec:: c.spec, value:: value },
+        controlsLib.scalarControl { spec:: c.spec, value:: value },
       ],
     }] + [
       issue { message:: i.message, hint:: !present }
       for i in c.issues
       if present || !initial
     ]
-    else paramsLib.hiddenControl { name:: name, value:: value },
+    else controlsLib.hiddenControl { name:: name, value:: value },
 };
 
 local paramsForm = {
@@ -174,7 +174,7 @@ local applyForm = {
   local hasParams = std.length(c.paramSpecs) > 0,
   local issues = if c.action != null && std.objectHas(c.action, 'issues') then c.action.issues else [],
   local applicable = c.action != null && !std.objectHas(c.action, 'issues'),
-  local paramNames = [spec.name for spec in c.paramSpecs if std.member(paramsLib.scalarTypes, spec.type)],
+  local paramNames = [spec.name for spec in c.paramSpecs if std.member(controlsLib.scalarTypes, spec.type)],
   local formIssues = [i for i in issues if !std.member(paramNames, std.get(i, 'param', null))],
   html: [
     { element: 'style', children: [style] },

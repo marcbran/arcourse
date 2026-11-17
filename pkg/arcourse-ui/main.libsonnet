@@ -204,7 +204,7 @@ local tableView = baseView {
   items: [projectItem(item, columns) for item in dataItems],
   local specs = std.get($, '_paramSpecs', []),
   local params = std.get($, '_params', {}),
-  local droppedNames = [spec.name for spec in specs if std.member(['filter', 'pagination'], std.get(spec, 'role', null))],
+  local droppedNames = [spec.name for spec in specs if std.member(['filter', 'sort', 'pagination'], std.get(spec, 'role', null))],
   local cleared = $ { _params: { [k]: params[k] for k in std.objectFields(params) if !std.member(droppedNames, k) } },
   _view+:: {
     fragment:
@@ -213,7 +213,7 @@ local tableView = baseView {
         columns:: columns,
         rowLinks:: linkspecs.rowLinksFor($, std.get($, 'linkSpecs', []), at),
         pagination:: std.get(std.get($, 'links', {}), 'pagination', null),
-        filters:: c.filters {
+        params:: c.params {
           paramSpecs:: specs,
           params:: params,
           clearHref:: if std.objectHasAll(cleared, '_queryPath') then cleared._queryPath else null,
