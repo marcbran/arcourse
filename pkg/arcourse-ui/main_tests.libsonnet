@@ -141,7 +141,7 @@ local resolveHtml(v) =
       expected: { cardChildCount: 1 },
     },
     {
-      name: 'a.table.view renders a collapsed filter form from filter params, carries sort and shaping values as hidden inputs and drops pagination',
+      name: 'a.table.view renders an expanded filter card before the table card from filter params, carries sort and shaping values as hidden inputs and drops pagination',
       input:: function()
         local node = a.table.view {
           data: { items: [{ name: 'alpha' }] },
@@ -155,12 +155,15 @@ local resolveHtml(v) =
           ],
           _params: { sort: 'name', include: ['teams'], page: 2 },
         };
-        local details = resolveHtml(node._view.fragment.html[1].children[0].html)[1];
+        local html = resolveHtml(node._view.fragment.html);
+        local details = html[2];
+        local tableCard = html[3];
         local form = details.children[1];
         local labels = [child for child in form.children if child.element == 'label'];
         local hidden = [child.attributes for child in form.children if child.element == 'input'];
         {
           open: details.attributes.open,
+          classes: [details.attributes.class, tableCard.attributes.class],
           summary: details.children[0].children[0],
           fields: [label.children[0].children[0] for label in labels],
           statusOptions: [o.attributes.value for o in labels[0].children[1].children],
@@ -168,7 +171,8 @@ local resolveHtml(v) =
           hidden: hidden,
         },
       expected: {
-        open: false,
+        open: true,
+        classes: ['card table-filters', 'card table-card'],
         summary: 'Filters',
         fields: ['status', 'ids'],
         statusOptions: ['', 'open', 'closed'],
@@ -180,7 +184,7 @@ local resolveHtml(v) =
       },
     },
     {
-      name: 'active filters open the form, count in the summary, prefill their controls and offer a clear link',
+      name: 'active filters count in the summary, prefill their controls and offer a clear link',
       input:: function()
         local c = import './components/main.libsonnet';
         local filters = c.filters {

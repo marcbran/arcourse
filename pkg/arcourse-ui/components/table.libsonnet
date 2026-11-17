@@ -200,10 +200,11 @@ local paginationNav = {
   local nav = paginationNav { pagination:: c.pagination },
   html: [
     { element: 'style', children: [style] },
+  ] + (if c.filters != null && c.filters.visible then [c.filters] else []) + [
     {
       element: 'div',
       attributes: { class: 'card table-card' },
-      children: (if c.filters != null && c.filters.visible then [c.filters] else []) + [
+      children: [
         {
           element: 'table',
           attributes: { class: 'table' },

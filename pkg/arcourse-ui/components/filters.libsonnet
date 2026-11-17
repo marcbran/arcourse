@@ -2,9 +2,11 @@ local paramsLib = import 'params.libsonnet';
 
 local style = |||
   @scope (.table-filters) {
+    :scope.card {
+      padding: 0.25em;
+    }
     :scope {
       font-family: monospace;
-      align-self: stretch;
     }
     summary {
       cursor: pointer;
@@ -109,7 +111,7 @@ local clearLink = {
     { element: 'style', children: [style] },
     {
       element: 'details',
-      attributes: { class: 'table-filters', open: active > 0 },
+      attributes: { class: 'card table-filters', open: true },
       children: [
         { element: 'summary', children: [if active > 0 then 'Filters (%d)' % active else 'Filters'] },
         {
