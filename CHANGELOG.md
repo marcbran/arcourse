@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.28.0](https://github.com/marcbran/arcourse/compare/v0.27.0...v0.28.0) (2026-11-19)
+
+
+### Features
+
+* let tables collapse their params card by default ([#184](https://github.com/marcbran/arcourse/issues/184)) ([b2c3ff2](https://github.com/marcbran/arcourse/commit/b2c3ff27fda158ac267e0254645090bbad4faa21))
+
 ## [0.27.0](https://github.com/marcbran/arcourse/compare/v0.26.1...v0.27.0) (2026-11-17)
 
 
