@@ -250,6 +250,19 @@ local resolveHtml(v) =
       expected: { visible: true, summary: 'Sort (1)', groups: ['Sort'], buttons: ['button', 'a'] },
     },
     {
+      name: 'table.params.open false collapses the params card unless a param is set',
+      input:: function()
+        local node(params) = a.table.view {
+          data: { items: [{ name: 'alpha' }] },
+          table: { columns: [{ label: 'Name', path: ['name'] }], params: { open: false } },
+          _paramSpecs: [{ name: 'labelSelector', type: 'string', role: 'filter', default: null }],
+          _params: params,
+        };
+        local openOf(n) = resolveHtml(n._view.fragment.html)[2].attributes.open;
+        { unset: openOf(node({})), set: openOf(node({ labelSelector: 'app=api' })) },
+      expected: { unset: false, set: true },
+    },
+    {
       name: 'a.table.view without filter or sort params renders no params card',
       input:: function()
         local node = a.table.view {

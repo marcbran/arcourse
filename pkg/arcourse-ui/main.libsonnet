@@ -216,6 +216,7 @@ local tableView = baseView {
         params:: c.params {
           paramSpecs:: specs,
           params:: params,
+          open:: std.get(std.get(table, 'params', {}), 'open', true),
           clearHref:: if std.objectHasAll(cleared, '_queryPath') then cleared._queryPath else null,
         },
       },
