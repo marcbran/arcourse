@@ -136,6 +136,7 @@ local clearLink = {
   paramSpecs:: [],
   params:: {},
   clearHref:: null,
+  open:: true,
   local filterSpecs = [spec for spec in c.paramSpecs if roleOf(spec) == 'filter'],
   local sortSpecs = [spec for spec in c.paramSpecs if roleOf(spec) == 'sort'],
   local keptSpecs = [spec for spec in c.paramSpecs if !std.member(['filter', 'sort', 'pagination'], roleOf(spec))],
@@ -148,7 +149,7 @@ local clearLink = {
     { element: 'style', children: [style] },
     {
       element: 'details',
-      attributes: { class: 'card table-params', open: true },
+      attributes: { class: 'card table-params', open: c.open || active > 0 },
       children: [
         { element: 'summary', children: [title + (if active > 0 then ' (%d)' % active else '')] },
         {
