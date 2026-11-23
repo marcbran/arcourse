@@ -143,6 +143,14 @@ func (f *ServerBackedCLIFacade) Watch(ctx context.Context, path pkg.QueryPath, p
 	return f.client.Watch(ctx, path, params, format, origin)
 }
 
+func (f *ServerBackedCLIFacade) Review(ctx context.Context, path pkg.QueryPath, id pkg.EvaluationID, format pkg.Format) (pkg.Result, error) {
+	err := f.start()
+	if err != nil {
+		return pkg.Result{}, err
+	}
+	return f.client.Review(ctx, path, id, format)
+}
+
 func (f *ServerBackedCLIFacade) Exec(ctx context.Context, id pkg.EvaluationID) (pkg.ExecResult, error) {
 	err := f.start()
 	if err != nil {
@@ -390,6 +398,25 @@ func (f *CLIFacade) Watch(ctx context.Context, path pkg.QueryPath, params map[st
 	}()
 
 	return ch, cancel, nil
+}
+
+func (f *CLIFacade) Review(ctx context.Context, path pkg.QueryPath, id pkg.EvaluationID, format pkg.Format) (pkg.Result, error) {
+	cmd := exec.CommandContext(ctx, f.binaryPath, "review", path.String(), string(id), "--format", string(format))
+	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		if stderr.String() != "" {
+			return pkg.Result{}, errors.New(stderr.String())
+		}
+		return pkg.Result{}, err
+	}
+	return pkg.Result{Output: strings.TrimSuffix(stdout.String(), "\n"), EvaluationID: id}, nil
 }
 
 type execOutput struct {

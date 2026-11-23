@@ -52,5 +52,5 @@ func (c *Client) Query(ctx context.Context, path pkg.QueryPath, params map[strin
 	if resp.StatusCode != http.StatusOK && out.Failure == nil {
 		return pkg.Result{}, out.Err()
 	}
-	return pkg.Result{Output: out.Output, EvaluationID: pkg.EvaluationID(out.EvaluationID), Failure: out.Failure}, nil
+	return pkg.Result{Output: out.Output, EvaluationID: pkg.EvaluationID(out.EvaluationID), Failure: out.Failure, Action: out.Action}, nil
 }

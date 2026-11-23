@@ -78,31 +78,32 @@ func decodeEvaluation(out string, req request) (evaluated, error) {
 	if err != nil {
 		return evaluated{}, err
 	}
-	failure, err := failureOf(decoded)
+	failure, action, err := inspect(decoded)
 	if err != nil {
 		return evaluated{}, err
 	}
 	return evaluated{
-		result:       pkg.Result{Output: decoded[req.format], Failure: failure},
+		result:       pkg.Result{Output: decoded[req.format], Failure: failure, Action: action},
 		evaluationID: course.EvaluationID(evaluationID),
 		contents:     recordableContents(decoded),
 		recordable:   recordable(decoded),
 	}, nil
 }
 
-func failureOf(decoded map[pkg.Format]string) (*pkg.Failure, error) {
+func inspect(decoded map[pkg.Format]string) (*pkg.Failure, bool, error) {
 	raw, ok := decoded[pkg.FormatJSON]
 	if !ok {
-		return nil, nil
+		return nil, false, nil
 	}
 	var doc struct {
-		Failure *pkg.Failure `json:"_failure"`
+		Failure *pkg.Failure    `json:"_failure"`
+		Action  json.RawMessage `json:"_action"`
 	}
 	err := json.Unmarshal([]byte(raw), &doc)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	return doc.Failure, nil
+	return doc.Failure, len(doc.Action) > 0 && string(doc.Action) != "null", nil
 }
 
 func decodeOutput(out string, formats []pkg.Format, primary pkg.Format) (map[pkg.Format]string, pkg.EvaluationID, error) {

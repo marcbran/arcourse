@@ -35,6 +35,11 @@ const browseTemplate = `<div id="node">%s</div>
 </script>
 `
 
+const reviewTemplate = `<div id="node">%s</div>
+%s`
+
+const evaluationIDParam = "evaluationId"
+
 const quickRemarkTemplate = `<quick-remark from="%s"></quick-remark>
 <script src="%s"></script>
 `
@@ -43,6 +48,10 @@ func (s *Server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 	path := pkg.NewQueryPath(r.URL.EscapedPath())
 	if path == "" {
 		http.Redirect(w, r, "/root", http.StatusFound)
+		return
+	}
+	if id := r.URL.Query().Get(evaluationIDParam); id != "" {
+		s.serveReview(w, r, path, pkg.EvaluationID(id))
 		return
 	}
 	params := map[string]any{}
@@ -61,6 +70,13 @@ func (s *Server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result := <-ch
+	if result.Action && result.EvaluationID != "" {
+		unregister()
+		cancel()
+		target := "/" + path.String() + "?" + url.Values{evaluationIDParam: {string(result.EvaluationID)}}.Encode()
+		http.Redirect(w, r, target, http.StatusSeeOther)
+		return
+	}
 	token := s.pendingWatches.store(ch, func() {
 		unregister()
 		cancel()
@@ -71,6 +87,20 @@ func (s *Server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 	_, err = fmt.Fprintf(w, browseTemplate, result.Output, browseRemark(result.EvaluationID), watchURL)
 	if err != nil {
 		slog.Warn("write browse response", "err", err)
+	}
+}
+
+func (s *Server) serveReview(w http.ResponseWriter, r *http.Request, path pkg.QueryPath, id pkg.EvaluationID) {
+	result, err := s.facade.Review(r.Context(), path, id, pkg.FormatHTML)
+	if err != nil {
+		returnError(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, err = fmt.Fprintf(w, reviewTemplate, result.Output, browseRemark(result.EvaluationID))
+	if err != nil {
+		slog.Warn("write review response", "err", err)
 	}
 }
 

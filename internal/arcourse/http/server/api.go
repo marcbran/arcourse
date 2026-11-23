@@ -26,6 +26,7 @@ type outputResponse struct {
 	Output       string       `json:"output"`
 	EvaluationID string       `json:"evaluationId,omitempty"`
 	Failure      *pkg.Failure `json:"failure,omitempty"`
+	Action       bool         `json:"action,omitempty"`
 }
 
 type remarkRequest struct {
@@ -89,6 +90,30 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 	}
 	origin := pkg.Origin{Session: pkg.SessionID(req.Session), From: pkg.EntryID(req.From), FromPath: pkg.NewQueryPath(req.FromPath)}
 	result, err := s.facade.Query(r.Context(), pkg.NewQueryPath(req.Path), req.Params, format, origin)
+	if err != nil {
+		returnError(w, err)
+		return
+	}
+	returnResult(w, result)
+}
+
+func (s *Server) handleReview(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		returnBadRequest(w, errors.New("id is required"))
+		return
+	}
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		returnBadRequest(w, errors.New("path is required"))
+		return
+	}
+	format, err := pkg.ParseFormat(r.URL.Query().Get("format"))
+	if err != nil {
+		returnBadRequest(w, err)
+		return
+	}
+	result, err := s.facade.Review(r.Context(), pkg.NewQueryPath(path), pkg.EvaluationID(id), format)
 	if err != nil {
 		returnError(w, err)
 		return

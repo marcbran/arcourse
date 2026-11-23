@@ -49,6 +49,11 @@ func (uc *watch) Exec(ctx context.Context, path pkg.QueryPath, params map[string
 
 	results := make(chan pkg.Result, 1)
 	results <- result
+	if result.Action {
+		unregister()
+		close(results)
+		return results, func() {}, nil
+	}
 	go func() {
 		defer close(results)
 

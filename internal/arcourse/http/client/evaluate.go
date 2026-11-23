@@ -19,6 +19,7 @@ type outputResponse struct {
 	Output       string       `json:"output"`
 	EvaluationID string       `json:"evaluationId"`
 	Failure      *pkg.Failure `json:"failure"`
+	Action       bool         `json:"action"`
 }
 
 func (c *Client) Evaluate(ctx context.Context, expression string) (pkg.Result, error) {
