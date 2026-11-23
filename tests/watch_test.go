@@ -125,3 +125,20 @@ func TestWatchRecoversWhenAFailingNodeIsFixed(t *testing.T) {
 	then.
 		the_raw_output_is("<p>fixed</p>")
 }
+
+func TestWatchOfAnActionNodeEndsAfterItsFirstEvent(t *testing.T) {
+	given, when, then := plugin_scenario(t)
+
+	given.
+		a_graph_root(`{
+			_node: "resource",
+			_action: { plugin: "test", name: "echo", data: { value: "hello" } },
+		}`).and().
+		a_watcher_subscribes_to("root", pkg.FormatJSON)
+
+	when.
+		the_watch_event_is_received_and_watcher_stays_subscribed()
+
+	then.
+		the_watch_has_ended()
+}

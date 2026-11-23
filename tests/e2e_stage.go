@@ -23,9 +23,10 @@ type Stage struct {
 	watchCh          <-chan pkg.Result
 	watchUnsubscribe func()
 
-	evaluationID pkg.EvaluationID
-	executionID  string
-	origin       pkg.Origin
+	evaluationID   pkg.EvaluationID
+	executionID    string
+	recordedOutput string
+	origin         pkg.Origin
 
 	LastOutput string
 	LastError  string

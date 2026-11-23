@@ -17,6 +17,7 @@ type facade struct {
 	remark      *remark
 	query       *query
 	watch       *watch
+	review      *review
 	compile     *compile
 	warm        *warm
 	environment *environment
@@ -33,6 +34,7 @@ func NewFacade(cfg Config, evaluator Evaluator, executor Executor, courseFacade 
 	warm := newWarm(environment)
 	exec := newExec(courseFacade, environment)
 	remark := newRemark(courseFacade)
+	review := newReview(courseFacade)
 
 	return &facade{
 		evaluate:    evaluate,
@@ -40,6 +42,7 @@ func NewFacade(cfg Config, evaluator Evaluator, executor Executor, courseFacade 
 		remark:      remark,
 		query:       query,
 		watch:       watch,
+		review:      review,
 		compile:     compile,
 		warm:        warm,
 		environment: environment,
@@ -56,6 +59,10 @@ func (f *facade) Query(ctx context.Context, path pkg.QueryPath, params map[strin
 
 func (f *facade) Watch(ctx context.Context, path pkg.QueryPath, params map[string]any, format pkg.Format, origin pkg.Origin) (<-chan pkg.Result, func(), error) {
 	return f.watch.Exec(ctx, path, params, format, origin)
+}
+
+func (f *facade) Review(ctx context.Context, path pkg.QueryPath, id pkg.EvaluationID, format pkg.Format) (pkg.Result, error) {
+	return f.review.Exec(ctx, path, id, format)
 }
 
 func (f *facade) Exec(ctx context.Context, id pkg.EvaluationID) (pkg.ExecResult, error) {

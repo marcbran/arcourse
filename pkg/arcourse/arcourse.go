@@ -16,6 +16,7 @@ var (
 	ErrActionNotFound     = errors.New("node has no action")
 	ErrActionInvalid      = errors.New("action is invalid")
 	ErrAlreadyExecuted    = errors.New("query already executed")
+	ErrEvaluationMismatch = errors.New("evaluation belongs to a different node")
 	ErrEmptyRemark        = errors.New("remark text is empty")
 	ErrEvaluation         = errors.New("evaluation failed")
 	ErrShapeNotSupported  = errors.New("compiling a root shape requires immediateGraph or compiledGraph mode (root.jsonnet must be a node-spec list, not a finished value)")
@@ -91,6 +92,7 @@ type Result struct {
 	Output       string
 	EvaluationID EvaluationID
 	Failure      *Failure
+	Action       bool
 }
 
 type Failure struct {
@@ -109,6 +111,7 @@ type Facade interface {
 	Evaluate(ctx context.Context, expression string) (Result, error)
 	Query(ctx context.Context, path QueryPath, params map[string]any, format Format, origin Origin) (Result, error)
 	Watch(ctx context.Context, path QueryPath, params map[string]any, format Format, origin Origin) (<-chan Result, func(), error)
+	Review(ctx context.Context, path QueryPath, id EvaluationID, format Format) (Result, error)
 	Exec(ctx context.Context, id EvaluationID) (ExecResult, error)
 	Remark(ctx context.Context, id EvaluationID, text string) (RemarkID, error)
 	Compile(ctx context.Context) (Result, error)

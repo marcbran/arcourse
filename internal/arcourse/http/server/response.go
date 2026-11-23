@@ -27,7 +27,7 @@ func resultStatus(result pkg.Result) int {
 func returnResult(w http.ResponseWriter, result pkg.Result) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(resultStatus(result))
-	returnJSON(w, outputResponse{Output: result.Output, EvaluationID: string(result.EvaluationID), Failure: result.Failure})
+	returnJSON(w, outputResponse{Output: result.Output, EvaluationID: string(result.EvaluationID), Failure: result.Failure, Action: result.Action})
 }
 
 func returnSuccess(w http.ResponseWriter, data any) {
@@ -43,7 +43,7 @@ func returnError(w http.ResponseWriter, err error) {
 		returnBadRequest(w, err)
 		return
 	}
-	if errors.Is(err, pkg.ErrQueryNotRecorded) {
+	if errors.Is(err, pkg.ErrQueryNotRecorded) || errors.Is(err, pkg.ErrEvaluationMismatch) {
 		returnNotFound(w, err)
 		return
 	}

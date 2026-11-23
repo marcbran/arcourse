@@ -80,7 +80,7 @@ func (c *Client) Watch(ctx context.Context, path pkg.QueryPath, params map[strin
 			if err != nil {
 				continue
 			}
-			result := pkg.Result{Output: out.Output, EvaluationID: pkg.EvaluationID(out.EvaluationID), Failure: out.Failure}
+			result := pkg.Result{Output: out.Output, EvaluationID: pkg.EvaluationID(out.EvaluationID), Failure: out.Failure, Action: out.Action}
 			select {
 			case ch <- result:
 			case <-streamCtx.Done():
