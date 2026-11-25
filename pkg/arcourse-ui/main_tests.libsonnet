@@ -685,6 +685,31 @@ local resolveHtml(v) =
       },
     },
     {
+      name: 'action with an evaluation time renders when it was planned below the summary',
+      input:: function()
+        local c = import './components/main.libsonnet';
+        local t = c.action {
+          evaluationId:: 'e1',
+          evaluatedAt:: '2026-11-23T14:03:05+01:00',
+          summary:: 'Restart',
+          action:: { plugin: 'test', name: 'echo', data: {} },
+        };
+        local card = resolveHtml(t.html)[std.length(resolveHtml(t.html)) - 1];
+        local planned = card.children[1];
+        {
+          class: planned.attributes.class,
+          label: planned.children[0],
+          time: planned.children[1].attributes.datetime,
+          text: planned.children[1].children[0],
+        },
+      expected: {
+        class: 'planned',
+        label: 'Planned ',
+        time: '2026-11-23T14:03:05+01:00',
+        text: '2026-11-23 14:03:05',
+      },
+    },
+    {
       name: 'action with a missing param renders a hint, a plan button and no apply form',
       input:: function()
         local c = import './components/main.libsonnet';
@@ -701,6 +726,7 @@ local resolveHtml(v) =
           hasScript: resolveHtml(t.html)[1].element == 'script',
           formId: form.attributes.id,
           formMethod: form.attributes.method,
+          formAutocomplete: form.attributes.autocomplete,
           input: form.children[0].children[1].attributes,
           issue: { class: form.children[1].attributes.class, text: form.children[1].children[0] },
           buttons: [b.children[0] for b in buttons.children],
@@ -710,6 +736,7 @@ local resolveHtml(v) =
         hasScript: true,
         formId: 'action-params',
         formMethod: 'get',
+        formAutocomplete: 'off',
         input: { type: 'number', step: 'any', name: 'replicas', value: null },
         issue: { class: 'issue hint', text: 'is required' },
         buttons: ['Plan'],

@@ -8,6 +8,7 @@ function(root, segments, params, formats)
   local found = traversePath(root, segments);
   local merged = if failure.isFailure(found) then found else applyParams(found, params);
   local evaluationId = std.native('invoke:arcourse')('uuid', []);
+  local evaluatedAt = std.native('invoke:arcourse')('now', []);
   local fields =
     if failure.isFailure(merged) then
       {
@@ -15,7 +16,7 @@ function(root, segments, params, formats)
         html: failurePage(merged._failure, 'html'),
       }
     else
-      local identified = merged + { _evaluationId: evaluationId };
+      local identified = merged + { _evaluationId: evaluationId, _evaluatedAt:: evaluatedAt };
       local view = if std.objectHasAll(identified, '_view') then identified._view else {};
       { json: truncateNode(identified, 'query') } +
       (if std.objectHasAll(view, 'html') then { html: view.html } else {}) +
