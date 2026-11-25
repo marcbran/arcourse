@@ -38,8 +38,6 @@ const browseTemplate = `<div id="node">%s</div>
 const reviewTemplate = `<div id="node">%s</div>
 %s`
 
-const evaluationIDParam = "evaluationId"
-
 const quickRemarkTemplate = `<quick-remark from="%s"></quick-remark>
 <script src="%s"></script>
 `
@@ -50,7 +48,7 @@ func (s *Server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/root", http.StatusFound)
 		return
 	}
-	if id := r.URL.Query().Get(evaluationIDParam); id != "" {
+	if id := r.URL.Query().Get(pkg.EvaluationIDParam); id != "" {
 		s.serveReview(w, r, path, pkg.EvaluationID(id))
 		return
 	}
@@ -73,7 +71,7 @@ func (s *Server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 	if result.Action && result.EvaluationID != "" {
 		unregister()
 		cancel()
-		target := "/" + path.String() + "?" + url.Values{evaluationIDParam: {string(result.EvaluationID)}}.Encode()
+		target := "/" + path.String() + "?" + url.Values{pkg.EvaluationIDParam: {string(result.EvaluationID)}}.Encode()
 		http.Redirect(w, r, target, http.StatusSeeOther)
 		return
 	}

@@ -22,6 +22,10 @@ func (s *Stage) the_recorded_evaluation_is_reviewed_at(path string, format pkg.F
 	return s.an_evaluation_is_reviewed_at(path, s.evaluationID, format)
 }
 
+func (s *Stage) the_recorded_evaluation_is_reviewed_at_its_url(path string, format pkg.Format) *Stage {
+	return s.an_evaluation_is_reviewed_at(path+"?"+pkg.EvaluationIDParam+"="+string(s.evaluationID), "", format)
+}
+
 func (s *Stage) an_evaluation_is_reviewed_at(path string, id pkg.EvaluationID, format pkg.Format) *Stage {
 	result, err := s.facade.Review(context.Background(), pkg.NewQueryPath(path), id, format)
 	if err != nil {
@@ -36,6 +40,11 @@ func (s *Stage) an_evaluation_is_reviewed_at(path string, id pkg.EvaluationID, f
 
 func (s *Stage) the_output_is_the_recorded_query_output() *Stage {
 	require.JSONEq(s.t, s.recordedOutput, s.LastOutput)
+	return s
+}
+
+func (s *Stage) the_output_is_pretty_printed() *Stage {
+	require.Contains(s.t, s.LastOutput, "{\n   \"")
 	return s
 }
 

@@ -89,7 +89,7 @@ func NewServer(ctx context.Context, facade pkg.Facade) *Server {
 	s := &Server{facade: facade, mux: http.NewServeMux(), pendingWatches: newPendingWatches(), ctx: serverCtx, cancel: cancel}
 	s.mux.HandleFunc("POST /api/evaluate", s.handleEvaluate)
 	s.mux.HandleFunc("POST /api/query", s.handleQuery)
-	s.mux.HandleFunc("GET /api/review/{id}", s.handleReview)
+	s.mux.HandleFunc("GET /api/review", s.handleReview)
 	s.mux.HandleFunc("POST /api/exec/{id}", s.handleExec)
 	s.mux.HandleFunc("POST /api/remark/{id}", s.handleRemark)
 	s.mux.HandleFunc("GET /api/watch", s.handleWatch)

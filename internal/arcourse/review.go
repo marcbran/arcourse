@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/marcbran/arcourse/internal/course"
@@ -24,6 +25,21 @@ func (uc *review) Exec(ctx context.Context, path pkg.QueryPath, id pkg.Evaluatio
 		return pkg.Result{}, err
 	}
 
+	base, rawQuery, _ := strings.Cut(path.String(), "?")
+	values, err := url.ParseQuery(rawQuery)
+	if err != nil {
+		return pkg.Result{}, err
+	}
+	if fromPath := pkg.EvaluationID(values.Get(pkg.EvaluationIDParam)); fromPath != "" {
+		if id != "" && id != fromPath {
+			return pkg.Result{}, fmt.Errorf("%w: path names %s but %s was given", pkg.ErrEvaluationMismatch, fromPath, id)
+		}
+		id = fromPath
+	}
+	if id == "" {
+		return pkg.Result{}, fmt.Errorf("%w: pass it as an argument or as ?%s= in the path", pkg.ErrEvaluationIDNeeded, pkg.EvaluationIDParam)
+	}
+
 	event, err := uc.course.Evaluation(ctx, course.EvaluationID(id))
 	if err != nil {
 		if errors.Is(err, course.ErrEvaluationNotRecorded) {
@@ -32,7 +48,6 @@ func (uc *review) Exec(ctx context.Context, path pkg.QueryPath, id pkg.Evaluatio
 		return pkg.Result{}, err
 	}
 
-	base, _, _ := strings.Cut(path.String(), "?")
 	if pkg.NewQueryPath(base) != pkg.QueryPath(event.Address) {
 		return pkg.Result{}, fmt.Errorf("%w: %s is not an evaluation of %s", pkg.ErrEvaluationMismatch, id, pkg.NewQueryPath(base))
 	}
@@ -46,6 +61,10 @@ func (uc *review) Exec(ctx context.Context, path pkg.QueryPath, id pkg.Evaluatio
 	}
 	if format == pkg.FormatJSON {
 		content, err = withEvaluationID(content, event.EvaluationID)
+		if err != nil {
+			return pkg.Result{}, err
+		}
+		content, err = indentJSON(content)
 		if err != nil {
 			return pkg.Result{}, err
 		}

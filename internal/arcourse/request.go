@@ -64,6 +64,10 @@ func queryParts(path pkg.QueryPath, params map[string]any, formats []pkg.Format)
 	if err != nil {
 		return "", nil, "", "", err
 	}
+	merged := mergeParams(queryParams, params)
+	if _, ok := merged[pkg.EvaluationIDParam]; ok {
+		return "", nil, "", "", fmt.Errorf("%w: review it with arco review <path> <id>", pkg.ErrEvaluationIDParam)
+	}
 	queryPath = pkg.NewQueryPath(queryPath.String())
 	parts := strings.Split(queryPath.String(), "/")
 	segments = make([]string, 0, len(parts)-1)
@@ -74,7 +78,7 @@ func queryParts(path pkg.QueryPath, params map[string]any, formats []pkg.Format)
 		}
 		segments = append(segments, segment)
 	}
-	paramsBytes, err := json.Marshal(mergeParams(queryParams, params))
+	paramsBytes, err := json.Marshal(merged)
 	if err != nil {
 		return "", nil, "", "", err
 	}

@@ -12,7 +12,8 @@ func newReviewCmd(plugins []*jpoet.Plugin) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "review [path] [id]",
 		Short: "Review a recorded evaluation of a node without evaluating it again",
-		Args:  cobra.ExactArgs(2),
+		Long:  "Review a recorded evaluation of a node without evaluating it again. The id can also be part of the path, as in a browse URL: review \"<path>?evaluationId=<id>\".",
+		Args:  cobra.RangeArgs(1, 2),
 		RunE: func(c *cobra.Command, args []string) error {
 			c.SilenceUsage = true
 			c.SilenceErrors = true
@@ -33,11 +34,15 @@ func newReviewCmd(plugins []*jpoet.Plugin) *cobra.Command {
 			}
 			facade := buildFacade(cfg, plugins)
 
-			result, err := facade.Review(c.Context(), pkg.NewQueryPath(args[0]), pkg.EvaluationID(args[1]), format)
+			var id pkg.EvaluationID
+			if len(args) == 2 {
+				id = pkg.EvaluationID(args[1])
+			}
+			result, err := facade.Review(c.Context(), pkg.NewQueryPath(args[0]), id, format)
 			if err != nil {
 				return err
 			}
-			_, err = fmt.Fprint(c.OutOrStdout(), result.Output)
+			_, err = fmt.Fprintln(c.OutOrStdout(), result.Output)
 			return err
 		},
 	}

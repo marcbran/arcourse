@@ -17,12 +17,16 @@ var (
 	ErrActionInvalid      = errors.New("action is invalid")
 	ErrAlreadyExecuted    = errors.New("query already executed")
 	ErrEvaluationMismatch = errors.New("evaluation belongs to a different node")
+	ErrEvaluationIDNeeded = errors.New("evaluation id is required")
+	ErrEvaluationIDParam  = errors.New("evaluationId is reserved for reviewing a recorded evaluation")
 	ErrEmptyRemark        = errors.New("remark text is empty")
 	ErrEvaluation         = errors.New("evaluation failed")
 	ErrShapeNotSupported  = errors.New("compiling a root shape requires immediateGraph or compiledGraph mode (root.jsonnet must be a node-spec list, not a finished value)")
 )
 
 const EvaluationIDField = "_evaluationId"
+
+const EvaluationIDParam = "evaluationId"
 
 type Format string
 

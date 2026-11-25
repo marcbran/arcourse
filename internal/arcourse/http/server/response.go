@@ -39,7 +39,8 @@ func returnSuccess(w http.ResponseWriter, data any) {
 func returnError(w http.ResponseWriter, err error) {
 	if errors.Is(err, pkg.ErrGraphEntryNotFound) || errors.Is(err, pkg.ErrEvaluateDirNotSet) ||
 		errors.Is(err, pkg.ErrActionNotFound) || errors.Is(err, pkg.ErrActionInvalid) ||
-		errors.Is(err, pkg.ErrEmptyRemark) {
+		errors.Is(err, pkg.ErrEmptyRemark) || errors.Is(err, pkg.ErrEvaluationIDNeeded) ||
+		errors.Is(err, pkg.ErrEvaluationIDParam) {
 		returnBadRequest(w, err)
 		return
 	}
