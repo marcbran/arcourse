@@ -66,7 +66,7 @@ func queryParts(path pkg.QueryPath, params map[string]any, formats []pkg.Format)
 	}
 	merged := mergeParams(queryParams, params)
 	if _, ok := merged[pkg.EvaluationIDParam]; ok {
-		return "", nil, "", "", fmt.Errorf("%w: review it with arco review <path> <id>", pkg.ErrEvaluationIDParam)
+		return "", nil, "", "", pkg.ErrEvaluationIDParam
 	}
 	queryPath = pkg.NewQueryPath(queryPath.String())
 	parts := strings.Split(queryPath.String(), "/")

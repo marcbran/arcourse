@@ -37,7 +37,7 @@ func (uc *review) Exec(ctx context.Context, path pkg.QueryPath, id pkg.Evaluatio
 		id = fromPath
 	}
 	if id == "" {
-		return pkg.Result{}, fmt.Errorf("%w: pass it as an argument or as ?%s= in the path", pkg.ErrEvaluationIDNeeded, pkg.EvaluationIDParam)
+		return pkg.Result{}, fmt.Errorf("%w: give it directly or as ?%s= in the path", pkg.ErrEvaluationIDNeeded, pkg.EvaluationIDParam)
 	}
 
 	event, err := uc.course.Evaluation(ctx, course.EvaluationID(id))
