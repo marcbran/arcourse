@@ -11,13 +11,13 @@ import (
 func newPlugin() *jpoet.Plugin {
 	return jpoet.NewPlugin("arcourse", []jsonnet.NativeFunction{
 		{
-			Name: "uuid",
+			Name: "evaluationId",
 			Func: func(args []any) (any, error) {
 				return uuid.Must(uuid.NewV7()).String(), nil
 			},
 		},
 		{
-			Name: "now",
+			Name: "evaluatedAt",
 			Func: func(args []any) (any, error) {
 				return time.Now().Format(time.RFC3339), nil
 			},
