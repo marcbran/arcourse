@@ -19,7 +19,8 @@ func TestReviewShowsTheRecordedJSONWithoutEvaluatingAgain(t *testing.T) {
 		the_recorded_evaluation_is_reviewed_at("root", pkg.FormatJSON)
 
 	then.
-		the_output_is_the_recorded_query_output()
+		the_output_is_the_recorded_query_output().and().
+		the_output_is_pretty_printed()
 }
 
 func TestReviewShowsTheRecordedHTML(t *testing.T) {
@@ -61,4 +62,31 @@ func TestReviewOfAnEvaluationThatWasNeverRecordedIsRejected(t *testing.T) {
 
 	then.
 		the_error_contains("query not recorded")
+}
+
+func TestReviewTakesTheEvaluationIdFromThePath(t *testing.T) {
+	given, when, then := scenario(t)
+
+	given.
+		a_graph_root(`{ _node: "resource", title: "hello" }`).and().
+		the_path_was_queried("root")
+
+	when.
+		the_recorded_evaluation_is_reviewed_at_its_url("root", pkg.FormatJSON)
+
+	then.
+		the_output_is_the_recorded_query_output()
+}
+
+func TestReviewWithoutAnEvaluationIdIsRejected(t *testing.T) {
+	given, when, then := scenario(t)
+
+	given.
+		a_graph_root(`{ _node: "resource", title: "hello" }`)
+
+	when.
+		an_evaluation_is_reviewed_at("root", "", pkg.FormatJSON)
+
+	then.
+		the_error_contains("evaluation id is required")
 }

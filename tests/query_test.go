@@ -519,3 +519,16 @@ func TestQueryFailurePageShowsTheFailureCode(t *testing.T) {
 		})
 	}
 }
+
+func TestQueryWithAnEvaluationIdIsRejected(t *testing.T) {
+	given, when, then := scenario(t)
+
+	given.
+		a_graph_root(`{ _node: "resource", title: "hello" }`)
+
+	when.
+		a_path_is_queried("root?evaluationId=01a00000-0000-7000-8000-000000000000")
+
+	then.
+		the_error_contains("evaluationId is reserved for reviewing a recorded evaluation")
+}

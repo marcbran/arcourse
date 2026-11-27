@@ -255,6 +255,7 @@ local actionView = baseView {
   _view+:: {
     fragment: c.action {
       evaluationId:: std.get($, '_evaluationId', ''),
+      evaluatedAt:: std.get($, '_evaluatedAt', ''),
       summary:: std.get($, '_summary', ''),
       paramSpecs:: std.get($, '_paramSpecs', []),
       params:: std.get($, '_params', {}),

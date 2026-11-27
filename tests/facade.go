@@ -401,7 +401,12 @@ func (f *CLIFacade) Watch(ctx context.Context, path pkg.QueryPath, params map[st
 }
 
 func (f *CLIFacade) Review(ctx context.Context, path pkg.QueryPath, id pkg.EvaluationID, format pkg.Format) (pkg.Result, error) {
-	cmd := exec.CommandContext(ctx, f.binaryPath, "review", path.String(), string(id), "--format", string(format))
+	args := []string{"review", path.String()}
+	if id != "" {
+		args = append(args, string(id))
+	}
+	args = append(args, "--format", string(format))
+	cmd := exec.CommandContext(ctx, f.binaryPath, args...)
 	cmd.Env = append(os.Environ(), "ARCOURSE_HOME="+f.homeDir)
 
 	var stdout bytes.Buffer

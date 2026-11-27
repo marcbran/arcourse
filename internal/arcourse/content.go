@@ -92,6 +92,15 @@ func decodeJSONValue(raw string) (any, error) {
 	return value, nil
 }
 
+func indentJSON(raw string) (string, error) {
+	var buf bytes.Buffer
+	err := json.Indent(&buf, []byte(raw), "", "   ")
+	if err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
 func marshalCanonical(value any) (string, error) {
 	var buf bytes.Buffer
 	encoder := json.NewEncoder(&buf)

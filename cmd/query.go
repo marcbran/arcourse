@@ -59,7 +59,7 @@ func newQueryCmd(plugins []*jpoet.Plugin) *cobra.Command {
 			if outputPath != "" {
 				err = writeQueryOutput(outputPath, result.Output)
 			} else {
-				_, err = fmt.Fprint(os.Stdout, result.Output)
+				_, err = fmt.Fprintln(os.Stdout, result.Output)
 			}
 			if err != nil {
 				return err

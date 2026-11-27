@@ -13,7 +13,10 @@ import (
 
 func (c *Client) Review(ctx context.Context, path pkg.QueryPath, id pkg.EvaluationID, format pkg.Format) (pkg.Result, error) {
 	query := url.Values{"path": {path.String()}, "format": {string(format)}}
-	reqURL := c.baseURL + "/api/review/" + url.PathEscape(string(id)) + "?" + query.Encode()
+	if id != "" {
+		query.Set("id", string(id))
+	}
+	reqURL := c.baseURL + "/api/review?" + query.Encode()
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
 		return pkg.Result{}, err

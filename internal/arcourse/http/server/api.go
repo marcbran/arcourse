@@ -98,11 +98,7 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleReview(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
-	if id == "" {
-		returnBadRequest(w, errors.New("id is required"))
-		return
-	}
+	id := r.URL.Query().Get("id")
 	path := r.URL.Query().Get("path")
 	if path == "" {
 		returnBadRequest(w, errors.New("path is required"))
