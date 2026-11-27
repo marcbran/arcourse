@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.28.0](https://github.com/marcbran/arcourse/compare/v0.27.0...v0.28.0) (2026-11-27)
+
+
+### Features
+
+* let tables collapse their params card by default ([#184](https://github.com/marcbran/arcourse/issues/184)) ([b2c3ff2](https://github.com/marcbran/arcourse/commit/b2c3ff27fda158ac267e0254645090bbad4faa21))
+* show action pages as recorded evaluations ([#186](https://github.com/marcbran/arcourse/issues/186)) ([461ca26](https://github.com/marcbran/arcourse/commit/461ca267054489f0612f6ec8b0eb700f27389102))
+* show planned time and review evaluations from browse urls ([#187](https://github.com/marcbran/arcourse/issues/187)) ([18ff15d](https://github.com/marcbran/arcourse/commit/18ff15dc6ceffff2959bd223d44aeee449d1c4bd))
+
 ## [0.27.0](https://github.com/marcbran/arcourse/compare/v0.26.1...v0.27.0) (2026-11-17)
 
 
